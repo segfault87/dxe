@@ -1,0 +1,2 @@
+[workspace]
+members = ["identity", "identity-impl", "main", "notification", "notification-impl", "types"]

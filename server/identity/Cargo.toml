@@ -1,0 +1,7 @@
+[package]
+name = "dxe-identity"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dxe-types = { path = "../types" }

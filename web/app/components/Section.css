@@ -1,0 +1,41 @@
+.section {
+    display: flex;
+    width: 100%;
+    gap: 20px;
+    border-top: 1px #ba9787 solid;
+    padding-top: 30px;
+    padding-bottom: 60px;
+
+    font-size: 20px;
+    line-height: 200%;
+
+    ul {
+        padding-left: 20px;
+        margin-top: 0px;
+        list-style-type: disc;
+    }
+
+    > .title {
+        flex: 1;
+        font-weight: bold;
+
+        a:hover::after {
+            content: "¶";
+            color: #bbb;
+        }
+    }
+
+    > .body {
+        flex: 2;
+
+        :not(.cta) a {
+            text-decoration: underline;
+        }
+    }
+}
+
+@media only screen and (max-width: 767px) {
+    .section {
+        flex-direction: column;
+    }
+}

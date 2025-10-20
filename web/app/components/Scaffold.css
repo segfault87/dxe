@@ -1,0 +1,49 @@
+main {
+    max-width: 1280px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 30px;
+    padding-right: 30px;
+}
+
+nav {
+    margin-top: 50px;
+    height: 227px;
+    display: flex;
+    flex-direction: row;
+}
+
+.navigation {
+    margin-left: auto;
+
+    a {
+        padding: 2px 8px 2px 8px;
+        margin-left: 12px;
+        font-size: 20px;
+        font-weight: bold;
+    }
+
+    .active {
+        text-decoration: underline;
+        text-decoration-thickness: 2px;
+        text-underline-offset: 8px;
+    }
+}
+
+@media only screen and (max-width: 767px) {
+    nav {
+        margin-top: 20px;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .logotype {
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .navigation {
+        margin-right: auto;
+        margin-top: 20px;
+    }
+}

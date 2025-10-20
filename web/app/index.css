@@ -1,0 +1,50 @@
+:root {
+    font-family:
+        Gowun Batang,
+        system-ui,
+        Avenir,
+        Helvetica,
+        Arial,
+        sans-serif;
+    line-height: 1.5;
+    font-weight: 400;
+
+    color-scheme: light dark;
+    color: #030303;
+    background-color: #fff6e6;
+
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    margin: 0;
+}
+
+a {
+    all: unset;
+    cursor: pointer;
+}
+
+em {
+    font-weight: bold;
+}
+
+.cta {
+    display: inline-block;
+    background-color: #000;
+    color: #ebc1ae;
+    font-size: 20px;
+    margin-right: 10px;
+    margin-bottom: 10px;
+    padding: 20px 30px 20px 30px;
+    text-decoration: none;
+}
+
+@media only screen and (max-width: 767px) {
+    .cta {
+        padding: 10px 20px 10px 20px;
+    }
+}

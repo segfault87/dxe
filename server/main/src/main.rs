@@ -61,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let key_pair = config.jwt.key_pair()?;
 
-    let _ = actix_web::HttpServer::new(move || {
+    actix_web::HttpServer::new(move || {
         let authority = Authority::<UserSession, Ed25519, _, _>::new()
             .refresh_authorizer(|| async move { Ok(()) })
             .token_signer(Some(
@@ -72,7 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .build()
                     .unwrap(),
             ))
-            .verifying_key(key_pair.pk.clone())
+            .verifying_key(key_pair.pk)
             .build()
             .unwrap();
 
@@ -94,7 +94,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
 
     notification_task.abort();
-    biztalk_task.map(|v| v.abort());
+    if let Some(v) = biztalk_task {
+        v.abort()
+    }
 
     Ok(())
 }

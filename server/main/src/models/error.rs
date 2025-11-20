@@ -140,7 +140,7 @@ impl ResponseError for Error {
             Self::Kakao(_) => "KakaoApiError",
             Self::Sqlx(_) => "DatabaseError",
         };
-        let message = format!("{}", self);
+        let message = format!("{self}");
 
         let payload = serde_json::json!({
             "type": r#type,

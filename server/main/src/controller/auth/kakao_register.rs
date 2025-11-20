@@ -45,12 +45,12 @@ pub async fn post(
     let mut tx = database.begin().await?;
 
     let user_id = create_user(
-        &mut *tx,
+        &mut tx,
         now,
         IdentityProvider::Kakao,
         me.id.to_string().as_str(),
         body.name.as_str(),
-        body.license_plate_number.as_ref().map(String::as_str),
+        body.license_plate_number.as_deref(),
     )
     .await?;
 

@@ -23,11 +23,11 @@ pub async fn get(
 
     let mut connection = database.acquire().await?;
 
-    let mut group = get_group_with_members(&mut *connection, &now, group_id.as_ref())
+    let mut group = get_group_with_members(&mut connection, &now, group_id.as_ref())
         .await?
         .ok_or(Error::GroupNotFound)?;
 
-    if group.1.iter().find(|v| v.id != session.user_id).is_none() {
+    if !group.1.iter().any(|v| v.id != session.user_id) {
         // Hide everyone else owner if you are not the member
         group.1.retain(|v| v.id == group.0.owner_id);
     }
@@ -48,7 +48,7 @@ pub async fn put(
 
     let mut tx = database.begin().await?;
 
-    let group = get_group(&mut *tx, &now, group_id.as_ref())
+    let group = get_group(&mut tx, &now, group_id.as_ref())
         .await?
         .ok_or(Error::GroupNotFound)?;
 
@@ -57,19 +57,19 @@ pub async fn put(
     }
 
     if let Some(new_name) = &body.new_name {
-        update_group_name(&mut *tx, group_id.as_ref(), new_name).await?;
+        update_group_name(&mut tx, group_id.as_ref(), new_name).await?;
     }
     if let Some(new_owner) = &body.new_owner {
-        if !is_member_of(&mut *tx, group_id.as_ref(), new_owner).await? {
+        if !is_member_of(&mut tx, group_id.as_ref(), new_owner).await? {
             return Err(Error::CannotTransferGroupOwnership);
         }
-        update_group_owner(&mut *tx, group_id.as_ref(), new_owner).await?;
+        update_group_owner(&mut tx, group_id.as_ref(), new_owner).await?;
     }
     if let Some(is_open) = body.is_open {
-        update_group_open(&mut *tx, group_id.as_ref(), is_open).await?;
+        update_group_open(&mut tx, group_id.as_ref(), is_open).await?;
     }
 
-    let group = get_group(&mut *tx, &now, group_id.as_ref())
+    let group = get_group(&mut tx, &now, group_id.as_ref())
         .await?
         .ok_or(Error::GroupNotFound)?;
 
@@ -89,7 +89,7 @@ pub async fn delete(
 
     let mut tx = database.begin().await?;
 
-    let (group, members) = get_group_with_members(&mut *tx, &now, group_id.as_ref())
+    let (group, members) = get_group_with_members(&mut tx, &now, group_id.as_ref())
         .await?
         .ok_or(Error::GroupNotFound)?;
 
@@ -97,7 +97,7 @@ pub async fn delete(
         return Err(Error::CannotDeleteGroup);
     }
 
-    if !delete_group(&mut *tx, &now, group_id.as_ref()).await? {
+    if !delete_group(&mut tx, &now, group_id.as_ref()).await? {
         return Err(Error::CannotDeleteGroup);
     }
 
@@ -115,14 +115,14 @@ pub async fn membership_put(
 
     let mut tx = database.begin().await?;
 
-    let group = get_group(&mut *tx, &now, group_id.as_ref())
+    let group = get_group(&mut tx, &now, group_id.as_ref())
         .await?
         .ok_or(Error::GroupNotFound)?;
     if !group.is_open {
         return Err(Error::GroupIsNotOpen);
     }
 
-    join_group(&mut *tx, &now, group_id.as_ref(), &session.user_id).await?;
+    join_group(&mut tx, &now, group_id.as_ref(), &session.user_id).await?;
     tx.commit().await?;
 
     Ok(web::Json(serde_json::json!({})))
@@ -136,13 +136,13 @@ pub async fn membership_delete(
     let now = Utc::now();
 
     let mut tx = database.begin().await?;
-    let group = get_group(&mut *tx, &now, &group_id)
+    let group = get_group(&mut tx, &now, &group_id)
         .await?
         .ok_or(Error::GroupNotFound)?;
     if group.owner_id == session.user_id {
         return Err(Error::CannotLeaveGroup);
     }
-    let result = leave_group(&mut *tx, &group_id, &session.user_id).await?;
+    let result = leave_group(&mut tx, &group_id, &session.user_id).await?;
     if !result {
         return Err(Error::CannotLeaveGroup);
     }

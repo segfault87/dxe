@@ -47,7 +47,7 @@ pub async fn redirect(
 
         let token = kakao_client::get_oauth_token(
             kakao_auth.get_ref(),
-            &code,
+            code,
             &format!("{}/api/auth/kakao/redirect", url_config.base_url),
         )
         .await?;
@@ -77,7 +77,7 @@ pub async fn redirect(
         if let Some(user) = user {
             let session = UserSession {
                 user_id: user.id,
-                is_administrator: is_administrator(&mut *tx, &user.id).await?,
+                is_administrator: is_administrator(&mut tx, &user.id).await?,
             };
 
             let mut access_cookie = token_signer
@@ -135,7 +135,7 @@ pub enum Error {
     #[error("Kakao API error: {0}")]
     Kakao(#[from] kakao_client::Error),
     #[error("Data error: {0}")]
-    DataError(#[from] dxe_data::Error),
+    Data(#[from] dxe_data::Error),
     #[error("Error generating/validating token: {0}")]
     Jwt(actix_jwt_auth_middleware::AuthError),
     #[error("Error encrypting/decrypting cookie data: {0}")]
@@ -144,7 +144,7 @@ pub enum Error {
 
 impl ResponseError for Error {
     fn error_response(&self) -> HttpResponse<BoxBody> {
-        let message = format!("{}", self);
+        let message = format!("{self}");
         let url = format!("/error?message={}", urlencoding::encode(message.as_str()));
 
         HttpResponse::TemporaryRedirect()

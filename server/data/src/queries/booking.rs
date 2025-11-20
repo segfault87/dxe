@@ -350,7 +350,7 @@ pub async fn get_bookings_by_unit_id(
     time_from: &DateTime<Utc>,
     time_to: &DateTime<Utc>,
 ) -> Result<Vec<Booking>, Error> {
-    Ok(sqlx::query!(
+    sqlx::query!(
         r#"
         SELECT
             b.id AS "b_id: BookingId",
@@ -444,7 +444,7 @@ pub async fn get_bookings_by_unit_id(
             canceled_at: v.b_canceled_at,
         })
     })
-    .collect::<Result<Vec<_>, Error>>()?)
+    .collect::<Result<Vec<_>, Error>>()
 }
 
 pub async fn get_bookings_by_user_id(
@@ -454,7 +454,7 @@ pub async fn get_bookings_by_user_id(
     time_from: &DateTime<Utc>,
     include_canceled: bool,
 ) -> Result<Vec<Booking>, Error> {
-    Ok(sqlx::query!(
+    sqlx::query!(
         r#"
         SELECT
             b.id AS "b_id: BookingId",
@@ -560,7 +560,7 @@ pub async fn get_bookings_by_user_id(
             canceled_at: v.b_canceled_at,
         })
     })
-    .collect::<Result<Vec<_>, Error>>()?)
+    .collect::<Result<Vec<_>, Error>>()
 }
 
 pub async fn get_bookings_pending(
@@ -568,7 +568,7 @@ pub async fn get_bookings_pending(
     now: &DateTime<Utc>,
     include_canceled: bool,
 ) -> Result<Vec<(Booking, Option<CashPaymentStatus>)>, Error> {
-    Ok(sqlx::query!(
+    sqlx::query!(
         r#"
         SELECT
             b.id AS "b_id: BookingId",
@@ -697,7 +697,7 @@ pub async fn get_bookings_pending(
             cash_payment_status,
         ))
     })
-    .collect::<Result<Vec<_>, Error>>()?)
+    .collect::<Result<Vec<_>, Error>>()
 }
 
 pub async fn create_booking(
@@ -709,11 +709,11 @@ pub async fn create_booking(
     time_from: &DateTime<Utc>,
     time_to: &DateTime<Utc>,
 ) -> Result<BookingId, Error> {
-    if is_unit_enabled(connection, &unit_id).await? != Some(true) {
+    if is_unit_enabled(connection, unit_id).await? != Some(true) {
         return Err(Error::UnitNotFound);
     }
 
-    if !is_booking_available(connection, &now, &unit_id, &time_from, &time_to).await? {
+    if !is_booking_available(connection, now, unit_id, time_from, time_to).await? {
         return Err(Error::TimeRangeOccupied);
     }
 
@@ -918,11 +918,11 @@ pub async fn create_reservation(
     remark: &Option<String>,
     temporary: bool,
 ) -> Result<ReservationId, Error> {
-    if is_unit_enabled(connection, &unit_id).await? != Some(true) {
+    if is_unit_enabled(connection, unit_id).await? != Some(true) {
         return Err(Error::UnitNotFound);
     }
 
-    if !is_booking_available(connection, &now, &unit_id, &time_from, &time_to).await? {
+    if !is_booking_available(connection, now, unit_id, time_from, time_to).await? {
         return Err(Error::TimeRangeOccupied);
     }
 
@@ -1015,7 +1015,7 @@ pub async fn get_reservations_by_unit_id(
     unit_id: &UnitId,
     date_from: Option<DateTime<Utc>>,
 ) -> Result<Vec<Reservation>, Error> {
-    let date_from = date_from.unwrap_or(DateTime::default());
+    let date_from = date_from.unwrap_or_default();
 
     let result = sqlx::query!(
         r#"

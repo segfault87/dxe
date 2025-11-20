@@ -102,8 +102,8 @@ impl IntoView for Booking {
 
 impl Booking {
     pub fn finish(mut self, booking_config: &BookingConfig, now: &DateTime<Utc>) -> Self {
-        let start = self.booking_start.clone();
-        let end = self.booking_end.clone();
+        let start = self.booking_start;
+        let end = self.booking_end;
 
         let start_with_buffer = start - booking_config.buffer_time.0;
         let end_with_buffer = end + booking_config.buffer_time.1;

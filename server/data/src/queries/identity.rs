@@ -238,7 +238,7 @@ pub async fn get_groups_associated_with_members(
 
     let mut result = HashMap::new();
     for row in rows {
-        let (_, users) = result.entry(row.g_id.clone()).or_insert_with(|| {
+        let (_, users) = result.entry(row.g_id).or_insert_with(|| {
             (
                 Group {
                     id: row.g_id,
@@ -263,7 +263,7 @@ pub async fn get_groups_associated_with_members(
         });
     }
 
-    Ok(result.into_iter().map(|(_, v)| v).collect())
+    Ok(result.into_values().collect())
 }
 
 pub async fn create_group(

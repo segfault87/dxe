@@ -24,7 +24,7 @@ pub async fn post(
 
     let mut connection = database.acquire().await?;
 
-    let booking = get_booking_with_user_id(&mut *connection, booking_id.as_ref(), &session.user_id)
+    let booking = get_booking_with_user_id(&mut connection, booking_id.as_ref(), &session.user_id)
         .await?
         .ok_or(Error::BookingNotFound)?;
 
@@ -32,7 +32,7 @@ pub async fn post(
         return Err(Error::BookingNotActive);
     }
 
-    let user = get_user_by_id(&mut *connection, &session.user_id, &now)
+    let user = get_user_by_id(&mut connection, &session.user_id, &now)
         .await?
         .ok_or(Error::UserNotFound)?;
 

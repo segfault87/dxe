@@ -53,7 +53,7 @@ impl MessagingBackend for BiztalkClient {
             .replace("#{customer}", customer_name)
             .replace("#{reservation_dt}", reservation_time);
 
-        let url_mobile = format!("https://dream-house.kr/reservation/{}", booking_id);
+        let url_mobile = format!("https://dream-house.kr/reservation/{booking_id}");
 
         let mut error = None;
 

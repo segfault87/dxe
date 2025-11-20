@@ -28,7 +28,7 @@ pub async fn post(
 
     let mut tx = database.begin().await?;
 
-    if is_unit_enabled(&mut *tx, &body.unit_id).await? != Some(true) {
+    if is_unit_enabled(&mut tx, &body.unit_id).await? != Some(true) {
         return Err(Error::UnitNotFound);
     }
 
@@ -39,11 +39,11 @@ pub async fn post(
     let time_from = truncate_time(body.time_from).to_utc();
     let time_to = time_from + TimeDelta::hours(body.desired_hours);
 
-    if !is_booking_available(&mut *tx, &now, &body.unit_id, &time_from, &time_to).await? {
+    if !is_booking_available(&mut tx, &now, &body.unit_id, &time_from, &time_to).await? {
         return Err(Error::TimeRangeOccupied);
     }
 
-    let identity = get_identity(&mut *tx, &now, &body.identity_id)
+    let identity = get_identity(&mut tx, &now, &body.identity_id)
         .await?
         .ok_or(Error::UserNotFound)?;
 
@@ -54,14 +54,14 @@ pub async fn post(
             }
         }
         Identity::Group(g) => {
-            if !is_member_of(&mut *tx, &g.id, &session.user_id).await? {
+            if !is_member_of(&mut tx, &g.id, &session.user_id).await? {
                 return Err(Error::GroupNotFound);
             }
         }
     }
 
     let booking_id = create_booking(
-        &mut *tx,
+        &mut tx,
         &now,
         &body.unit_id,
         &session.user_id,
@@ -71,10 +71,10 @@ pub async fn post(
     )
     .await?;
 
-    let price = booking_config.calculate_price(time_from.clone(), time_to.clone());
+    let price = booking_config.calculate_price(time_from, time_to);
 
     create_cash_payment_status(
-        &mut *tx,
+        &mut tx,
         &now,
         &booking_id,
         body.depositor_name.as_str(),
@@ -82,11 +82,11 @@ pub async fn post(
     )
     .await?;
 
-    let booking = get_booking_with_user_id(&mut *tx, &booking_id, &session.user_id)
+    let booking = get_booking_with_user_id(&mut tx, &booking_id, &session.user_id)
         .await?
         .ok_or(Error::BookingNotFound)?;
 
-    let cash_payment_status = get_cash_payment_status(&mut *tx, &booking_id)
+    let cash_payment_status = get_cash_payment_status(&mut tx, &booking_id)
         .await?
         .ok_or(Error::BookingNotFound)?;
 
@@ -97,7 +97,7 @@ pub async fn post(
         format!(
             "New booking by {}: {} ({} hours)",
             identity.name(),
-            timezone_config.convert(time_from).to_string(),
+            timezone_config.convert(time_from),
             body.desired_hours
         ),
     );

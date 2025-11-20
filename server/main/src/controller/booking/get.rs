@@ -21,11 +21,11 @@ pub async fn get(
 
     let mut tx = database.begin().await?;
 
-    let booking = get_booking_with_user_id(&mut *tx, booking_id.as_ref(), &session.user_id)
+    let booking = get_booking_with_user_id(&mut tx, booking_id.as_ref(), &session.user_id)
         .await?
         .ok_or(Error::BookingNotFound)?;
 
-    let cash_payment_status = get_cash_payment_status(&mut *tx, booking_id.as_ref()).await?;
+    let cash_payment_status = get_cash_payment_status(&mut tx, booking_id.as_ref()).await?;
 
     Ok(web::Json(GetBookingResponse {
         booking: Booking::convert(booking, &timezone_config, &now)

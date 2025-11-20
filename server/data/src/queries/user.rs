@@ -135,9 +135,9 @@ pub async fn update_user(
 
     connection.execute(query.build()).await?;
 
-    Ok(get_user_by_id(&mut *connection, user_id, now)
+    get_user_by_id(&mut *connection, user_id, now)
         .await?
-        .ok_or(Error::UserNotFound)?)
+        .ok_or(Error::UserNotFound)
 }
 
 pub async fn is_administrator(

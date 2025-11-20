@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use actix_web::web;
 use chrono::Utc;
 use dxe_data::queries::booking::{
@@ -29,20 +31,20 @@ pub async fn delete(
 
     let mut tx = database.begin().await?;
 
-    let booking = get_booking_with_user_id(&mut *tx, booking_id.as_ref(), &session.user_id)
+    let booking = get_booking_with_user_id(&mut tx, booking_id.as_ref(), &session.user_id)
         .await?
         .ok_or(Error::BookingNotFound)?;
 
-    cancel_booking(&mut *tx, &now, booking_id.as_ref()).await?;
+    cancel_booking(&mut tx, &now, booking_id.as_ref()).await?;
 
-    let mut cash_payment_status = get_cash_payment_status(&mut *tx, booking_id.as_ref()).await?;
+    let mut cash_payment_status = get_cash_payment_status(&mut tx, booking_id.as_ref()).await?;
     if let Some(cash_payment_status) = &mut cash_payment_status {
         let refund_price = booking_config
             .calculate_refund_price(
                 timezone_config.as_ref(),
                 cash_payment_status.price,
-                booking.time_from.clone(),
-                now.clone(),
+                booking.time_from,
+                now,
             )
             .map_err(|_| Error::NotRefundable)?;
 
@@ -51,7 +53,7 @@ pub async fn delete(
         }
 
         if update_refund_information(
-            &mut *tx,
+            &mut tx,
             booking_id.as_ref(),
             refund_price,
             query.refund_account.clone(),
@@ -66,7 +68,7 @@ pub async fn delete(
 
         send_cancellation(
             biztalk_sender.as_ref(),
-            &mut *tx,
+            &mut tx,
             &timezone_config,
             &booking,
             refund_rate,
@@ -81,7 +83,7 @@ pub async fn delete(
         format!(
             "Booking cancellation request by {}: {}",
             booking.customer.name(),
-            timezone_config.convert(booking.time_from).to_string(),
+            timezone_config.convert(booking.time_from),
         ),
     );
 

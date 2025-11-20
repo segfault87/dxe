@@ -23,16 +23,47 @@ type Pages = {
   "/reservation": {
     params: {};
   };
+  "/reservation/:bookingId": {
+    params: {
+      "bookingId": string;
+    };
+  };
+  "/login": {
+    params: {};
+  };
+  "/register": {
+    params: {};
+  };
+  "/my": {
+    params: {};
+  };
+  "/terms-of-service": {
+    params: {};
+  };
+  "/join/:groupId": {
+    params: {
+      "groupId": string;
+    };
+  };
+  "/admin": {
+    params: {};
+  };
+  "/admin/pending-bookings": {
+    params: {};
+  };
+  "/admin/reservations": {
+    params: {};
+  };
 };
 
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/guide" | "/inquiries" | "/reservation";
+    page: "/" | "/guide" | "/inquiries" | "/reservation" | "/reservation/:bookingId" | "/login" | "/register" | "/my" | "/terms-of-service" | "/join/:groupId" | "/admin" | "/admin/pending-bookings" | "/admin/reservations";
   };
   "./components/Scaffold.tsx": {
     id: "components/Scaffold";
-    page: "/" | "/guide" | "/inquiries" | "/reservation";
+    page: "/" | "/guide" | "/inquiries" | "/reservation" | "/reservation/:bookingId" | "/login" | "/register" | "/my" | "/terms-of-service";
   };
   "./pages/Index.tsx": {
     id: "pages/Index";
@@ -46,9 +77,49 @@ type RouteFiles = {
     id: "pages/Inquiries";
     page: "/inquiries";
   };
-  "./pages/Reservation.tsx": {
-    id: "pages/Reservation";
+  "./pages/Reservation/Create.tsx": {
+    id: "pages/Reservation/Create";
     page: "/reservation";
+  };
+  "./pages/Reservation/Show.tsx": {
+    id: "pages/Reservation/Show";
+    page: "/reservation/:bookingId";
+  };
+  "./pages/Login.tsx": {
+    id: "pages/Login";
+    page: "/login";
+  };
+  "./pages/Register.tsx": {
+    id: "pages/Register";
+    page: "/register";
+  };
+  "./pages/MyPage.tsx": {
+    id: "pages/MyPage";
+    page: "/my";
+  };
+  "./pages/legal/TermsOfService.tsx": {
+    id: "pages/legal/TermsOfService";
+    page: "/terms-of-service";
+  };
+  "./pages/JoinGroup.tsx": {
+    id: "pages/JoinGroup";
+    page: "/join/:groupId";
+  };
+  "./components/AdminScaffold.tsx": {
+    id: "components/AdminScaffold";
+    page: "/admin" | "/admin/pending-bookings" | "/admin/reservations";
+  };
+  "./pages/Admin/Index.tsx": {
+    id: "pages/Admin/Index";
+    page: "/admin";
+  };
+  "./pages/Admin/PendingBookings.tsx": {
+    id: "pages/Admin/PendingBookings";
+    page: "/admin/pending-bookings";
+  };
+  "./pages/Admin/Reservations.tsx": {
+    id: "pages/Admin/Reservations";
+    page: "/admin/reservations";
   };
 };
 
@@ -58,5 +129,15 @@ type RouteModules = {
   "pages/Index": typeof import("./app/./pages/Index.tsx");
   "pages/Guide": typeof import("./app/./pages/Guide.tsx");
   "pages/Inquiries": typeof import("./app/./pages/Inquiries.tsx");
-  "pages/Reservation": typeof import("./app/./pages/Reservation.tsx");
+  "pages/Reservation/Create": typeof import("./app/./pages/Reservation/Create.tsx");
+  "pages/Reservation/Show": typeof import("./app/./pages/Reservation/Show.tsx");
+  "pages/Login": typeof import("./app/./pages/Login.tsx");
+  "pages/Register": typeof import("./app/./pages/Register.tsx");
+  "pages/MyPage": typeof import("./app/./pages/MyPage.tsx");
+  "pages/legal/TermsOfService": typeof import("./app/./pages/legal/TermsOfService.tsx");
+  "pages/JoinGroup": typeof import("./app/./pages/JoinGroup.tsx");
+  "components/AdminScaffold": typeof import("./app/./components/AdminScaffold.tsx");
+  "pages/Admin/Index": typeof import("./app/./pages/Admin/Index.tsx");
+  "pages/Admin/PendingBookings": typeof import("./app/./pages/Admin/PendingBookings.tsx");
+  "pages/Admin/Reservations": typeof import("./app/./pages/Admin/Reservations.tsx");
 };

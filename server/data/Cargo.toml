@@ -1,0 +1,12 @@
+[package]
+name = "dxe-data"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { version = "0.8", features = [ "sqlite", "uuid", "chrono", "macros" ] }
+thiserror = { workspace = true }
+uuid = { workspace = true, features = [ "v4" ] }

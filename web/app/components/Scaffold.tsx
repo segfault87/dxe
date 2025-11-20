@@ -22,6 +22,12 @@ export default function Scaffold() {
           <NavLink to="/inquiries" end>
             문의
           </NavLink>
+          <NavLink to="/reservation" end>
+            예약하기
+          </NavLink>
+          <NavLink to="/my" end>
+            조회
+          </NavLink>
         </div>
       </nav>
       <div className="content">

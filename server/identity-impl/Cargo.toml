@@ -1,7 +1,0 @@
-[package]
-name = "dxe-identity-impl"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-dxe-identity = { path = "../identity" }

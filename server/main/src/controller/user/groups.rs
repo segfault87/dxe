@@ -21,7 +21,7 @@ pub async fn get(
     let mut connection = database.acquire().await?;
 
     let mut groups =
-        get_groups_associated_with_members(&mut *connection, &now, &session.user_id).await?;
+        get_groups_associated_with_members(&mut connection, &now, &session.user_id).await?;
     groups.sort_by(|a, b| a.0.name.cmp(&b.0.name));
 
     Ok(web::Json(ListGroupsResponse {
@@ -42,12 +42,12 @@ pub async fn post(
 
     let mut tx = database.begin().await?;
 
-    let group_id = create_group(&mut *tx, &now, &session.user_id, &body.name, true).await?;
-    let group = get_group_with_members(&mut *tx, &now, &group_id)
+    let group_id = create_group(&mut tx, &now, &session.user_id, &body.name, true).await?;
+    let group = get_group_with_members(&mut tx, &now, &group_id)
         .await?
         .ok_or(Error::UserNotFound)?;
 
-    let _ = tx.commit().await?;
+    tx.commit().await?;
 
     Ok(web::Json(CreateGroupResponse {
         group: GroupWithUsers::convert(group, &timezone_config, &now),

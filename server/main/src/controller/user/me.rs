@@ -23,7 +23,7 @@ pub async fn get(
 
     let mut connection = database.acquire().await?;
 
-    let user = get_user_by_id(&mut *connection, &session.user_id, &now)
+    let user = get_user_by_id(&mut connection, &session.user_id, &now)
         .await?
         .ok_or(Error::UserNotFound)?;
 
@@ -36,7 +36,7 @@ pub async fn get(
     };
 
     let mut bookings =
-        get_bookings_by_user_id(&mut *connection, &now, &session.user_id, &now, false).await?;
+        get_bookings_by_user_id(&mut connection, &now, &session.user_id, &now, false).await?;
     bookings.sort_by(|a, b| a.time_from.cmp(&b.time_from));
 
     let mut active_bookings = HashMap::new();
@@ -77,7 +77,7 @@ pub async fn post(
     let mut tr = database.begin().await?;
 
     let result = update_user(
-        &mut *tr,
+        &mut tr,
         &now,
         &session.user_id,
         &body.new_name,

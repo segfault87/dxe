@@ -23,7 +23,7 @@ pub async fn put(
 
     let mut tx = database.begin().await?;
 
-    let booking = get_booking_with_user_id(&mut *tx, booking_id.as_ref(), &session.user_id)
+    let booking = get_booking_with_user_id(&mut tx, booking_id.as_ref(), &session.user_id)
         .await?
         .ok_or(Error::BookingNotFound)?;
 
@@ -34,14 +34,14 @@ pub async fn put(
 
         let group_id = GroupId::from(*new_identity_id);
 
-        if !is_member_of(&mut *tx, &group_id, &session.user_id).await? {
+        if !is_member_of(&mut tx, &group_id, &session.user_id).await? {
             return Err(Error::UserNotMemberOf);
         }
 
-        update_booking_customer(&mut *tx, booking_id.as_ref(), new_identity_id).await?;
+        update_booking_customer(&mut tx, booking_id.as_ref(), new_identity_id).await?;
     }
 
-    let booking = get_booking_with_user_id(&mut *tx, booking_id.as_ref(), &session.user_id)
+    let booking = get_booking_with_user_id(&mut tx, booking_id.as_ref(), &session.user_id)
         .await?
         .ok_or(Error::BookingNotFound)?;
 

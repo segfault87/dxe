@@ -19,7 +19,7 @@ pub async fn get(
 
     let mut connection = database.acquire().await?;
 
-    let bookings = get_bookings_pending(&mut *connection, &now, false).await?;
+    let bookings = get_bookings_pending(&mut connection, &now, false).await?;
 
     Ok(web::Json(GetPendingBookingsResponse {
         bookings: bookings

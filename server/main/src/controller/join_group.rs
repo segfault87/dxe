@@ -32,7 +32,7 @@ async fn redirect(
 
     let mut connection = database.acquire().await?;
 
-    let group = get_group(&mut *connection, &now, group_id.as_ref())
+    let group = get_group(&mut connection, &now, group_id.as_ref())
         .await?
         .ok_or(Error::GroupNotFound)?;
 

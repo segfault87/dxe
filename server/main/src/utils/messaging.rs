@@ -43,7 +43,7 @@ pub async fn send_confirmation(
 
         biztalk_sender.send(MessagingEvent::BookingConfirmation {
             recipients: biztalk_recipients,
-            booking_id: booking.id.clone(),
+            booking_id: booking.id,
             customer_name: booking.customer.name().to_owned(),
             reservation_time: time_str,
         });
@@ -88,7 +88,7 @@ pub async fn send_cancellation(
 
         biztalk_sender.send(MessagingEvent::CancelNotification {
             recipients: biztalk_recipients,
-            booking_id: booking.id.clone(),
+            booking_id: booking.id,
             customer_name: booking.customer.name().to_owned(),
             reservation_time: time_str,
             refund_rate,
@@ -114,12 +114,13 @@ pub fn send_refund_confirmation(
         (end - start).num_hours()
     );
 
+    #[allow(clippy::single_match)]
     match booking.holder.provider {
         IdentityProvider::Kakao => {
             if let Some(biztalk_sender) = biztalk_sender {
                 biztalk_sender.send(MessagingEvent::RefundNotification {
                     recipient: booking.holder.foreign_id.clone(),
-                    booking_id: booking.id.clone(),
+                    booking_id: booking.id,
                     customer_name: booking.customer.name().to_owned(),
                     reservation_time: time_str,
                     refunded_price,

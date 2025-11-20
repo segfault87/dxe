@@ -1,6 +1,5 @@
 pub mod aes;
 pub mod datetime;
-pub mod identity;
 pub mod messaging;
 
 pub fn mask_identity(identity: String) -> String {

@@ -19,7 +19,7 @@ pub async fn post(
 
     let mut connection = database.acquire().await?;
 
-    if is_unit_enabled(&mut *connection, &body.unit_id).await? != Some(true) {
+    if is_unit_enabled(&mut connection, &body.unit_id).await? != Some(true) {
         return Err(Error::UnitNotFound);
     }
 
@@ -30,8 +30,8 @@ pub async fn post(
     let time_from = truncate_time(body.time_from).to_utc();
     let time_to = time_from + TimeDelta::hours(body.desired_hours);
 
-    if is_booking_available(&mut *connection, &now, &body.unit_id, &time_from, &time_to).await? {
-        let total_price = booking_config.calculate_price(time_from.clone(), time_to.clone());
+    if is_booking_available(&mut connection, &now, &body.unit_id, &time_from, &time_to).await? {
+        let total_price = booking_config.calculate_price(time_from, time_to);
 
         Ok(web::Json(CheckResponse { total_price }))
     } else {

@@ -67,6 +67,12 @@ impl ItsokeyClient {
     }
 }
 
+impl Default for ItsokeyClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("HTTP client error: {0}")]

@@ -108,13 +108,6 @@ pub struct Reservation {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
-pub enum Event {
-    Booking(Booking),
-    Reservation(Reservation),
-}
-
-#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OccupiedSlot {
     pub masked_name: String,

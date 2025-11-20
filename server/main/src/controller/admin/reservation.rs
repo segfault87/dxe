@@ -27,7 +27,7 @@ pub async fn get(
     let mut connection = database.acquire().await?;
 
     let reservations =
-        get_reservations_by_unit_id(&mut *connection, &query.unit_id, Some(now)).await?;
+        get_reservations_by_unit_id(&mut connection, &query.unit_id, Some(now)).await?;
 
     Ok(web::Json(GetReservationsResponse {
         reservations: reservations
@@ -50,12 +50,12 @@ pub async fn post(
     let time_from = truncate_time(body.time_from).to_utc();
     let time_to = time_from + TimeDelta::hours(body.desired_hours);
 
-    if !is_booking_available(&mut *tx, &now, &body.unit_id, &time_from, &time_to).await? {
+    if !is_booking_available(&mut tx, &now, &body.unit_id, &time_from, &time_to).await? {
         return Err(Error::TimeRangeOccupied);
     }
 
     let id = create_reservation(
-        &mut *tx,
+        &mut tx,
         &now,
         &body.unit_id,
         &session.user_id,
@@ -66,7 +66,7 @@ pub async fn post(
     )
     .await?;
 
-    let reservation = get_reservation(&mut *tx, id)
+    let reservation = get_reservation(&mut tx, id)
         .await?
         .ok_or(Error::BookingNotFound)?;
 
@@ -83,11 +83,11 @@ pub async fn delete(
 ) -> Result<web::Json<serde_json::Value>, Error> {
     let mut tx = database.begin().await?;
 
-    let reservation = get_reservation(&mut *tx, path.into_inner())
+    let reservation = get_reservation(&mut tx, path.into_inner())
         .await?
         .ok_or(Error::BookingNotFound)?;
 
-    delete_reservation(&mut *tx, reservation.id).await?;
+    delete_reservation(&mut tx, reservation.id).await?;
 
     tx.commit().await?;
 

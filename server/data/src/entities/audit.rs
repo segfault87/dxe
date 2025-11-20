@@ -3,6 +3,7 @@ use sqlx::FromRow;
 
 use crate::types::{BookingId, UserId};
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, FromRow)]
 pub struct Activity {
     pub id: i64,

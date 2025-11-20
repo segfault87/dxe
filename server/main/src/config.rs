@@ -111,8 +111,8 @@ impl BookingConfig {
             .find(|(hour, _)| hour == &0)
             .map(|(_, v)| *v)
         {
-            let local_booking_date = timezone_config.convert(booking_date.clone()).date_naive();
-            let local_today = timezone_config.convert(now.clone()).date_naive();
+            let local_booking_date = timezone_config.convert(booking_date).date_naive();
+            let local_today = timezone_config.convert(now).date_naive();
 
             if local_booking_date == local_today {
                 return Ok(booking_price * imminent_refund_rate / 100);
@@ -183,7 +183,7 @@ pub struct NtfyConfig {
 
 impl dxe_extern::ntfy::NtfyConfig for NtfyConfig {
     fn access_token(&self) -> Option<&str> {
-        self.token.as_ref().map(String::as_str)
+        self.token.as_deref()
     }
 
     fn channel(&self, channel: dxe_extern::ntfy::Channel) -> &str {

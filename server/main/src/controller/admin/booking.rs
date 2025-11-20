@@ -29,7 +29,7 @@ pub async fn put(
 
     let mut tx = database.begin().await?;
 
-    let booking = get_booking(&mut *tx, booking_id.as_ref())
+    let booking = get_booking(&mut tx, booking_id.as_ref())
         .await?
         .ok_or(Error::BookingNotFound)?;
 
@@ -39,29 +39,29 @@ pub async fn put(
 
     match body.action {
         ModifyAction::Confirm => {
-            if !is_in_effect(&booking.canceled_at, &now) {
-                if confirm_booking(&mut *tx, booking_id.as_ref(), &now).await? {
-                    confirm_cash_payment(&mut *tx, &now, booking_id.as_ref()).await?;
-                }
+            if !is_in_effect(&booking.canceled_at, &now)
+                && confirm_booking(&mut tx, booking_id.as_ref(), &now).await?
+            {
+                confirm_cash_payment(&mut tx, &now, booking_id.as_ref()).await?;
             }
         }
         ModifyAction::Refund => {
             if is_in_effect(&booking.canceled_at, &now) {
-                refund_payment(&mut *tx, &now, booking_id.as_ref()).await?;
+                refund_payment(&mut tx, &now, booking_id.as_ref()).await?;
             }
         }
         ModifyAction::Cancel => {
             if !is_in_effect(&booking.canceled_at, &now) {
-                cancel_booking(&mut *tx, &now, booking_id.as_ref()).await?;
+                cancel_booking(&mut tx, &now, booking_id.as_ref()).await?;
             }
         }
     }
 
-    let booking = get_booking(&mut *tx, booking_id.as_ref())
+    let booking = get_booking(&mut tx, booking_id.as_ref())
         .await?
         .ok_or(Error::BookingNotFound)?;
 
-    let cash_payment_status = get_cash_payment_status(&mut *tx, booking_id.as_ref()).await?;
+    let cash_payment_status = get_cash_payment_status(&mut tx, booking_id.as_ref()).await?;
 
     match body.action {
         ModifyAction::Confirm => {

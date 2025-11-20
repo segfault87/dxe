@@ -27,8 +27,7 @@ pub async fn get(
 
     let mut connection = database.acquire().await?;
 
-    let mut slots =
-        get_occupied_slots(&mut *connection, &now, &query.unit_id, &start, &end).await?;
+    let mut slots = get_occupied_slots(&mut connection, &now, &query.unit_id, &start, &end).await?;
     slots.sort_by(|a, b| a.time_from.cmp(&b.time_from));
 
     Ok(web::Json(CalendarResponse {

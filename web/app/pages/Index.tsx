@@ -5,17 +5,17 @@ import "slick-carousel/slick/slick-theme.css";
 
 import "./Index.css";
 import type { Route } from "./+types/Index";
-import Section from "../components/Section";
 import Image1 from "../assets/interior1.jpg";
 import Image2 from "../assets/interior2.jpg";
 import Image3 from "../assets/interior3.jpg";
 import OpenGraphThumbnail from "../assets/og.png";
+import Section from "../components/Section";
+import { useAuth } from "../context/AuthContext";
 
 // @ts-expect-error Workaround for SSR
 const SliderComponent = typeof window === "undefined" ? Slider.default : Slider;
 
-export function meta(args: Route.MetaArgs) {
-  console.log(args);
+export function meta({}: Route.MetaArgs) {
   return [
     { title: "드림하우스 합주실" },
     {
@@ -77,15 +77,47 @@ function Introduction() {
   );
 }
 
+export function Actions() {
+  const auth = useAuth();
+
+  let action = (
+    <Link to="/reservation" className="cta">
+      예약하기
+    </Link>
+  );
+
+  if (auth) {
+    if (auth.activeBookings.default) {
+      const activeBooking = auth.activeBookings.default;
+      action = (
+        <Link to={`/reservation/${activeBooking.id}`} className="cta">
+          현재 이용 중 예약 보기 ({activeBooking.customer.name})
+        </Link>
+      );
+    } else if (auth.pendingBookings.default) {
+      const today = new Date().toDateString();
+
+      for (const booking of auth.pendingBookings.default) {
+        if (new Date(booking.bookingStart).toDateString() === today) {
+          action = (
+            <Link to={`/reservation/${booking.id}`} className="cta">
+              오늘의 예약 ({booking.customer.name})
+            </Link>
+          );
+          break;
+        }
+      }
+    }
+  }
+
+  return <div className="actions">{action}</div>;
+}
+
 export default function Index() {
   return (
     <>
       <div className="top">
-        <div className="actions">
-          <Link className="cta" to="/reservation">
-            예약하기
-          </Link>
-        </div>
+        <Actions />
         <div className="cell availability-info">
           서울특별시 강남구 삼성로 517 채널리저브 B1층 101-2호
           <br />

@@ -1,0 +1,17 @@
+input[type="text"] {
+    margin-right: 16px;
+}
+
+section {
+    margin-bottom: 16px;
+}
+
+.group-management {
+    li {
+        margin-bottom: 16px;
+    }
+}
+
+.field-single-row {
+    width: 240px;
+}

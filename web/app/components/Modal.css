@@ -1,0 +1,23 @@
+.modal {
+    min-width: 240px;
+    display: flex;
+    flex-direction: column;
+
+    .actions {
+        margin-top: 16px;
+        display: flex;
+        flex-direction: row;
+        flex: 1;
+        gap: 16px;
+        justify-content: space-evenly;
+
+        button {
+            flex: 1;
+        }
+    }
+
+    input[type="text"] {
+        flex: 1;
+        margin: 0;
+    }
+}

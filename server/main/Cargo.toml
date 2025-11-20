@@ -4,12 +4,29 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-actix-web = "4.11"
+actix-jwt-auth-middleware = "0.5"
+actix-state-guards = "0.1.0"
+actix-web = { version = "4.11", features = ["cookies"] }
+aes-gcm = "0.10"
 async-trait = "0.1"
+base64 = "0.22"
+chrono = { workspace = true }
 clap = { version = "4.5", features = ["derive"] }
+ed25519-compact = "2"
 env_logger = "0.11"
+futures = "0.3"
+jwt-compact = { version = "0.8", features = ["ed25519-compact"] }
 log = "0.4"
-serde = { version = "1", features = ["derive"] }
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_with = "3.15"
+sqlx = { version = "0.8", features = [ "runtime-tokio", "sqlite" ] }
+thiserror = { workspace = true }
+tokio = { workspace = true }
 toml = "0.9"
 url = { version = "2.5", features = ["serde"] }
+urlencoding = "2"
+
+dxe-data = { path = "../data" }
+dxe-extern = { path = "../extern" }

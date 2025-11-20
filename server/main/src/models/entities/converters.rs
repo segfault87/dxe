@@ -1,0 +1,179 @@
+use chrono::{DateTime, Utc};
+use dxe_data::entities;
+
+use super::{
+    Booking, BookingCashPaymentStatus, BookingStatus, Group, GroupWithUsers, Identity,
+    OccupiedSlot, User,
+};
+use crate::config::{BookingConfig, TimeZoneConfig};
+use crate::models::entities::Reservation;
+use crate::utils::mask_identity;
+
+pub trait IntoView {
+    type Entity;
+
+    fn convert(entity: Self::Entity, timezone: &TimeZoneConfig, now: &DateTime<Utc>) -> Self;
+}
+
+impl IntoView for User {
+    type Entity = entities::User;
+
+    fn convert(entity: Self::Entity, timezone: &TimeZoneConfig, _now: &DateTime<Utc>) -> Self {
+        Self {
+            id: entity.id,
+            name: entity.name,
+            created_at: timezone.convert(entity.created_at),
+        }
+    }
+}
+
+impl IntoView for Group {
+    type Entity = entities::Group;
+
+    fn convert(entity: Self::Entity, timezone: &TimeZoneConfig, _now: &DateTime<Utc>) -> Self {
+        Self {
+            id: entity.id,
+            name: entity.name,
+            owner_id: entity.owner_id,
+            is_open: entity.is_open,
+            created_at: timezone.convert(entity.created_at),
+        }
+    }
+}
+
+impl IntoView for GroupWithUsers {
+    type Entity = (entities::Group, Vec<entities::User>);
+
+    fn convert(entity: Self::Entity, timezone: &TimeZoneConfig, now: &DateTime<Utc>) -> Self {
+        let mut users: Vec<User> = entity
+            .1
+            .into_iter()
+            .map(|v| User::convert(v, timezone, now))
+            .collect();
+        users.sort_by(|a, b| a.name.cmp(&b.name));
+
+        Self {
+            id: entity.0.id,
+            name: entity.0.name,
+            owner_id: entity.0.owner_id,
+            is_open: entity.0.is_open,
+            created_at: timezone.convert(entity.0.created_at),
+            users,
+        }
+    }
+}
+
+impl IntoView for Identity {
+    type Entity = entities::Identity;
+
+    fn convert(entity: Self::Entity, timezone: &TimeZoneConfig, now: &DateTime<Utc>) -> Self {
+        match entity {
+            entities::Identity::User(user) => Identity::User(User::convert(user, timezone, now)),
+            entities::Identity::Group(group) => {
+                Identity::Group(Group::convert(group, timezone, now))
+            }
+        }
+    }
+}
+
+impl IntoView for Booking {
+    type Entity = entities::Booking;
+
+    fn convert(booking: entities::Booking, timezone: &TimeZoneConfig, now: &DateTime<Utc>) -> Self {
+        let booking_time = booking.time_to - booking.time_from;
+
+        Self {
+            id: booking.id,
+            unit_id: booking.unit_id,
+            holder: User::convert(booking.holder, timezone, now),
+            customer: Identity::convert(booking.customer, timezone, now),
+            booking_start: timezone.convert(booking.time_from),
+            booking_end: timezone.convert(booking.time_to),
+            booking_hours: booking_time.num_hours(),
+            created_at: timezone.convert(booking.created_at),
+            confirmed_at: booking.confirmed_at.map(|v| timezone.convert(v)),
+            is_confirmed: booking.confirmed_at.map(|v| &v < now).unwrap_or(false),
+            canceled_at: booking.canceled_at.map(|v| timezone.convert(v)),
+            is_canceled: booking.canceled_at.map(|v| &v < now).unwrap_or(false),
+            status: BookingStatus::Pending, // to set later
+        }
+    }
+}
+
+impl Booking {
+    pub fn finish(mut self, booking_config: &BookingConfig, now: &DateTime<Utc>) -> Self {
+        let start = self.booking_start.clone();
+        let end = self.booking_end.clone();
+
+        let start_with_buffer = start - booking_config.buffer_time.0;
+        let end_with_buffer = end + booking_config.buffer_time.1;
+
+        self.status = if self.is_canceled {
+            BookingStatus::Canceled
+        } else if !self.is_confirmed {
+            if now > &start {
+                BookingStatus::Overdue
+            } else {
+                BookingStatus::Pending
+            }
+        } else if &start <= now && now < &end {
+            BookingStatus::InProgress
+        } else if &start_with_buffer <= now && now < &end_with_buffer {
+            BookingStatus::Buffered
+        } else if now >= &end_with_buffer {
+            BookingStatus::Complete
+        } else {
+            BookingStatus::Confirmed
+        };
+
+        self
+    }
+}
+
+impl IntoView for OccupiedSlot {
+    type Entity = entities::OccupiedSlot;
+
+    fn convert(entity: Self::Entity, timezone: &TimeZoneConfig, _now: &DateTime<Utc>) -> Self {
+        let booking_time = entity.time_to - entity.time_from;
+
+        Self {
+            masked_name: mask_identity(entity.name),
+            booking_date: timezone.convert(entity.time_from),
+            booking_hours: booking_time.num_hours(),
+            confirmed: entity.confirmed,
+        }
+    }
+}
+
+impl IntoView for BookingCashPaymentStatus {
+    type Entity = entities::CashPaymentStatus;
+
+    fn convert(entity: Self::Entity, timezone: &TimeZoneConfig, now: &DateTime<Utc>) -> Self {
+        Self {
+            depositor_name: entity.depositor_name,
+            price: entity.price,
+            confirmed_at: entity.confirmed_at.map(|v| timezone.convert(v)),
+            refund_price: entity.refund_price,
+            refund_account: entity.refund_account,
+            is_refund_requested: entity.refund_price.is_some(),
+            refunded_at: entity.refunded_at.map(|v| timezone.convert(v)),
+            is_refunded: entity.refunded_at.map(|v| &v < now).unwrap_or(false),
+        }
+    }
+}
+
+impl IntoView for Reservation {
+    type Entity = entities::Reservation;
+
+    fn convert(entity: Self::Entity, timezone: &TimeZoneConfig, now: &DateTime<Utc>) -> Self {
+        Self {
+            id: entity.id,
+            holder: User::convert(entity.holder, timezone, now),
+            reservation_start: timezone.convert(entity.time_from),
+            reservation_end: timezone.convert(entity.time_to),
+            reserved_hours: (entity.time_to - entity.time_from).num_hours(),
+            temporary: entity.temporary,
+            remark: entity.remark,
+        }
+    }
+}

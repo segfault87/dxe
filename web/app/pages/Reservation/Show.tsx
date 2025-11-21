@@ -1,5 +1,6 @@
+import { isAxiosError } from "axios";
 import { useState } from "react";
-import { useNavigate, Link } from "react-router";
+import { redirect, useNavigate, Link } from "react-router";
 
 import "./Show.css";
 import type { Route } from "./+types/Show";
@@ -28,12 +29,24 @@ export async function clientLoader({
     throw new Error("bookingId is not supplied");
   }
 
-  const result = await BookingService.get(params.bookingId);
+  try {
+    const result = await BookingService.get(params.bookingId);
 
-  return {
-    booking: result.data.booking,
-    cashPaymentStatus: result.data.cashPaymentStatus,
-  };
+    return {
+      booking: result.data.booking,
+      cashPaymentStatus: result.data.cashPaymentStatus,
+    };
+  } catch (error) {
+    if (isAxiosError(error)) {
+      if (error.status === 401) {
+        throw redirect(`/login?redirect_to=/reservation/${params.bookingId}`);
+      } else {
+        throw error;
+      }
+    } else {
+      throw error;
+    }
+  }
 }
 
 function ShowReservation({ loaderData }: Route.ComponentProps) {

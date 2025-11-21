@@ -20,6 +20,12 @@ pub mod admin {
         pub bookings: Vec<BookingWithPayments>,
     }
 
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct GetRefundPendingBookingsResponse {
+        pub bookings: Vec<BookingWithPayments>,
+    }
+
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
     pub enum ModifyAction {
@@ -66,6 +72,18 @@ pub mod admin {
     #[serde(rename_all = "camelCase")]
     pub struct CreateReservationResponse {
         pub reservation: Reservation,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct GetGroupsResponse {
+        pub groups: Vec<GroupWithUsers>,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct GetUsersResponse {
+        pub users: Vec<SelfUser>,
     }
 }
 

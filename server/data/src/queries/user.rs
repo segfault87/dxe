@@ -101,6 +101,26 @@ pub async fn get_user_by_foreign_id(
     .await?)
 }
 
+pub async fn get_users(executor: &mut SqliteConnection) -> Result<Vec<User>, Error> {
+    Ok(sqlx::query_as!(
+        User,
+        r#"
+        SELECT
+            id as "id: _",
+            provider as "provider: _",
+            foreign_id,
+            name,
+            created_at as "created_at: _",
+            deactivated_at as "deactivated_at: _",
+            license_plate_number
+        FROM user
+        ORDER BY created_at DESC
+        "#,
+    )
+    .fetch_all(executor)
+    .await?)
+}
+
 pub async fn update_user(
     connection: &mut SqliteConnection,
     now: &DateTime<Utc>,

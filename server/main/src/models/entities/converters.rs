@@ -3,10 +3,9 @@ use dxe_data::entities;
 
 use super::{
     Booking, BookingCashPaymentStatus, BookingStatus, Group, GroupWithUsers, Identity,
-    OccupiedSlot, User,
+    OccupiedSlot, Reservation, SelfUser, User,
 };
 use crate::config::{BookingConfig, TimeZoneConfig};
-use crate::models::entities::Reservation;
 use crate::utils::mask_identity;
 
 pub trait IntoView {
@@ -23,6 +22,20 @@ impl IntoView for User {
             id: entity.id,
             name: entity.name,
             created_at: timezone.convert(entity.created_at),
+        }
+    }
+}
+
+impl IntoView for SelfUser {
+    type Entity = entities::User;
+
+    fn convert(entity: Self::Entity, timezone: &TimeZoneConfig, _now: &DateTime<Utc>) -> Self {
+        Self {
+            id: entity.id,
+            name: entity.name,
+            license_plate_number: entity.license_plate_number,
+            created_at: timezone.convert(entity.created_at),
+            is_administrator: false,
         }
     }
 }

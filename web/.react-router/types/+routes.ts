@@ -51,6 +51,15 @@ type Pages = {
   "/admin/pending-bookings": {
     params: {};
   };
+  "/admin/pending-refunds": {
+    params: {};
+  };
+  "/admin/groups": {
+    params: {};
+  };
+  "/admin/users": {
+    params: {};
+  };
   "/admin/reservations": {
     params: {};
   };
@@ -59,7 +68,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/guide" | "/inquiries" | "/reservation" | "/reservation/:bookingId" | "/login" | "/register" | "/my" | "/terms-of-service" | "/join/:groupId" | "/admin" | "/admin/pending-bookings" | "/admin/reservations";
+    page: "/" | "/guide" | "/inquiries" | "/reservation" | "/reservation/:bookingId" | "/login" | "/register" | "/my" | "/terms-of-service" | "/join/:groupId" | "/admin" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/reservations";
   };
   "./components/Scaffold.tsx": {
     id: "components/Scaffold";
@@ -107,7 +116,7 @@ type RouteFiles = {
   };
   "./components/AdminScaffold.tsx": {
     id: "components/AdminScaffold";
-    page: "/admin" | "/admin/pending-bookings" | "/admin/reservations";
+    page: "/admin" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/reservations";
   };
   "./pages/Admin/Index.tsx": {
     id: "pages/Admin/Index";
@@ -116,6 +125,18 @@ type RouteFiles = {
   "./pages/Admin/PendingBookings.tsx": {
     id: "pages/Admin/PendingBookings";
     page: "/admin/pending-bookings";
+  };
+  "./pages/Admin/RefundPendingBookings.tsx": {
+    id: "pages/Admin/RefundPendingBookings";
+    page: "/admin/pending-refunds";
+  };
+  "./pages/Admin/Groups.tsx": {
+    id: "pages/Admin/Groups";
+    page: "/admin/groups";
+  };
+  "./pages/Admin/Users.tsx": {
+    id: "pages/Admin/Users";
+    page: "/admin/users";
   };
   "./pages/Admin/Reservations.tsx": {
     id: "pages/Admin/Reservations";
@@ -139,5 +160,8 @@ type RouteModules = {
   "components/AdminScaffold": typeof import("./app/./components/AdminScaffold.tsx");
   "pages/Admin/Index": typeof import("./app/./pages/Admin/Index.tsx");
   "pages/Admin/PendingBookings": typeof import("./app/./pages/Admin/PendingBookings.tsx");
+  "pages/Admin/RefundPendingBookings": typeof import("./app/./pages/Admin/RefundPendingBookings.tsx");
+  "pages/Admin/Groups": typeof import("./app/./pages/Admin/Groups.tsx");
+  "pages/Admin/Users": typeof import("./app/./pages/Admin/Users.tsx");
   "pages/Admin/Reservations": typeof import("./app/./pages/Admin/Reservations.tsx");
 };

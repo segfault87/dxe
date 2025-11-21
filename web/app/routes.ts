@@ -23,6 +23,9 @@ export default [
     layout("./components/AdminScaffold.tsx", [
       index("./pages/Admin/Index.tsx"),
       route("pending-bookings", "./pages/Admin/PendingBookings.tsx"),
+      route("pending-refunds", "./pages/Admin/RefundPendingBookings.tsx"),
+      route("groups", "./pages/Admin/Groups.tsx"),
+      route("users", "./pages/Admin/Users.tsx"),
       route("reservations", "./pages/Admin/Reservations.tsx"),
     ]),
   ]),

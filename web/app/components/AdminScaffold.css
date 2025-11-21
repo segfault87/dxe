@@ -4,3 +4,20 @@
     align-items: center;
     min-height: 320px;
 }
+
+.navigation {
+    > ul {
+        display: flex;
+        flex-direction: row;
+
+        > li {
+            padding: 0;
+            list-style: none;
+            margin-right: 16px;
+
+            > a {
+                font-size: 18px;
+            }
+        }
+    }
+}

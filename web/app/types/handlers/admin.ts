@@ -5,8 +5,14 @@ import type {
   CashPaymentStatus,
   Reservation,
 } from "../models/booking";
+import type { GroupWithUsers } from "../models/group";
+import type { SelfUser } from "../models/user";
 
 export interface GetPendingBookingsResponse {
+  bookings: BookingWithPayments[];
+}
+
+export interface GetRefundPendingBookingsResponse {
   bookings: BookingWithPayments[];
 }
 
@@ -35,4 +41,12 @@ export interface CreateReservationRequest {
 
 export interface CreateReservationResponse {
   reservation: Reservation;
+}
+
+export interface GetGroupsResponse {
+  groups: GroupWithUsers[];
+}
+
+export interface GetUsersResponse {
+  users: SelfUser[];
 }

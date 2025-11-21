@@ -47,7 +47,7 @@ function PendingBookingsSection({ bookings }: { bookings: Booking[] }) {
           <Link to={`/reservation/${booking.id}`}>
             {bookingStart.toLocaleString()} - {bookingEnd.toLocaleString()} |{" "}
             {booking.customer.name}
-            {booking.isConfirmed ? " (미확정)" : null}
+            {!booking.isConfirmed ? " (미확정)" : null}
           </Link>
         </li>
       );

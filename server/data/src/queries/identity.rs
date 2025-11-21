@@ -194,6 +194,67 @@ pub async fn get_groups_by_owner(
     .await?)
 }
 
+pub async fn get_all_groups_associated_with_members(
+    connection: &mut SqliteConnection,
+    now: &DateTime<Utc>,
+) -> Result<Vec<(Group, Vec<User>)>, Error> {
+    let rows = sqlx::query!(
+        r#"
+        SELECT
+            g.id AS "g_id: GroupId",
+            g.name AS "g_name",
+            g.owner_id AS "g_owner_id: UserId",
+            g.is_open AS "g_is_open: bool",
+            g.created_at AS "g_created_at: DateTime<Utc>",
+            g.deleted_at AS "g_deleted_at: DateTime<Utc>",
+            u.id AS "u_id: UserId",
+            u.provider AS "u_provider: IdentityProvider",
+            u.foreign_id AS "u_foreign_id",
+            u.name AS "u_name",
+            u.created_at AS "u_created_at: DateTime<Utc>",
+            u.deactivated_at AS "u_deactivated_at: DateTime<Utc>",
+            u.license_plate_number AS "u_license_plate_number"
+        FROM "group" "g"
+        JOIN group_association "ga" ON g.id = ga.group_id
+        JOIN user "u" ON ga.user_id = u.id
+        WHERE
+            (g.deleted_at IS NULL OR g.deleted_at < ?1)
+        "#,
+        now,
+    )
+    .fetch_all(&mut *connection)
+    .await?;
+
+    let mut result = HashMap::new();
+    for row in rows {
+        let (_, users) = result.entry(row.g_id).or_insert_with(|| {
+            (
+                Group {
+                    id: row.g_id,
+                    name: row.g_name,
+                    owner_id: row.g_owner_id,
+                    is_open: row.g_is_open,
+                    created_at: row.g_created_at,
+                    deleted_at: row.g_deleted_at,
+                },
+                Vec::new(),
+            )
+        });
+
+        users.push(User {
+            id: row.u_id,
+            provider: row.u_provider,
+            foreign_id: row.u_foreign_id,
+            name: row.u_name,
+            created_at: row.u_created_at,
+            deactivated_at: row.u_deactivated_at,
+            license_plate_number: row.u_license_plate_number,
+        });
+    }
+
+    Ok(result.into_values().collect())
+}
+
 pub async fn get_groups_associated_with_members(
     connection: &mut SqliteConnection,
     now: &DateTime<Utc>,
@@ -229,6 +290,7 @@ pub async fn get_groups_associated_with_members(
                     group_association.group_id = g.id AND
                     group_association.user_id = ?1
             )
+        ORDER BY g.created_at DESC
         "#,
         user_id,
         now,

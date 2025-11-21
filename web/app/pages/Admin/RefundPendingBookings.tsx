@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router";
 
-import type { Route } from "./+types/PendingBookings";
+import type { Route } from "./+types/RefundPendingBookings";
 import AdminService from "../../api/admin";
 import { defaultErrorHandler } from "../../lib/error";
 import type { BookingId } from "../../types/models/base";
@@ -12,7 +12,7 @@ interface LoaderData {
 }
 
 export async function clientLoader({}: Route.ClientLoaderArgs): Promise<LoaderData> {
-  const result = await AdminService.getPendingBookings();
+  const result = await AdminService.getRefundPendingBookings();
 
   return {
     bookings: result.data.bookings,
@@ -37,13 +37,12 @@ export default function PendingBookings({ loaderData }: Route.ComponentProps) {
 
   return (
     <>
-      <h2>대기 예약 목록</h2>
+      <h2>환불 요청 목록</h2>
       <table>
         <tr>
           <th>고객명</th>
           <th>시작시간</th>
           <th>종료시간</th>
-          <th>상태</th>
           <th>동작</th>
         </tr>
         {bookings.map((e) => (
@@ -51,15 +50,9 @@ export default function PendingBookings({ loaderData }: Route.ComponentProps) {
             <td>{e.booking.customer.name}</td>
             <td>{new Date(e.booking.bookingStart).toLocaleString()}</td>
             <td>{new Date(e.booking.bookingEnd).toLocaleString()}</td>
-            <td>{e.booking.status}</td>
             <td>
-              {e.booking.status === "PENDING" ? (
-                <button onClick={() => modifyBooking(e.booking.id, "CONFIRM")}>
-                  확정
-                </button>
-              ) : null}
-              <button onClick={() => modifyBooking(e.booking.id, "CANCEL")}>
-                취소
+              <button onClick={() => modifyBooking(e.booking.id, "REFUND")}>
+                환불처리
               </button>
             </td>
           </tr>

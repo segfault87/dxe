@@ -6,11 +6,28 @@ import type {
   ModifyBookingRequest,
   CreateReservationRequest,
   CreateReservationResponse,
+  GetRefundPendingBookingsResponse,
+  GetUsersResponse,
+  GetGroupsResponse,
 } from "../types/handlers/admin";
 import type { BookingId, ReservationId, UnitId } from "../types/models/base";
 
 const getPendingBookings = () => {
   return API.get<GetPendingBookingsResponse>("/admin/bookings/pending");
+};
+
+const getRefundPendingBookings = () => {
+  return API.get<GetRefundPendingBookingsResponse>(
+    "/admin/bookings/pending-refunds",
+  );
+};
+
+const getUsers = () => {
+  return API.get<GetUsersResponse>("/admin/users");
+};
+
+const getGroups = () => {
+  return API.get<GetGroupsResponse>("/admin/groups");
 };
 
 const modifyBooking = (bookingId: BookingId, data: ModifyBookingRequest) => {
@@ -33,6 +50,9 @@ const deleteReservation = (id: ReservationId) => {
 
 const AdminService = {
   getPendingBookings,
+  getRefundPendingBookings,
+  getUsers,
+  getGroups,
   modifyBooking,
   getReservations,
   createReservation,

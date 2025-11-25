@@ -4,7 +4,7 @@ use dxe_data::queries::booking::{
     create_reservation, delete_reservation, get_reservation, get_reservations_by_unit_id,
     is_booking_available,
 };
-use dxe_data::types::ReservationId;
+use dxe_types::ReservationId;
 use sqlx::SqlitePool;
 
 use crate::config::TimeZoneConfig;

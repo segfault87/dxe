@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, FixedOffset};
-use dxe_data::types::{IdentityId, UnitId, UserId};
+use dxe_types::{IdentityId, UnitId, UserId};
 use serde::{Deserialize, Serialize};
 
 use crate::models::entities::{

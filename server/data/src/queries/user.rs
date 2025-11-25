@@ -1,9 +1,9 @@
 use chrono::{DateTime, Utc};
+use dxe_types::{IdentityId, IdentityProvider, UserId};
 use sqlx::{Executor, QueryBuilder, SqliteConnection};
 
 use crate::Error;
 use crate::entities::{IdentityDiscriminator, User};
-use crate::types::{IdentityId, IdentityProvider, UserId};
 
 pub async fn create_user(
     connection: &mut SqliteConnection,

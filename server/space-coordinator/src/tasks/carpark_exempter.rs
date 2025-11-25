@@ -1,0 +1,136 @@
+use std::collections::HashSet;
+use std::error::Error;
+use std::sync::{Arc, Mutex};
+
+use dxe_s2s_shared::entities::BookingWithUsers;
+use dxe_types::BookingId;
+use tokio_task_scheduler::{Task, TaskBuilder};
+
+use crate::callback::EventStateCallback;
+use crate::services::carpark_exemption::CarparkExemptionService;
+use crate::tasks::booking_state_manager::BookingStates;
+
+pub struct CarparkExempter {
+    booking_states: Arc<Mutex<BookingStates>>,
+    service: CarparkExemptionService,
+
+    active_bookings: Mutex<HashSet<BookingId>>,
+}
+
+impl CarparkExempter {
+    pub fn new(
+        booking_states: Arc<Mutex<BookingStates>>,
+        service: CarparkExemptionService,
+    ) -> Self {
+        Self {
+            booking_states,
+            service,
+
+            active_bookings: Mutex::new(HashSet::new()),
+        }
+    }
+
+    async fn update(self: Arc<Self>) {
+        let mut license_plate_numbers = HashSet::new();
+
+        {
+            let active_bookings = self.active_bookings.lock().unwrap();
+
+            for bookings in self.booking_states.lock().unwrap().bookings_1d.values() {
+                for booking in bookings {
+                    if active_bookings.contains(&booking.booking.id) {
+                        for user in booking.users.iter() {
+                            if let Some(license_plate_number) = &user.license_plate_number
+                                && !license_plate_number.is_empty()
+                            {
+                                license_plate_numbers.insert(license_plate_number.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        for license_plate_number in license_plate_numbers {
+            let _ = self.service.exempt(&license_plate_number).await;
+        }
+    }
+
+    pub fn task(self) -> Task {
+        let arc_self = Arc::new(self);
+
+        TaskBuilder::new("carpark_exempter", move || {
+            let arc_self = arc_self.clone();
+            tokio::task::spawn(async move {
+                arc_self.update().await;
+            });
+
+            Ok(())
+        })
+        .every_minutes(10)
+        .build()
+    }
+}
+
+#[async_trait::async_trait]
+impl EventStateCallback<BookingWithUsers> for CarparkExempter {
+    async fn on_event_created(
+        &self,
+        event: &BookingWithUsers,
+        is_in_progress: bool,
+    ) -> Result<(), Box<dyn Error>> {
+        if is_in_progress {
+            self.active_bookings
+                .lock()
+                .unwrap()
+                .insert(event.booking.id.clone());
+        }
+
+        Ok(())
+    }
+
+    async fn on_event_deleted(
+        &self,
+        event: &BookingWithUsers,
+        is_in_progress: bool,
+    ) -> Result<(), Box<dyn Error>> {
+        if is_in_progress {
+            self.active_bookings
+                .lock()
+                .unwrap()
+                .remove(&event.booking.id);
+        }
+
+        Ok(())
+    }
+
+    async fn on_event_start(
+        &self,
+        event: &BookingWithUsers,
+        buffered: bool,
+    ) -> Result<(), Box<dyn Error>> {
+        if buffered {
+            self.active_bookings
+                .lock()
+                .unwrap()
+                .insert(event.booking.id.clone());
+        }
+
+        Ok(())
+    }
+
+    async fn on_event_end(
+        &self,
+        event: &BookingWithUsers,
+        buffered: bool,
+    ) -> Result<(), Box<dyn Error>> {
+        if buffered {
+            self.active_bookings
+                .lock()
+                .unwrap()
+                .remove(&event.booking.id);
+        }
+
+        Ok(())
+    }
+}

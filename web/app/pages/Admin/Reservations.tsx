@@ -72,7 +72,7 @@ export default function Reservations({ loaderData }: Route.ComponentProps) {
             <td>{v.holder.name}</td>
             <td>{new Date(v.reservationStart).toLocaleString()}</td>
             <td>{new Date(v.reservationEnd).toLocaleString()}</td>
-            <td>{v.temporary}</td>
+            <td>{v.temporary ? "Y" : "N"}</td>
             <td>{v.remark ?? ""}</td>
             <td>
               <button

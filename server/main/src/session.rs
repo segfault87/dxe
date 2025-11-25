@@ -1,5 +1,5 @@
 use actix_jwt_auth_middleware::FromRequest;
-use dxe_data::types::UserId;
+use dxe_types::UserId;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize, FromRequest)]

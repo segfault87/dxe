@@ -168,19 +168,20 @@ export default function Index() {
         </ul>
       </Section>
       <Section id="location" title="오시는 길">
-        <a className="cta" href="https://naver.me/xenEPvZ2">
+        <a className="cta" href="https://naver.me/5u9yYPi2">
           네이버 지도
         </a>
-        <a className="cta" href="https://kko.kakao.com/Xz55UhPMLl">
+        <a className="cta" href="https://kko.kakao.com/g9cAKvMpgq">
           카카오맵
         </a>
         <a className="cta" href="https://maps.app.goo.gl/MRiauyo4mNgGQfK47">
           Google Maps
         </a>
         <ul>
+          <li>상가 내 합주실 위치는 솔섬식품 왼쪽에 있습니다.</li>
           <li>
-            도보 이동 시: 대로변에서 씨유 오른쪽편 아래로 내려가는 계단을 통해
-            지하상가 진입 후 직진
+            도보 이동 시: 대로변에서 진입시 씨유 오른쪽편 아래로 내려가는 계단을
+            통해 지하상가 진입 후 직진
           </li>
           <li>
             자동차로 이동 시: 상가 지하주차장에 주차 후 지하 3층에 있는 상가

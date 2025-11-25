@@ -1,9 +1,10 @@
 use actix_web::web;
 use chrono::Utc;
 use dxe_data::queries::booking::get_booking_with_user_id;
+use dxe_data::queries::unit::get_space_by_unit_id;
 use dxe_data::queries::user::get_user_by_id;
-use dxe_data::types::BookingId;
 use dxe_extern::itsokey::Error as ItsokeyError;
+use dxe_types::BookingId;
 use sqlx::SqlitePool;
 
 use crate::config::BookingConfig;
@@ -22,9 +23,9 @@ pub async fn post(
 ) -> Result<web::Json<serde_json::Value>, Error> {
     let now = Utc::now();
 
-    let mut connection = database.acquire().await?;
+    let mut tx = database.begin().await?;
 
-    let booking = get_booking_with_user_id(&mut connection, booking_id.as_ref(), &session.user_id)
+    let booking = get_booking_with_user_id(&mut tx, booking_id.as_ref(), &session.user_id)
         .await?
         .ok_or(Error::BookingNotFound)?;
 
@@ -32,11 +33,15 @@ pub async fn post(
         return Err(Error::BookingNotActive);
     }
 
-    let user = get_user_by_id(&mut connection, &session.user_id, &now)
+    let user = get_user_by_id(&mut tx, &session.user_id, &now)
         .await?
         .ok_or(Error::UserNotFound)?;
 
-    doorlock_service.open().await.map_err(|e| {
+    let space = get_space_by_unit_id(&mut tx, &booking.unit_id)
+        .await?
+        .ok_or(Error::UnitNotFound)?;
+
+    doorlock_service.open(&space.id).await.map_err(|e| {
         notification_sender.enqueue(Priority::High, format!("Could not open the door: {e}"));
 
         match e {
@@ -49,6 +54,9 @@ pub async fn post(
                 ),
                 ItsokeyError::Itsokey(e) => Error::DoorNotOpened(e),
             },
+            DoorLockError::NoConfiguration(_) => {
+                Error::DoorNotOpened("서버에 오류가 발생했씁니다. 문의 바랍니다.".to_owned())
+            }
         }
     })?;
 

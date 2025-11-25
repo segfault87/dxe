@@ -1,6 +1,6 @@
 use dxe_data::entities::{Booking, Identity};
 use dxe_data::queries::identity::get_group_members;
-use dxe_data::types::IdentityProvider;
+use dxe_types::IdentityProvider;
 use sqlx::SqliteConnection;
 
 use crate::config::TimeZoneConfig;

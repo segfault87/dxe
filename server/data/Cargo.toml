@@ -9,4 +9,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { version = "0.8", features = [ "sqlite", "uuid", "chrono", "macros" ] }
 thiserror = { workspace = true }
-uuid = { workspace = true, features = [ "v4" ] }
+uuid = { workspace = true }
+
+dxe-types = { path = "../types", features = ["sqlx"] }

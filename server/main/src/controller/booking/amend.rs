@@ -3,7 +3,7 @@ use chrono::Utc;
 use dxe_data::entities::Identity;
 use dxe_data::queries::booking::{get_booking_with_user_id, update_booking_customer};
 use dxe_data::queries::identity::is_member_of;
-use dxe_data::types::{BookingId, GroupId};
+use dxe_types::{BookingId, GroupId};
 use sqlx::SqlitePool;
 
 use crate::config::TimeZoneConfig;

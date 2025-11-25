@@ -278,6 +278,10 @@ function UserProfile({ me }: { me: SelfUser }) {
         >
           변경
         </button>
+        <hr />
+        <a className="primary" href="/api/auth/logout">
+          로그아웃
+        </a>
       </section>
     </div>
   );

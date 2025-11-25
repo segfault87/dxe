@@ -27,10 +27,12 @@
 
     > .body {
         flex: 2;
+    }
+}
 
-        :not(.cta) a {
-            text-decoration: underline;
-        }
+@media only screen and (max-width: 400px) {
+    .section {
+        font-size: 16px;
     }
 }
 

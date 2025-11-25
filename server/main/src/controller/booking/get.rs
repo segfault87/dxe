@@ -1,7 +1,7 @@
 use actix_web::web;
 use chrono::Utc;
 use dxe_data::queries::booking::{get_booking_with_user_id, get_cash_payment_status};
-use dxe_data::types::BookingId;
+use dxe_types::BookingId;
 use sqlx::SqlitePool;
 
 use crate::config::{BookingConfig, TimeZoneConfig};

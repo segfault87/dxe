@@ -3,9 +3,10 @@ use chrono::{TimeDelta, Utc};
 use dxe_data::entities::Identity;
 use dxe_data::queries::booking::{
     create_booking, create_cash_payment_status, get_booking_with_user_id, get_cash_payment_status,
-    is_booking_available, is_unit_enabled,
+    is_booking_available,
 };
 use dxe_data::queries::identity::{get_identity, is_member_of};
+use dxe_data::queries::unit::is_unit_enabled;
 use sqlx::SqlitePool;
 
 use crate::config::{BookingConfig, TimeZoneConfig};
@@ -71,7 +72,9 @@ pub async fn post(
     )
     .await?;
 
-    let price = booking_config.calculate_price(time_from, time_to);
+    let price = booking_config
+        .calculate_price(&body.unit_id, time_from, time_to)
+        .map_err(|_| Error::UnitNotFound)?;
 
     create_cash_payment_status(
         &mut tx,

@@ -33,7 +33,7 @@ export default function PendingBookings({ loaderData }: Route.ComponentProps) {
             <td>{e.id}</td>
             <td>{e.name}</td>
             <td>{new Date(e.createdAt).toLocaleString()}</td>
-            <td>{e.isOpen}</td>
+            <td>{e.isOpen ? "Y" : "N"}</td>
             <td>
               <ul>
                 {e.users.map((e) => (

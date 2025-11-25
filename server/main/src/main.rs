@@ -1,10 +1,12 @@
 mod config;
 mod controller;
+mod middleware;
 mod models;
 mod services;
 mod session;
 mod utils;
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use actix_jwt_auth_middleware::{Authority, TokenSigner};
@@ -13,6 +15,7 @@ use clap::Parser;
 use jwt_compact::alg::Ed25519;
 
 use crate::config::Config;
+use crate::middleware::coordinator_verifier::PublicKeyBundle;
 use crate::services::doorlock::DoorLockService;
 use crate::services::messaging::biztalk::BiztalkClient;
 use crate::services::messaging::spawn_messaging_backend;
@@ -46,7 +49,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let timezone_config = Data::new(config.timezone.clone());
 
-    let doorlock_service = DoorLockService::new(config.doorlock.clone());
+    let doorlock_service = DoorLockService::new(&config.spaces);
+
+    let s2s_public_keys = Arc::new(PublicKeyBundle::new(&config.spaces));
 
     let (biztalk_task, biztalk_sender) = if let Some(config) = &config.messaging.biztalk {
         let backend = BiztalkClient::new(config);
@@ -87,7 +92,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .app_data(Data::new(doorlock_service.clone()))
             .app_data(Data::new(biztalk_sender.clone()))
             .app_data(Data::new(config.url.clone()))
-            .service(controller::api(authority))
+            .service(controller::api(authority, s2s_public_keys.clone()))
     })
     .bind(&args.address)?
     .run()

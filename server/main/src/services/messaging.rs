@@ -1,6 +1,6 @@
 pub mod biztalk;
 
-use dxe_data::types::BookingId;
+use dxe_types::BookingId;
 use tokio::sync::mpsc;
 
 #[derive(Debug)]

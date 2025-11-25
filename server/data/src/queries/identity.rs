@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
+use dxe_types::{GroupId, IdentityId, IdentityProvider, UserId};
 use sqlx::SqliteConnection;
 
 use crate::Error;
 use crate::entities::{Group, Identity, IdentityDiscriminator, User};
-use crate::types::{GroupId, IdentityId, IdentityProvider, UserId};
 
 pub async fn get_identity(
     connection: &mut SqliteConnection,

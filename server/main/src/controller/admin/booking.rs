@@ -4,7 +4,7 @@ use dxe_data::queries::booking::{
     cancel_booking, confirm_booking, confirm_cash_payment, get_booking, get_cash_payment_status,
     refund_payment,
 };
-use dxe_data::types::BookingId;
+use dxe_types::BookingId;
 use sqlx::SqlitePool;
 
 use crate::config::{BookingConfig, TimeZoneConfig};

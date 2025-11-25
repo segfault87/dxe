@@ -21,12 +21,22 @@ nav {
         margin-left: 12px;
         font-size: 20px;
         font-weight: bold;
+        text-decoration: none;
     }
 
     .active {
         text-decoration: underline;
         text-decoration-thickness: 2px;
         text-underline-offset: 8px;
+    }
+}
+
+@media only screen and (max-width: 400px) {
+    .navigation {
+        a {
+            margin-left: 0px;
+            font-size: 16px;
+        }
     }
 }
 

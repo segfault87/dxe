@@ -56,8 +56,6 @@ impl BiztalkClient {
         let response = self.client.execute(request).await?;
         let payload: GetTokenResponse = response.json().await?;
 
-        println!("token ------ {payload:#?}\n\n");
-
         if payload.response_code == BIZTALK_RESPONSE_OK
             && let Some(token) = payload.token
         {
@@ -119,8 +117,6 @@ impl BiztalkClient {
         }?;
 
         let response: SendAlimTalkResponse = result.json().await?;
-
-        println!("!!!!!\n\n--- {response:#?}\n\n");
 
         if response.response_code == BIZTALK_RESPONSE_OK {
             Ok(())

@@ -3,11 +3,19 @@ CREATE TABLE identity(
     discriminator VARCHAR(5) NOT NULL
 );
 
-CREATE TABLE unit(
+CREATE TABLE space(
     id VARCHAR(20) NOT NULL PRIMARY KEY,
     enabled BOOLEAN NOT NULL
 );
-INSERT INTO unit(id, enabled) VALUES('default', 1);
+INSERT INTO space(id, enabled) VALUES('default', 1);
+
+CREATE TABLE unit(
+    id VARCHAR(20) NOT NULL PRIMARY KEY,
+    space_id VARCHAR(20) NOT NULL,
+    enabled BOOLEAN NOT NULL,
+    FOREIGN KEY(space_id) REFERENCES space(id)
+);
+INSERT INTO unit(id, space_id, enabled) VALUES('default', 'default', 1);
 
 CREATE TABLE user(
     id BLOB NOT NULL PRIMARY KEY,

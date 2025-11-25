@@ -1,7 +1,7 @@
 use actix_web::{HttpResponse, web};
 use chrono::Utc;
 use dxe_data::queries::identity::get_group;
-use dxe_data::types::GroupId;
+use dxe_types::GroupId;
 use sqlx::SqlitePool;
 
 use crate::models::Error;

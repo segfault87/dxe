@@ -1,7 +1,6 @@
 use chrono::NaiveDateTime;
+use dxe_types::{BookingId, UserId};
 use sqlx::FromRow;
-
-use crate::types::{BookingId, UserId};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, FromRow)]

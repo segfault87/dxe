@@ -1,6 +1,7 @@
 use actix_web::web;
 use chrono::{TimeDelta, Utc};
-use dxe_data::queries::booking::{is_booking_available, is_unit_enabled};
+use dxe_data::queries::booking::is_booking_available;
+use dxe_data::queries::unit::is_unit_enabled;
 use sqlx::SqlitePool;
 
 use crate::config::BookingConfig;
@@ -31,7 +32,9 @@ pub async fn post(
     let time_to = time_from + TimeDelta::hours(body.desired_hours);
 
     if is_booking_available(&mut connection, &now, &body.unit_id, &time_from, &time_to).await? {
-        let total_price = booking_config.calculate_price(time_from, time_to);
+        let total_price = booking_config
+            .calculate_price(&body.unit_id, time_from, time_to)
+            .map_err(|_| Error::UnitNotFound)?;
 
         Ok(web::Json(CheckResponse { total_price }))
     } else {

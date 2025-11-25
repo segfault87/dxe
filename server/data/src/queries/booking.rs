@@ -1,35 +1,13 @@
 use chrono::{DateTime, Utc};
+use dxe_types::{BookingId, GroupId, IdentityId, IdentityProvider, ReservationId, UnitId, UserId};
 use sqlx::SqliteConnection;
 
 use crate::Error;
 use crate::entities::{
     Booking, CashPaymentStatus, Group, Identity, IdentityDiscriminator, ItsokeyCredential,
-    OccupiedSlot, Reservation, Unit, User,
+    OccupiedSlot, Reservation, User,
 };
-use crate::types::{
-    BookingId, GroupId, IdentityId, IdentityProvider, ReservationId, UnitId, UserId,
-};
-
-pub async fn is_unit_enabled(
-    connection: &mut SqliteConnection,
-    unit_id: &UnitId,
-) -> Result<Option<bool>, Error> {
-    let result = sqlx::query_as!(
-        Unit,
-        r#"
-        SELECT
-            id as "id: _",
-            enabled
-        FROM unit
-        WHERE id = ?1
-        "#,
-        unit_id
-    )
-    .fetch_optional(&mut *connection)
-    .await?;
-
-    Ok(result.map(|v| v.enabled))
-}
+use crate::queries::unit::is_unit_enabled;
 
 pub async fn is_booking_available(
     connection: &mut SqliteConnection,
@@ -346,9 +324,12 @@ pub async fn get_booking_with_user_id(
 
 pub async fn get_bookings_by_unit_id(
     connection: &mut SqliteConnection,
+    now: &DateTime<Utc>,
     unit_id: &UnitId,
     time_from: &DateTime<Utc>,
     time_to: &DateTime<Utc>,
+    confirmed_only: bool,
+    exclude_canceled: bool,
 ) -> Result<Vec<Booking>, Error> {
     sqlx::query!(
         r#"
@@ -389,16 +370,29 @@ pub async fn get_bookings_by_unit_id(
         WHERE
             b.unit_id = ?1 AND
             b.time_from >= ?2 AND
-            b.time_to < ?3 AND
-            b.canceled_at IS NULL
+            b.time_to < ?3
         "#,
         unit_id,
         time_from,
         time_to,
     )
-    .fetch_optional(&mut *connection)
+    .fetch_all(&mut *connection)
     .await?
     .into_iter()
+    .filter(|v| {
+        if confirmed_only {
+            if !v.b_confirmed_at.map(|v| &v < now).unwrap_or(false) {
+                return false;
+            }
+        }
+        if exclude_canceled {
+            if v.b_canceled_at.map(|v| &v < now).unwrap_or(false) {
+                return false;
+            }
+        }
+
+        true
+    })
     .map(|v| {
         Ok(Booking {
             id: v.b_id,

@@ -26,6 +26,7 @@ body {
 a {
     all: unset;
     cursor: pointer;
+    text-decoration: underline;
 }
 
 em {
@@ -70,7 +71,8 @@ button {
     border: none;
 }
 
-button.primary {
+button.primary,
+a.primary {
     font-family: Gowun Batang;
     padding: 8px;
     border: #ebc1ae 1px solid;
@@ -80,6 +82,7 @@ button.primary {
     cursor: pointer;
     padding-left: 16px;
     padding-right: 16px;
+    text-decoration: none;
 
     &:disabled {
         color: #ccc;
@@ -96,6 +99,12 @@ hr {
 @media only screen and (max-width: 767px) {
     .cta {
         padding: 10px 20px 10px 20px;
+    }
+}
+
+@media only screen and (max-width: 400px) {
+    .cta {
+        font-size: 16px;
     }
 }
 

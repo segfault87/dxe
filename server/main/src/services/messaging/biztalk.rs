@@ -1,5 +1,5 @@
-use dxe_data::types::BookingId;
 use dxe_extern::biztalk::models::AlimTalkButtonAttachment;
+use dxe_types::BookingId;
 
 use super::MessagingBackend;
 use crate::config::BiztalkConfig;

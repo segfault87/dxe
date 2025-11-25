@@ -9,6 +9,7 @@
     > ul {
         display: flex;
         flex-direction: row;
+        padding: 0;
 
         > li {
             padding: 0;
@@ -20,4 +21,5 @@
             }
         }
     }
+    border-bottom: #ebc1ae 1px solid;
 }

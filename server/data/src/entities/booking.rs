@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
+use dxe_types::{BookingId, IdentityId, ReservationId, UnitId};
 use sqlx::FromRow;
 
 use crate::entities::{Identity, User};
-use crate::types::{BookingId, IdentityId, ReservationId, UnitId};
 
 #[derive(Debug, Clone)]
 pub struct OccupiedSlot {

@@ -4,7 +4,7 @@ use actix_web::web;
 use chrono::Utc;
 use dxe_data::queries::booking::get_bookings_by_user_id;
 use dxe_data::queries::user::{get_user_by_id, update_user};
-use dxe_data::types::UnitId;
+use dxe_types::UnitId;
 use sqlx::SqlitePool;
 
 use crate::config::{BookingConfig, TimeZoneConfig};

@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
+use dxe_types::{GroupId, IdentityId, IdentityProvider, UserId};
 use sqlx::FromRow;
-
-use crate::types::{GroupId, IdentityId, IdentityProvider, UserId};
 
 #[derive(Clone, Debug, sqlx::Type)]
 #[sqlx(rename_all = "lowercase")]
@@ -44,6 +43,13 @@ pub enum Identity {
 }
 
 impl Identity {
+    pub fn id(&self) -> IdentityId {
+        match self {
+            Identity::User(u) => u.id.into(),
+            Identity::Group(g) => g.id.into(),
+        }
+    }
+
     pub fn name(&self) -> &str {
         match self {
             Identity::User(u) => &u.name,

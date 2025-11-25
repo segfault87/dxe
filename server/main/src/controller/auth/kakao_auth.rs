@@ -5,13 +5,14 @@ use actix_jwt_auth_middleware::TokenSigner;
 use actix_web::body::BoxBody;
 use actix_web::cookie::Cookie;
 use actix_web::cookie::time::OffsetDateTime;
+use actix_web::http::Uri;
 use actix_web::http::header::LOCATION;
 use actix_web::{HttpResponse, ResponseError, web};
 use chrono::Utc;
 use dxe_data::queries::user::{get_user_by_foreign_id, is_administrator};
-use dxe_data::types::IdentityProvider;
 use dxe_extern::kakao::client as kakao_client;
 use dxe_extern::kakao::models::AccountPropertyKey;
+use dxe_types::IdentityProvider;
 use jwt_compact::alg::Ed25519;
 use serde::Deserialize;
 use sqlx::SqlitePool;
@@ -87,8 +88,16 @@ pub async fn redirect(
                 .create_refresh_cookie(&session)
                 .map_err(Error::Jwt)?;
 
+            access_cookie.set_http_only(true);
             access_cookie.set_path("/");
+            refresh_cookie.set_http_only(true);
             refresh_cookie.set_path("/");
+
+            let base_url = Uri::try_from(&url_config.base_url).unwrap();
+            if let Some(host) = base_url.host() {
+                access_cookie.set_domain(host);
+                refresh_cookie.set_domain(host);
+            }
 
             Ok(HttpResponse::TemporaryRedirect()
                 .insert_header((LOCATION, redirect_to))
@@ -97,11 +106,16 @@ pub async fn redirect(
                 .finish())
         } else {
             let encrypted_access_token = aes_crypto.encrypt(None, token.access_token.as_bytes())?;
-            let cookie_bearer = Cookie::build("kakao_bearer_token", encrypted_access_token)
+            let mut cookie_bearer = Cookie::build("kakao_bearer_token", encrypted_access_token)
                 .path("/")
                 .expires(OffsetDateTime::now_utc() + Duration::from_secs(180))
-                .secure(true)
-                .finish();
+                .http_only(true)
+                .secure(true);
+
+            let base_url = Uri::try_from(&url_config.base_url).unwrap();
+            if let Some(host) = base_url.host() {
+                cookie_bearer = cookie_bearer.domain(host);
+            }
 
             Ok(HttpResponse::TemporaryRedirect()
                 .insert_header((
@@ -112,7 +126,7 @@ pub async fn redirect(
                         redirect_to,
                     ),
                 ))
-                .cookie(cookie_bearer)
+                .cookie(cookie_bearer.finish())
                 .finish())
         }
     } else if let Some(error) = &query.error {

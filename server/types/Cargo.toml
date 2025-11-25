@@ -1,0 +1,12 @@
+[package]
+name = "dxe-types"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+sqlx = ["dep:sqlx"]
+
+[dependencies]
+serde = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+sqlx = { version = "0.8", optional = true }

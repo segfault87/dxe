@@ -4,7 +4,7 @@ use dxe_data::queries::identity::{
     delete_group, get_group, get_group_with_members, is_member_of, join_group, leave_group,
     update_group_name, update_group_open, update_group_owner,
 };
-use dxe_data::types::GroupId;
+use dxe_types::GroupId;
 use sqlx::SqlitePool;
 
 use crate::config::TimeZoneConfig;

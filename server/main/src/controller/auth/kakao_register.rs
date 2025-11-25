@@ -2,8 +2,8 @@ use actix_jwt_auth_middleware::TokenSigner;
 use actix_web::{HttpRequest, HttpResponse, Responder, web};
 use chrono::Utc;
 use dxe_data::queries::user::create_user;
-use dxe_data::types::IdentityProvider;
 use dxe_extern::kakao::{BearerToken, client as kakao_client};
+use dxe_types::IdentityProvider;
 use jwt_compact::alg::Ed25519;
 use sqlx::SqlitePool;
 

@@ -1,7 +1,7 @@
 mod converters;
 
 use chrono::{DateTime, FixedOffset};
-use dxe_data::types::{BookingId, GroupId, ReservationId, UnitId, UserId};
+use dxe_types::{BookingId, GroupId, ReservationId, UnitId, UserId};
 use serde::Serialize;
 
 pub use converters::IntoView;

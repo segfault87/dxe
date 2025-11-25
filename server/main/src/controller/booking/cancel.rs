@@ -5,7 +5,7 @@ use chrono::Utc;
 use dxe_data::queries::booking::{
     cancel_booking, get_booking_with_user_id, get_cash_payment_status, update_refund_information,
 };
-use dxe_data::types::BookingId;
+use dxe_types::BookingId;
 use sqlx::SqlitePool;
 
 use crate::config::{BookingConfig, TimeZoneConfig};

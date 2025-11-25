@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, FixedOffset, TimeDelta, Utc};
+use dxe_types::{SpaceId, UnitId};
 use serde::Deserialize;
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -59,13 +60,27 @@ impl TimeZoneConfig {
 }
 
 #[derive(Clone, Deserialize, Debug)]
+pub struct UnitBookingConfig {
+    pub base_price: i64,
+    pub price_per_hour: i64,
+}
+
+impl UnitBookingConfig {
+    fn calculate_price(&self, from: DateTime<Utc>, to: DateTime<Utc>) -> i64 {
+        let delta = to - from;
+        let hours = delta.num_hours();
+
+        self.base_price + self.price_per_hour * hours
+    }
+}
+
+#[derive(Clone, Deserialize, Debug)]
 pub struct BookingConfig {
     pub lookahead_days: i64,
     pub max_booking_hours: i64,
     pub buffer_time: (TimeDelta, TimeDelta),
-    pub base_price: i64,
-    pub price_per_hour: i64,
     pub refund_rates: Vec<(i64, i64)>,
+    pub units: HashMap<UnitId, UnitBookingConfig>,
 }
 
 impl BookingConfig {
@@ -85,11 +100,17 @@ impl BookingConfig {
         now >= &lower && now < &upper
     }
 
-    pub fn calculate_price(&self, from: DateTime<Utc>, to: DateTime<Utc>) -> i64 {
-        let delta = to - from;
-        let hours = delta.num_hours();
+    pub fn calculate_price(
+        &self,
+        unit_id: &UnitId,
+        time_from: DateTime<Utc>,
+        time_to: DateTime<Utc>,
+    ) -> Result<i64, ()> {
+        let Some(unit_booking_config) = self.units.get(unit_id) else {
+            return Err(());
+        };
 
-        self.base_price + self.price_per_hour * hours
+        Ok(unit_booking_config.calculate_price(time_from, time_to))
     }
 
     pub fn calculate_refund_price(
@@ -232,6 +253,17 @@ pub struct UrlConfig {
     pub base_url: String,
 }
 
+#[derive(Deserialize, Clone, Debug)]
+pub struct SpaceSecurityConfig {
+    pub public_key: Vec<u8>,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct SpaceConfig {
+    pub doorlock: Option<DoorLockConfig>,
+    pub security: SpaceSecurityConfig,
+}
+
 #[derive(Deserialize, Debug)]
 pub struct Config {
     #[serde(flatten)]
@@ -243,7 +275,7 @@ pub struct Config {
     pub jwt: JwtConfig,
     pub database: DatabaseConfig,
     pub auth: AuthConfig,
-    pub doorlock: DoorLockConfig,
+    pub spaces: HashMap<SpaceId, SpaceConfig>,
     pub notifications: NotificationConfig,
     pub messaging: MessagingConfig,
 }

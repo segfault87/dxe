@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO reservation(unit_id, holder_id, time_from, time_to, remark, temporary)\n        VALUES(?1, ?2, ?3, ?4, ?5, ?6)\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6b2cd64551bb7ebe494a9297600ed6b25a5aa1f1d3b433854d0cfa0ce5545e34"
+}

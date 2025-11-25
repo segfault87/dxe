@@ -1,0 +1,92 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            r.id AS \"id: ReservationId\",\n            r.unit_id AS \"unit_id: UnitId\",\n            r.time_from AS \"time_from: DateTime<Utc>\",\n            r.time_to AS \"time_to: DateTime<Utc>\",\n            r.temporary,\n            r.remark,\n            u.id AS \"u_id: UserId\",\n            u.provider AS \"u_provider: IdentityProvider\",\n            u.foreign_id AS \"u_foreign_id: String\",\n            u.name AS \"u_name: String\",\n            u.created_at AS \"u_created_at: DateTime<Utc>\",\n            u.deactivated_at AS \"u_deactivated_at: DateTime<Utc>\",\n            u.license_plate_number AS \"u_license_plate_number\"\n        FROM reservation \"r\"\n        JOIN user \"u\" ON r.holder_id=u.id\n        WHERE\n            unit_id = ?1 AND\n            time_to > ?2\n        ORDER BY r.time_from ASC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: ReservationId",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "unit_id: UnitId",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "time_from: DateTime<Utc>",
+        "ordinal": 2,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "time_to: DateTime<Utc>",
+        "ordinal": 3,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "temporary",
+        "ordinal": 4,
+        "type_info": "Bool"
+      },
+      {
+        "name": "remark",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "u_id: UserId",
+        "ordinal": 6,
+        "type_info": "Blob"
+      },
+      {
+        "name": "u_provider: IdentityProvider",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "u_foreign_id: String",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "u_name: String",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "u_created_at: DateTime<Utc>",
+        "ordinal": 10,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "u_deactivated_at: DateTime<Utc>",
+        "ordinal": 11,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "u_license_plate_number",
+        "ordinal": 12,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "e3d8a3136f5709bb4f10d1d40084429d7281a6a8d9cc0e8df6de39ba2a4b1ae0"
+}

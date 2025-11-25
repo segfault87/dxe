@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            remark,\n            time_from AS \"time_from: DateTime<Utc>\",\n            time_to AS \"time_to: DateTime<Utc>\"\n        FROM reservation\n        WHERE\n            time_from >= ?1 AND time_from < ?2 AND\n            unit_id = ?3\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "remark",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "time_from: DateTime<Utc>",
+        "ordinal": 1,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "time_to: DateTime<Utc>",
+        "ordinal": 2,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "835fe0ecf088ed2079f1e88f15f8f019dfe0efbcc7ef7643b1d9250b72b1bdce"
+}

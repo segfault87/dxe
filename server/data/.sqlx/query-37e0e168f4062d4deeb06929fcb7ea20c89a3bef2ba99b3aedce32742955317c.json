@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE \"group\"\n        SET owner_id=?1\n        WHERE id=?2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "37e0e168f4062d4deeb06929fcb7ea20c89a3bef2ba99b3aedce32742955317c"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE \"group\"\n        SET\n        deleted_at=?2\n        WHERE id=?1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "df4dccdf6c76b35edfdbe1cbd698ed1d6417f02039dfedb1d16a5c277b2670c0"
+}

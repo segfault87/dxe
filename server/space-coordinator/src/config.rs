@@ -1,3 +1,5 @@
+pub mod z2m;
+
 use std::net::IpAddr;
 
 use dxe_types::SpaceId;
@@ -48,13 +50,23 @@ pub struct PresenceMonitorConfig {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct MqttConfig {
+    pub host: String,
+    pub port: u16,
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Config {
     pub space_id: SpaceId,
     pub url_base: url::Url,
     pub request_expires_in_secs: i64,
     pub private_key: Vec<u8>,
+    pub mqtt: MqttConfig,
     pub carpark_exemption: Option<CarparkExemptionConfig>,
     pub presence_monitor: PresenceMonitorConfig,
+    pub z2m: z2m::Config,
 }
 
 impl Config {

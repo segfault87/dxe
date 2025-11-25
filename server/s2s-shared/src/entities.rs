@@ -1,7 +1,14 @@
-use dxe_types::{BookingId, IdentityId, UnitId, UserId};
+use dxe_types::{BookingId, IdentityId, SpaceId, UnitId, UserId};
 use serde::{Deserialize, Serialize};
 
 use crate::Timestamp;
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Unit {
+    pub id: UnitId,
+    pub enabled: bool,
+    pub space_id: SpaceId,
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 pub struct Booking {

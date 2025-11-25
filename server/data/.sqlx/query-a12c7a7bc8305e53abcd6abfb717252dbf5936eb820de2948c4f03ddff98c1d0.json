@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE booking\n        SET confirmed_at = ?2\n        WHERE id = ?1 AND confirmed_at IS NULL\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "a12c7a7bc8305e53abcd6abfb717252dbf5936eb820de2948c4f03ddff98c1d0"
+}

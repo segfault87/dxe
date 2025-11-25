@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 use dxe_s2s_shared::entities::BookingWithUsers;
 use dxe_s2s_shared::handlers::GetPendingBookingsResponse;
 use dxe_types::{BookingId, UnitId};
@@ -41,6 +41,10 @@ fn create_task_name(booking_id: &BookingId, r#type: BookingEventType) -> String 
     format!("booking_{booking_id}_{task_name}")
 }
 
+fn temp_pending_active_bookings() -> Vec<BookingWithUsers> {
+    serde_json::from_str(include_str!("temp.json")).unwrap()
+}
+
 impl BookingStateManager {
     pub fn new(client: DxeClient, scheduler: Scheduler) -> (Arc<Mutex<BookingStates>>, Self) {
         let states = Arc::new(Mutex::new(Default::default()));
@@ -65,7 +69,7 @@ impl BookingStateManager {
     }
 
     async fn update(self: Arc<Self>) {
-        let response = match self
+        let mut response = match self
             .client
             .get::<GetPendingBookingsResponse>("/pending-bookings", None)
             .await
@@ -77,7 +81,11 @@ impl BookingStateManager {
             }
         };
 
-        println!("{response:#?}");
+        response
+            .bookings
+            .get_mut(&UnitId::from("default".to_owned()))
+            .unwrap()
+            .extend(temp_pending_active_bookings());
 
         let now = Utc::now();
 
@@ -87,6 +95,7 @@ impl BookingStateManager {
         {
             let mut states = self.states.lock().unwrap();
 
+            // Remove outdated events
             for bookings in states.bookings_1d.values_mut() {
                 bookings.retain(|v| v.booking.date_end_w_buffer.to_utc() < now);
             }
@@ -100,7 +109,7 @@ impl BookingStateManager {
                     .collect::<HashSet<_>>();
                 for booking in bookings {
                     let delta = booking.booking.date_start_w_buffer.to_utc() - now;
-                    if delta.num_days() > 0 {
+                    if delta.num_days() != 0 {
                         continue;
                     }
 
@@ -305,7 +314,7 @@ impl BookingStateManager {
                 Ok(id) => {
                     log::info!(
                         "Task {task_name} scheduled at {}",
-                        date.naive_local().format("%H:%M:%S")
+                        date.with_timezone(&Local).format("%H:%M:%S")
                     );
                     self.pending_tasks
                         .lock()

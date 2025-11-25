@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        DELETE FROM group_association\n        WHERE group_id=?1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "64a20fac1a306369f2cc4f0b61dfcaea2920e6e33495f919bb4f9b5353ec66ea"
+}

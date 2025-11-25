@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            id AS \"id: _\",\n            name,\n            owner_id AS \"owner_id: _\",\n            is_open AS \"is_open: _\",\n            created_at AS \"created_at: _\",\n            deleted_at AS \"deleted_at: _\"\n        FROM \"group\"\n        WHERE\n            owner_id=?1 AND\n            (deleted_at IS NULL OR deleted_at < ?2)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: _",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "owner_id: _",
+        "ordinal": 2,
+        "type_info": "Blob"
+      },
+      {
+        "name": "is_open: _",
+        "ordinal": 3,
+        "type_info": "Bool"
+      },
+      {
+        "name": "created_at: _",
+        "ordinal": 4,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "deleted_at: _",
+        "ordinal": 5,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "9f0d8cd222187aac3703ef31bcbfb6e6b5961f00f208789532ae70784f5dfbd1"
+}

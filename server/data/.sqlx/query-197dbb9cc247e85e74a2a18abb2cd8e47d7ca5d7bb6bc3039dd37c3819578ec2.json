@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO group_association(group_id, user_id, joined_at)\n        VALUES(?1, ?2, ?3)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "197dbb9cc247e85e74a2a18abb2cd8e47d7ca5d7bb6bc3039dd37c3819578ec2"
+}

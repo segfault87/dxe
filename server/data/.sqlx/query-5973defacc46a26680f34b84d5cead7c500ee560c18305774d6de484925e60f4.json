@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE \"group\"\n        SET is_open=?1\n        WHERE id=?2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "5973defacc46a26680f34b84d5cead7c500ee560c18305774d6de484925e60f4"
+}

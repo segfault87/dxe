@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            u.id AS \"id: UnitId\",\n            u.space_id AS \"space_id: SpaceId\",\n            u.enabled\n        FROM space \"s\"\n        JOIN unit \"u\" ON u.space_id = s.id\n        WHERE s.id = ?1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: UnitId",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "space_id: SpaceId",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "enabled",
+        "ordinal": 2,
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "5dddf7fb9d85b6cf5254b94326806be0f72090a1d2318cabc9a2b6c45572a146"
+}

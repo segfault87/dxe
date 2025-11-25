@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO identity(id, discriminator)\n        VALUES(?1, ?2)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "cfaf8e8bd0c0067dfbd2ae1fcfa82ca31a0e729f8da2244bfb0670e529a8a718"
+}

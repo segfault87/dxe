@@ -4,31 +4,29 @@ use std::sync::{Arc, Mutex};
 
 use dxe_s2s_shared::entities::BookingWithUsers;
 use dxe_types::{BookingId, UnitId};
-use tokio::sync::broadcast::Receiver;
 use tokio::task::JoinHandle;
 use tokio_task_scheduler::{Task, TaskBuilder};
 
 use crate::callback::EventStateCallback;
 use crate::config::z2m;
-use crate::services::mqtt::{DeviceName, IncomingMessage, MqttService};
+use crate::services::mqtt::{DeviceName, MqttService};
 use crate::tasks::presence_monitor::PresenceState;
 
-pub struct PerUnitMqttController {
-    unit_id: UnitId,
+pub struct MqttController {
     presence_state: Arc<Mutex<PresenceState>>,
     mqtt_service: MqttService,
 
     devices: HashMap<DeviceName, z2m::Device>,
     device_states: Mutex<HashMap<DeviceName, serde_json::Value>>,
-    hooks: z2m::Hooks,
+    per_unit_hooks: HashMap<UnitId, z2m::PerUnitHooks>,
+    presence_hooks: z2m::PresenceHooks,
     alerts: Vec<z2m::Alert>,
 
     active_bookings: Mutex<HashSet<BookingId>>,
 }
 
-impl PerUnitMqttController {
+impl MqttController {
     pub fn new(
-        unit_id: UnitId,
         config: &z2m::Config,
         mqtt_service: MqttService,
         presence_state: Arc<Mutex<PresenceState>>,
@@ -43,14 +41,17 @@ impl PerUnitMqttController {
                 .map(|v| (v.name.clone(), v.clone()))
                 .collect(),
             device_states: Mutex::new(HashMap::new()),
-            hooks: config.hooks.get(&unit_id).cloned().unwrap_or_default(),
+            per_unit_hooks: config.hooks.units.clone(),
+            presence_hooks: config.hooks.presence.clone(),
             alerts: config.alerts.clone(),
-
-            unit_id,
 
             active_bookings: Mutex::new(Default::default()),
         }
     }
+
+    //async fn get_switch_state(&self, device: &z2m::Device) -> Option<bool> {}
+
+    async fn set_switch_state(&self, device: &z2m::Device, on: bool) {}
 
     pub async fn handle_incoming_message(
         self: Arc<Self>,
@@ -68,7 +69,7 @@ impl PerUnitMqttController {
     }
 
     pub fn task(self) -> (Arc<Self>, JoinHandle<()>, Task) {
-        let task_name = format!("mqtt_controller_{}", self.unit_id);
+        let task_name = format!("mqtt_controller");
 
         let mut receiver = self.mqtt_service.receiver();
 
@@ -102,16 +103,12 @@ impl PerUnitMqttController {
 }
 
 #[async_trait::async_trait]
-impl EventStateCallback<BookingWithUsers> for PerUnitMqttController {
+impl EventStateCallback<BookingWithUsers> for MqttController {
     async fn on_event_created(
         &self,
         event: &BookingWithUsers,
         is_in_progress: bool,
     ) -> Result<(), Box<dyn Error>> {
-        if event.booking.unit_id != self.unit_id {
-            return Ok(());
-        }
-
         if is_in_progress {
             self.active_bookings
                 .lock()
@@ -127,10 +124,6 @@ impl EventStateCallback<BookingWithUsers> for PerUnitMqttController {
         event: &BookingWithUsers,
         is_in_progress: bool,
     ) -> Result<(), Box<dyn Error>> {
-        if event.booking.unit_id != self.unit_id {
-            return Ok(());
-        }
-
         if is_in_progress {
             self.active_bookings
                 .lock()
@@ -144,16 +137,14 @@ impl EventStateCallback<BookingWithUsers> for PerUnitMqttController {
     async fn on_event_start(
         &self,
         event: &BookingWithUsers,
-        _buffered: bool,
+        buffered: bool,
     ) -> Result<(), Box<dyn Error>> {
-        if event.booking.unit_id != self.unit_id {
-            return Ok(());
+        if !buffered {
+            self.active_bookings
+                .lock()
+                .unwrap()
+                .insert(event.booking.id.clone());
         }
-
-        self.active_bookings
-            .lock()
-            .unwrap()
-            .insert(event.booking.id.clone());
 
         Ok(())
     }
@@ -161,16 +152,14 @@ impl EventStateCallback<BookingWithUsers> for PerUnitMqttController {
     async fn on_event_end(
         &self,
         event: &BookingWithUsers,
-        _buffered: bool,
+        buffered: bool,
     ) -> Result<(), Box<dyn Error>> {
-        if event.booking.unit_id != self.unit_id {
-            return Ok(());
+        if !buffered {
+            self.active_bookings
+                .lock()
+                .unwrap()
+                .remove(&event.booking.id);
         }
-
-        self.active_bookings
-            .lock()
-            .unwrap()
-            .remove(&event.booking.id);
 
         Ok(())
     }

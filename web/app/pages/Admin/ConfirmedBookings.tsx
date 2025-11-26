@@ -1,18 +1,13 @@
-import { useNavigate } from "react-router";
-
-import type { Route } from "./+types/RefundPendingBookings";
+import type { Route } from "./+types/ConfirmedBookings";
 import AdminService from "../../api/admin";
-import { defaultErrorHandler } from "../../lib/error";
-import type { BookingId } from "../../types/models/base";
 import type { BookingWithPayments } from "../../types/models/booking";
-import type { BookingAction } from "../../types/handlers/admin";
 
 interface LoaderData {
   bookings: BookingWithPayments[];
 }
 
 export async function clientLoader({}: Route.ClientLoaderArgs): Promise<LoaderData> {
-  const result = await AdminService.getBookings("refund_pending");
+  const result = await AdminService.getBookings("confirmed");
 
   return {
     bookings: result.data.bookings,
@@ -21,40 +16,29 @@ export async function clientLoader({}: Route.ClientLoaderArgs): Promise<LoaderDa
 
 export default function PendingBookings({ loaderData }: Route.ComponentProps) {
   const { bookings } = loaderData;
-  const navigate = useNavigate();
-
-  const modifyBooking = async (bookingId: BookingId, action: BookingAction) => {
-    try {
-      await AdminService.modifyBooking(bookingId, {
-        action,
-      });
-
-      navigate(0);
-    } catch (error) {
-      defaultErrorHandler(error);
-    }
-  };
 
   return (
     <>
-      <h2>환불 요청 목록</h2>
+      <h2>확정 예약 목록</h2>
       <table>
         <tr>
+          <th>ID</th>
           <th>고객명</th>
+          <th>예약자명</th>
           <th>시작시간</th>
           <th>종료시간</th>
-          <th>동작</th>
+          <th>생성시각</th>
+          <th>확정 시각</th>
         </tr>
         {bookings.map((e) => (
           <tr key={e.booking.id}>
+            <td>{e.booking.id}</td>
             <td>{e.booking.customer.name}</td>
+            <td>{e.booking.holder.name}</td>
             <td>{new Date(e.booking.bookingStart).toLocaleString()}</td>
             <td>{new Date(e.booking.bookingEnd).toLocaleString()}</td>
-            <td>
-              <button onClick={() => modifyBooking(e.booking.id, "REFUND")}>
-                환불처리
-              </button>
-            </td>
+            <td>{new Date(e.booking.createdAt).toLocaleString()}</td>
+            <td>{new Date(e.booking.confirmedAt!).toLocaleString()}</td>
           </tr>
         ))}
       </table>

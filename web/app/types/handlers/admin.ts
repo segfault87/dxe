@@ -8,11 +8,7 @@ import type {
 import type { GroupWithUsers } from "../models/group";
 import type { SelfUser } from "../models/user";
 
-export interface GetPendingBookingsResponse {
-  bookings: BookingWithPayments[];
-}
-
-export interface GetRefundPendingBookingsResponse {
+export interface GetBookingsResponse {
   bookings: BookingWithPayments[];
 }
 

@@ -99,7 +99,7 @@ pub struct Hook {
 }
 
 #[derive(Clone, Debug, Deserialize, Default)]
-pub struct Hooks {
+pub struct PerUnitHooks {
     #[serde(default)]
     pub on_booking_start_buffered: Hook,
     #[serde(default)]
@@ -108,6 +108,20 @@ pub struct Hooks {
     pub on_booking_end: Hook,
     #[serde(default)]
     pub on_booking_buffered: Hook,
+}
+
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct PresenceHooks {
+    #[serde(default)]
+    pub on_enter: Hook,
+    #[serde(default)]
+    pub on_leave: Hook,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct Hooks {
+    pub units: HashMap<UnitId, PerUnitHooks>,
+    pub presence: PresenceHooks,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -121,6 +135,6 @@ pub struct Alert {
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub devices: Vec<Device>,
-    pub hooks: HashMap<UnitId, Hooks>,
+    pub hooks: Hooks,
     pub alerts: Vec<Alert>,
 }

@@ -19,6 +19,10 @@
         flex: 1;
         font-weight: bold;
 
+        a {
+            text-decoration: none;
+        }
+
         a:hover::after {
             content: "¶";
             color: #bbb;

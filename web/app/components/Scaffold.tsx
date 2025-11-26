@@ -2,8 +2,11 @@ import { NavLink, Outlet } from "react-router";
 
 import "./Scaffold.css";
 import LogoType from "../assets/logotype.svg";
+import { useAuth } from "../context/AuthContext";
 
 export default function Scaffold() {
+  const auth = useAuth();
+
   return (
     <main>
       <nav className="header">
@@ -28,6 +31,11 @@ export default function Scaffold() {
           <NavLink to="/my" end>
             조회
           </NavLink>
+          {auth?.user.isAdministrator ? (
+            <NavLink to="/admin" end>
+              관리자
+            </NavLink>
+          ) : null}
         </div>
       </nav>
       <div className="content">

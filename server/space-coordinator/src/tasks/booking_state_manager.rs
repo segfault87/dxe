@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Local, Utc};
 use dxe_s2s_shared::entities::BookingWithUsers;
-use dxe_s2s_shared::handlers::GetPendingBookingsResponse;
+use dxe_s2s_shared::handlers::{BookingType, GetBookingsResponse};
 use dxe_types::{BookingId, UnitId};
 use tokio_task_scheduler::{Scheduler, SchedulerError, Task, TaskBuilder};
 
@@ -71,7 +71,10 @@ impl BookingStateManager {
     async fn update(self: Arc<Self>) {
         let mut response = match self
             .client
-            .get::<GetPendingBookingsResponse>("/pending-bookings", None)
+            .get::<GetBookingsResponse>(
+                "/pending-bookings",
+                Some(&format!("type={}", BookingType::Pending)),
+            )
             .await
         {
             Ok(v) => v,
@@ -141,6 +144,36 @@ impl BookingStateManager {
             Arc::clone(&self).on_new_booking(booking, &now).await;
         }
         for booking in bookings_to_delete {
+            let booking_start_with_buffer =
+                create_task_name(&booking.booking.id, BookingEventType::StartWithBuffer);
+            let booking_start = create_task_name(&booking.booking.id, BookingEventType::Start);
+            let booking_end = create_task_name(&booking.booking.id, BookingEventType::End);
+            let booking_end_with_buffer =
+                create_task_name(&booking.booking.id, BookingEventType::EndWithBuffer);
+
+            let mut tasks_to_remove = vec![];
+
+            {
+                let mut pending_tasks = self.pending_tasks.lock().unwrap();
+
+                if let Some(id) = pending_tasks.remove(&booking_start_with_buffer) {
+                    tasks_to_remove.push(id);
+                }
+                if let Some(id) = pending_tasks.remove(&booking_start) {
+                    tasks_to_remove.push(id);
+                }
+                if let Some(id) = pending_tasks.remove(&booking_end) {
+                    tasks_to_remove.push(id);
+                }
+                if let Some(id) = pending_tasks.remove(&booking_end_with_buffer) {
+                    tasks_to_remove.push(id);
+                }
+            }
+
+            for task in tasks_to_remove {
+                let _ = self.scheduler.remove(&task).await;
+            }
+
             Arc::clone(&self).on_booking_removed(booking, &now).await;
         }
 

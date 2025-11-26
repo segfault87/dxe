@@ -1,25 +1,27 @@
 import API from "../api";
+import { toUtcIso8601 } from "../lib/datetime";
 import type {
-  GetPendingBookingsResponse,
+  GetBookingsResponse,
   GetReservationsResponse,
   ModifyBookingResponse,
   ModifyBookingRequest,
   CreateReservationRequest,
   CreateReservationResponse,
-  GetRefundPendingBookingsResponse,
   GetUsersResponse,
   GetGroupsResponse,
 } from "../types/handlers/admin";
 import type { BookingId, ReservationId, UnitId } from "../types/models/base";
 
-const getPendingBookings = () => {
-  return API.get<GetPendingBookingsResponse>("/admin/bookings/pending");
-};
+const getBookings = (
+  type: "confirmed" | "pending" | "refund_pending" | "canceled",
+  dateFrom?: Date,
+) => {
+  let query = `type=${type}`;
+  if (dateFrom) {
+    query += `&date_from=${toUtcIso8601(dateFrom)}`;
+  }
 
-const getRefundPendingBookings = () => {
-  return API.get<GetRefundPendingBookingsResponse>(
-    "/admin/bookings/pending-refunds",
-  );
+  return API.get<GetBookingsResponse>(`/admin/bookings?${query}`);
 };
 
 const getUsers = () => {
@@ -49,8 +51,7 @@ const deleteReservation = (id: ReservationId) => {
 };
 
 const AdminService = {
-  getPendingBookings,
-  getRefundPendingBookings,
+  getBookings,
   getUsers,
   getGroups,
   modifyBooking,

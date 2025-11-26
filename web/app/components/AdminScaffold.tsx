@@ -16,6 +16,9 @@ export default function AdminScaffold() {
         <div className="navigation">
           <ul>
             <li>
+              <NavLink to="/admin/">확정 예약 목록</NavLink>
+            </li>
+            <li>
               <NavLink to="/admin/pending-bookings">대기중 예약 목록</NavLink>
             </li>
             <li>

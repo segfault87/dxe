@@ -118,8 +118,8 @@ type RouteFiles = {
     id: "components/AdminScaffold";
     page: "/admin" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/reservations";
   };
-  "./pages/Admin/Index.tsx": {
-    id: "pages/Admin/Index";
+  "./pages/Admin/ConfirmedBookings.tsx": {
+    id: "pages/Admin/ConfirmedBookings";
     page: "/admin";
   };
   "./pages/Admin/PendingBookings.tsx": {
@@ -158,7 +158,7 @@ type RouteModules = {
   "pages/legal/TermsOfService": typeof import("./app/./pages/legal/TermsOfService.tsx");
   "pages/JoinGroup": typeof import("./app/./pages/JoinGroup.tsx");
   "components/AdminScaffold": typeof import("./app/./components/AdminScaffold.tsx");
-  "pages/Admin/Index": typeof import("./app/./pages/Admin/Index.tsx");
+  "pages/Admin/ConfirmedBookings": typeof import("./app/./pages/Admin/ConfirmedBookings.tsx");
   "pages/Admin/PendingBookings": typeof import("./app/./pages/Admin/PendingBookings.tsx");
   "pages/Admin/RefundPendingBookings": typeof import("./app/./pages/Admin/RefundPendingBookings.tsx");
   "pages/Admin/Groups": typeof import("./app/./pages/Admin/Groups.tsx");

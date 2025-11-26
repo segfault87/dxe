@@ -112,7 +112,7 @@ impl MqttService {
         Ok(())
     }
 
-    pub async fn publish(
+    async fn publish(
         &self,
         device_name: &DeviceName,
         publish_topic: Z2mPublishTopic,

@@ -7,19 +7,34 @@
 
 .navigation {
     > ul {
-        display: flex;
-        flex-direction: row;
         padding: 0;
+        overflow-x: auto;
+        width: 100%;
+        height: fit-content;
+        white-space: nowrap;
 
         > li {
+            display: inline-block;
             padding: 0;
             list-style: none;
             margin-right: 16px;
 
             > a {
                 font-size: 18px;
+                text-decoration: none;
+            }
+
+            .active {
+                text-decoration: underline;
+                text-decoration-thickness: 2px;
+                text-underline-offset: 8px;
             }
         }
     }
+
     border-bottom: #ebc1ae 1px solid;
+}
+
+table {
+    width: 100%;
 }

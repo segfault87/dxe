@@ -1,7 +1,6 @@
 mod booking;
+mod bookings;
 mod groups;
-mod pending_bookings;
-mod pending_refunds;
 mod reservation;
 mod users;
 
@@ -9,11 +8,8 @@ use actix_web::web;
 
 pub fn scope() -> actix_web::Scope {
     web::scope("/admin")
-        .service(web::resource("/bookings/pending").route(web::get().to(pending_bookings::get)))
-        .service(
-            web::resource("/bookings/pending-refunds").route(web::get().to(pending_refunds::get)),
-        )
         .service(web::resource("/booking/{booking_id}").route(web::put().to(booking::put)))
+        .service(web::resource("/bookings").route(web::get().to(bookings::get)))
         .service(
             web::resource("/reservations")
                 .route(web::get().to(reservation::get))

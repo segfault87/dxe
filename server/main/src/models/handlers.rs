@@ -14,15 +14,25 @@ pub mod admin {
 
     use super::*;
 
-    #[derive(Debug, Serialize)]
-    #[serde(rename_all = "camelCase")]
-    pub struct GetPendingBookingsResponse {
-        pub bookings: Vec<BookingWithPayments>,
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    pub enum GetBookingsType {
+        Confirmed,
+        Pending,
+        RefundPending,
+        Canceled,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    pub struct GetBookingsQuery {
+        pub r#type: GetBookingsType,
+        pub date_from: Option<DateTime<FixedOffset>>,
     }
 
     #[derive(Debug, Serialize)]
     #[serde(rename_all = "camelCase")]
-    pub struct GetRefundPendingBookingsResponse {
+    pub struct GetBookingsResponse {
         pub bookings: Vec<BookingWithPayments>,
     }
 

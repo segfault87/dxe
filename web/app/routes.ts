@@ -21,7 +21,7 @@ export default [
   route("join/:groupId", "./pages/JoinGroup.tsx"),
   ...prefix("/admin", [
     layout("./components/AdminScaffold.tsx", [
-      index("./pages/Admin/Index.tsx"),
+      index("./pages/Admin/ConfirmedBookings.tsx"),
       route("pending-bookings", "./pages/Admin/PendingBookings.tsx"),
       route("pending-refunds", "./pages/Admin/RefundPendingBookings.tsx"),
       route("groups", "./pages/Admin/Groups.tsx"),

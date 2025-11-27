@@ -5,7 +5,8 @@ edition = "2024"
 
 [dependencies]
 chrono = { workspace = true }
-reqwest = { workspace = true }
+gcp_auth = "0.12"
+reqwest = { workspace = true, features = ["multipart", "stream"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

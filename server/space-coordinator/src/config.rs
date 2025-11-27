@@ -2,8 +2,9 @@ pub mod z2m;
 
 use std::collections::HashMap;
 use std::net::IpAddr;
+use std::path::PathBuf;
 
-use dxe_types::SpaceId;
+use dxe_types::{SpaceId, UnitId};
 use serde::Deserialize;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Deserialize)]
@@ -104,6 +105,39 @@ pub struct NotificationConfig {
     pub ntfy: Option<NtfyConfig>,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct GoogleDriveConfig {
+    pub parent: String,
+}
+
+impl dxe_extern::google_cloud::drive::GoogleDriveConfig for GoogleDriveConfig {
+    fn parent(&self) -> &str {
+        &self.parent
+    }
+}
+
+#[derive(Deserialize, Debug)]
+pub struct GoogleApiConfig {
+    pub service_account_path: PathBuf,
+    pub drive: GoogleDriveConfig,
+}
+
+impl dxe_extern::google_cloud::GoogleCloudAuthConfig for GoogleApiConfig {
+    fn service_account_path(&self) -> &PathBuf {
+        &self.service_account_path
+    }
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct AudioRecorderConfig {
+    pub pw_record_bin: String,
+    pub lame_bin: String,
+    pub target_device: String,
+    pub mp3_bitrate: i32,
+    pub sampling_rate: i32,
+    pub path_prefix: PathBuf,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub space_id: SpaceId,
@@ -114,6 +148,8 @@ pub struct Config {
     pub notifications: NotificationConfig,
     pub carpark_exemption: Option<CarparkExemptionConfig>,
     pub presence_monitor: PresenceMonitorConfig,
+    pub google_apis: GoogleApiConfig,
+    pub audio_recorder: HashMap<UnitId, AudioRecorderConfig>,
     pub z2m: z2m::Config,
 }
 

@@ -6,5 +6,6 @@ edition = "2024"
 [dependencies]
 chrono = { workspace = true }
 serde = { workspace = true }
+url = { workspace = true }
 
 dxe-types = { path = "../types" }

@@ -12,6 +12,7 @@ use crate::services::carpark_exemption::CarparkExemptionService;
 use crate::services::mqtt::MqttService;
 use crate::services::notification::NotificationService;
 use crate::tasks::TaskContext;
+use crate::tasks::audio_recorder::AudioRecorder;
 use crate::tasks::booking_state_manager::BookingStateManager;
 use crate::tasks::carpark_exempter::CarparkExempter;
 use crate::tasks::presence_monitor::PresenceMonitor;
@@ -26,6 +27,7 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
+    let _ = rustls::crypto::ring::default_provider().install_default();
 
     let args = Args::parse();
     let config = toml::from_str::<Config>(&std::fs::read_to_string(&args.config_path)?)?;
@@ -55,9 +57,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         notification_service.clone(),
     );
     z2m_controller.start().await;
-
     let (z2m_controller, z2m_consumer_task, z2m_controller_task) = z2m_controller.task();
+
+    let audio_recorder = AudioRecorder::new(
+        &config.google_apis,
+        config.audio_recorder.clone(),
+        client.clone(),
+    )
+    .await?;
+    let (audio_recorder, audio_recorder_task) = audio_recorder.task();
+
     booking_state_manager.add_callback(z2m_controller.clone());
+    booking_state_manager.add_callback(audio_recorder);
+
     presence_monitor.add_callback(z2m_controller);
 
     let presence_monitor_task = presence_monitor.task();
@@ -66,6 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     task_context.add_task(presence_monitor_task).await?;
     task_context.add_task(booking_state_manager_task).await?;
     task_context.add_task(z2m_controller_task).await?;
+    task_context.add_task(audio_recorder_task).await?;
 
     if let Some(carpark_exemption) = &config.carpark_exemption {
         let carpark_exempter = CarparkExempter::new(

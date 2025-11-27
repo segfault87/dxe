@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 
-use dxe_types::UnitId;
+use dxe_types::{BookingId, UnitId};
 use serde::{Deserialize, Serialize};
 
 use crate::Timestamp;
@@ -40,4 +40,10 @@ pub struct GetBookingsResponse {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GetUnitsResponse {
     pub units: Vec<Unit>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UpdateAudioRequest {
+    pub url: url::Url,
+    pub expires_in: Timestamp,
 }

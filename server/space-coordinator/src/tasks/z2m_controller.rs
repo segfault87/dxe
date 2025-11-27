@@ -394,36 +394,6 @@ impl Z2mController {
         })
     }
 
-    fn is_in_use(&self, device: &z2m::Device) -> bool {
-        let guard = self.active_bookings.lock().unwrap();
-
-        let Some(active_bookings) = guard.as_ref() else {
-            return false;
-        };
-
-        let active_bookings = active_bookings
-            .iter()
-            .filter_map(|(k, v)| if !v.is_empty() { Some(k.clone()) } else { None })
-            .collect::<Vec<_>>();
-        for unit_id in active_bookings {
-            let Some(per_unit_hooks) = self.per_unit_hooks.get(&unit_id) else {
-                continue;
-            };
-
-            if let z2m::SwitchState::On = per_unit_hooks
-                .on_booking_start
-                .switches
-                .get(&device.name)
-                .cloned()
-                .unwrap_or(z2m::SwitchState::Off)
-            {
-                return true;
-            }
-        }
-
-        false
-    }
-
     fn is_active_bookings(&self) -> Option<bool> {
         let guard = self.active_bookings.lock().unwrap();
 
@@ -607,16 +577,6 @@ impl Z2mController {
         if self.active_bookings.lock().unwrap().is_none() || self.presence.lock().unwrap().is_none()
         {
             return;
-        }
-
-        for device in self.devices.values() {
-            if device.classes.power_meter.is_some() {
-                log::info!(
-                    "power reading: {} {:?}",
-                    device.name,
-                    self.read_power_meter(device).unwrap()
-                );
-            }
         }
 
         self.handle_alert_tasks().await;

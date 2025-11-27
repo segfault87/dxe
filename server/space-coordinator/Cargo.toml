@@ -10,9 +10,11 @@ chrono = { workspace = true }
 clap = { workspace = true }
 ed25519-compact = "2"
 env_logger = "0.11"
+libc = "0.2"
 log = { workspace = true }
 ping = "0.7"
 reqwest = { workspace = true }
+rustls = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

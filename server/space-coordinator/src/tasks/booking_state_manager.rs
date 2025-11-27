@@ -13,13 +13,15 @@ use crate::client::DxeClient;
 #[derive(Default)]
 pub struct BookingStates {
     pub bookings_1d: HashMap<UnitId, Vec<BookingWithUsers>>,
+    pub has_initialized: bool,
 }
 
 pub struct BookingStateManager {
     states: Arc<Mutex<BookingStates>>,
+
     scheduler: Scheduler,
     client: DxeClient,
-    callbacks: Vec<Box<Arc<dyn EventStateCallback<BookingWithUsers> + Send + Sync + 'static>>>,
+    callbacks: Vec<Arc<dyn EventStateCallback<BookingWithUsers> + Send + Sync + 'static>>,
     pending_tasks: Mutex<HashMap<String, String>>,
 }
 
@@ -42,7 +44,7 @@ fn create_task_name(booking_id: &BookingId, r#type: BookingEventType) -> String 
 }
 
 fn temp_pending_active_bookings() -> Vec<BookingWithUsers> {
-    serde_json::from_str(include_str!("temp.json")).unwrap()
+    serde_json::from_str(include_str!("../../booking_overrides.json")).unwrap()
 }
 
 impl BookingStateManager {
@@ -65,7 +67,7 @@ impl BookingStateManager {
     where
         T: EventStateCallback<BookingWithUsers> + Send + Sync + 'static,
     {
-        self.callbacks.push(Box::new(callback));
+        self.callbacks.push(callback);
     }
 
     async fn update(self: Arc<Self>) {
@@ -108,7 +110,7 @@ impl BookingStateManager {
 
                 let mut previous_keys = current_bookings
                     .iter()
-                    .map(|v| v.booking.id.clone())
+                    .map(|v| v.booking.id)
                     .collect::<HashSet<_>>();
                 for booking in bookings {
                     let delta = booking.booking.date_start_w_buffer.to_utc() - now;
@@ -205,8 +207,9 @@ impl BookingStateManager {
                         .schedule_task_if_required(
                             start_with_buffer_task.as_str(),
                             start_with_buffer,
-                            now.clone(),
+                            now,
                             move || {
+                                log::info!("booking_start_with_buffer event triggered.");
                                 let arc_self = arc_self.clone();
                                 let booking = booking.clone();
                                 let task_name = task_name.clone();
@@ -234,29 +237,25 @@ impl BookingStateManager {
                     let task_name = start_task.clone();
 
                     Arc::clone(&self)
-                        .schedule_task_if_required(
-                            start_task.as_str(),
-                            start,
-                            now.clone(),
-                            move || {
-                                let arc_self = arc_self.clone();
-                                let booking = booking.clone();
-                                let task_name = task_name.clone();
-                                tokio::task::spawn(async move {
-                                    Arc::clone(&arc_self).on_booking_start(booking, false).await;
-                                    let task_id = Arc::clone(&arc_self)
-                                        .pending_tasks
-                                        .lock()
-                                        .unwrap()
-                                        .remove(&task_name);
-                                    if let Some(task_id) = task_id {
-                                        let _ = arc_self.scheduler.remove(&task_id).await;
-                                    }
-                                });
+                        .schedule_task_if_required(start_task.as_str(), start, now, move || {
+                            log::info!("booking_start event triggered.");
+                            let arc_self = arc_self.clone();
+                            let booking = booking.clone();
+                            let task_name = task_name.clone();
+                            tokio::task::spawn(async move {
+                                Arc::clone(&arc_self).on_booking_start(booking, false).await;
+                                let task_id = Arc::clone(&arc_self)
+                                    .pending_tasks
+                                    .lock()
+                                    .unwrap()
+                                    .remove(&task_name);
+                                if let Some(task_id) = task_id {
+                                    let _ = arc_self.scheduler.remove(&task_id).await;
+                                }
+                            });
 
-                                Ok(())
-                            },
-                        )
+                            Ok(())
+                        })
                         .await;
                 }
 
@@ -266,7 +265,8 @@ impl BookingStateManager {
                     let task_name = end_task.clone();
 
                     Arc::clone(&self)
-                        .schedule_task_if_required(end_task.as_str(), end, now.clone(), move || {
+                        .schedule_task_if_required(end_task.as_str(), end, now, move || {
+                            log::info!("booking_end event triggered.");
                             let arc_self = arc_self.clone();
                             let booking = booking.clone();
                             let task_name = task_name.clone();
@@ -296,8 +296,9 @@ impl BookingStateManager {
                         .schedule_task_if_required(
                             end_with_buffer_task.as_str(),
                             end_with_buffer,
-                            now.clone(),
+                            now,
                             move || {
+                                log::info!("booking_end_with_buffer event triggered.");
                                 let arc_self = arc_self.clone();
                                 let booking = booking.clone();
                                 let task_name = task_name.clone();
@@ -317,6 +318,17 @@ impl BookingStateManager {
                             },
                         )
                         .await;
+                }
+            }
+        }
+
+        {
+            let mut states = self.states.lock().unwrap();
+            if !states.has_initialized {
+                states.has_initialized = true;
+
+                for callback in self.callbacks.iter() {
+                    callback.on_initialized();
                 }
             }
         }
@@ -406,22 +418,34 @@ impl BookingStateManager {
             }
         }
 
-        let _ = self.scheduler.remove(&create_task_name(
-            &booking.booking.id,
-            BookingEventType::Start,
-        ));
-        let _ = self.scheduler.remove(&create_task_name(
-            &booking.booking.id,
-            BookingEventType::StartWithBuffer,
-        ));
-        let _ = self.scheduler.remove(&create_task_name(
-            &booking.booking.id,
-            BookingEventType::End,
-        ));
-        let _ = self.scheduler.remove(&create_task_name(
-            &booking.booking.id,
-            BookingEventType::EndWithBuffer,
-        ));
+        let _ = self
+            .scheduler
+            .remove(&create_task_name(
+                &booking.booking.id,
+                BookingEventType::Start,
+            ))
+            .await;
+        let _ = self
+            .scheduler
+            .remove(&create_task_name(
+                &booking.booking.id,
+                BookingEventType::StartWithBuffer,
+            ))
+            .await;
+        let _ = self
+            .scheduler
+            .remove(&create_task_name(
+                &booking.booking.id,
+                BookingEventType::End,
+            ))
+            .await;
+        let _ = self
+            .scheduler
+            .remove(&create_task_name(
+                &booking.booking.id,
+                BookingEventType::EndWithBuffer,
+            ))
+            .await;
     }
 
     pub fn task(self) -> Task {

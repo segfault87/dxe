@@ -1,7 +1,7 @@
 pub mod booking_state_manager;
 pub mod carpark_exempter;
-pub mod mqtt_controller;
 pub mod presence_monitor;
+pub mod z2m_controller;
 
 use std::collections::HashMap;
 

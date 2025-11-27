@@ -380,15 +380,11 @@ pub async fn get_bookings_by_unit_id(
     .await?
     .into_iter()
     .filter(|v| {
-        if confirmed_only {
-            if !v.b_confirmed_at.map(|v| &v < now).unwrap_or(false) {
-                return false;
-            }
+        if confirmed_only && !v.b_confirmed_at.map(|v| &v < now).unwrap_or(false) {
+            return false;
         }
-        if exclude_canceled {
-            if v.b_canceled_at.map(|v| &v < now).unwrap_or(false) {
-                return false;
-            }
+        if exclude_canceled && v.b_canceled_at.map(|v| &v < now).unwrap_or(false) {
+            return false;
         }
 
         true

@@ -15,7 +15,7 @@ use crate::models::Error;
 
 fn convert_user(user: &RawUser) -> User {
     User {
-        id: user.id.clone(),
+        id: user.id,
         name: user.name.clone(),
         license_plate_number: user.license_plate_number.clone(),
     }
@@ -23,7 +23,7 @@ fn convert_user(user: &RawUser) -> User {
 
 fn convert_booking(booking: &RawBooking, booking_config: &BookingConfig) -> Booking {
     Booking {
-        id: booking.id.clone(),
+        id: booking.id,
         unit_id: booking.unit_id.clone(),
         date_start_w_buffer: (booking.time_from - booking_config.buffer_time.0).into(),
         date_start: booking.time_from.into(),

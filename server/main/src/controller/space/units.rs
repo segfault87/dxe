@@ -13,7 +13,7 @@ pub async fn get(
 ) -> Result<web::Json<GetUnitsResponse>, Error> {
     let mut connection = database.begin().await?;
 
-    let units = get_units_by_space_id(&mut *connection, &context.space_id).await?;
+    let units = get_units_by_space_id(&mut connection, &context.space_id).await?;
 
     Ok(web::Json(GetUnitsResponse {
         units: units

@@ -114,7 +114,7 @@ impl DxeClient {
                 &path,
                 query,
                 expires_in.as_str(),
-                body.as_ref().map(|v| v.as_str()),
+                body.as_deref(),
             ),
             Some(Noise::generate()),
         );

@@ -1,9 +1,24 @@
 pub mod z2m;
 
+use std::collections::HashMap;
 use std::net::IpAddr;
 
 use dxe_types::SpaceId;
 use serde::Deserialize;
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AlertPriority {
+    High,
+    Default,
+    Low,
+}
+
+impl Default for AlertPriority {
+    fn default() -> Self {
+        Self::Default
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub struct AmanoConfig {
@@ -57,6 +72,38 @@ pub struct MqttConfig {
     pub password: String,
 }
 
+#[derive(Clone, Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum NotificationBackend {
+    Ntfy,
+}
+
+#[derive(Clone, Deserialize, Debug)]
+pub struct NtfyConfig {
+    token: Option<String>,
+    channels: HashMap<String, String>,
+}
+
+impl dxe_extern::ntfy::NtfyConfig for NtfyConfig {
+    fn access_token(&self) -> Option<&str> {
+        self.token.as_deref()
+    }
+
+    fn channel(&self, channel: dxe_extern::ntfy::Channel) -> &str {
+        match channel {
+            dxe_extern::ntfy::Channel::General => self.channels.get("general").unwrap(),
+            dxe_extern::ntfy::Channel::Important => self.channels.get("important").unwrap(),
+            dxe_extern::ntfy::Channel::Minor => self.channels.get("minor").unwrap(),
+        }
+    }
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct NotificationConfig {
+    pub backend: NotificationBackend,
+    pub ntfy: Option<NtfyConfig>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub space_id: SpaceId,
@@ -64,6 +111,7 @@ pub struct Config {
     pub request_expires_in_secs: i64,
     pub private_key: Vec<u8>,
     pub mqtt: MqttConfig,
+    pub notifications: NotificationConfig,
     pub carpark_exemption: Option<CarparkExemptionConfig>,
     pub presence_monitor: PresenceMonitorConfig,
     pub z2m: z2m::Config,

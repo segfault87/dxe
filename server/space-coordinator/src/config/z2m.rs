@@ -1,15 +1,16 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use dxe_types::UnitId;
 use serde::Deserialize;
 
-use crate::services::mqtt::DeviceName;
+use crate::tasks::z2m_controller::DeviceName;
 
 #[derive(Copy, Clone, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PresencePolicy {
     Default,
     StayOn,
+    TurnOnWhilePresent,
 }
 
 impl Default for PresencePolicy {
@@ -21,11 +22,20 @@ impl Default for PresencePolicy {
 #[derive(Clone, Debug, Deserialize)]
 pub struct DeviceClassPowerMeter {}
 
-#[derive(Copy, Clone, Debug, Deserialize)]
+#[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum SwitchState {
     On,
     Off,
+}
+
+impl Display for SwitchState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::On => write!(f, "ON"),
+            Self::Off => write!(f, "OFF"),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Deserialize)]
@@ -101,13 +111,9 @@ pub struct Hook {
 #[derive(Clone, Debug, Deserialize, Default)]
 pub struct PerUnitHooks {
     #[serde(default)]
-    pub on_booking_start_buffered: Hook,
-    #[serde(default)]
     pub on_booking_start: Hook,
     #[serde(default)]
     pub on_booking_end: Hook,
-    #[serde(default)]
-    pub on_booking_buffered: Hook,
 }
 
 #[derive(Clone, Debug, Deserialize, Default)]
@@ -129,11 +135,15 @@ pub struct Alert {
     pub name: String,
     pub device: DeviceName,
     pub conditions: Vec<Condition>,
-    pub presence: bool,
+    #[serde(default)]
+    pub priority: super::AlertPriority,
+    pub presence: Option<bool>,
+    pub booking: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    pub command_timeout_secs: u64,
     pub devices: Vec<Device>,
     pub hooks: Hooks,
     pub alerts: Vec<Alert>,

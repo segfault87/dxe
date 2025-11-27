@@ -7,12 +7,15 @@ use dxe_types::BookingId;
 use tokio_task_scheduler::{Task, TaskBuilder};
 
 use crate::callback::EventStateCallback;
+use crate::config::AlertPriority;
 use crate::services::carpark_exemption::CarparkExemptionService;
+use crate::services::notification::NotificationService;
 use crate::tasks::booking_state_manager::BookingStates;
 
 pub struct CarparkExempter {
     booking_states: Arc<Mutex<BookingStates>>,
     service: CarparkExemptionService,
+    notification_service: NotificationService,
 
     active_bookings: Mutex<HashSet<BookingId>>,
 }
@@ -21,10 +24,12 @@ impl CarparkExempter {
     pub fn new(
         booking_states: Arc<Mutex<BookingStates>>,
         service: CarparkExemptionService,
+        notification_service: NotificationService,
     ) -> Self {
         Self {
             booking_states,
             service,
+            notification_service,
 
             active_bookings: Mutex::new(HashSet::new()),
         }
@@ -43,7 +48,11 @@ impl CarparkExempter {
                             if let Some(license_plate_number) = &user.license_plate_number
                                 && !license_plate_number.is_empty()
                             {
-                                license_plate_numbers.insert(license_plate_number.clone());
+                                license_plate_numbers.insert((
+                                    booking.booking.customer_name.clone(),
+                                    user.name.clone(),
+                                    license_plate_number.clone(),
+                                ));
                             }
                         }
                     }
@@ -51,8 +60,13 @@ impl CarparkExempter {
             }
         }
 
-        for license_plate_number in license_plate_numbers {
-            let _ = self.service.exempt(&license_plate_number).await;
+        for (customer_name, user_name, license_plate_number) in license_plate_numbers {
+            if let Err(e) = match self.service.exempt(&license_plate_number).await {
+                Ok(()) => self.notification_service.notify(AlertPriority::Low, format!("Car parking exempted sucessfully for user {user_name} ({customer_name})")).await,
+                Err(e) => self.notification_service.notify(AlertPriority::Low, format!("Car parking exemption error: {e}")).await,
+            } {
+                log::warn!("Could not send notification while processing parking exemtpion: {e}");
+            }
         }
     }
 
@@ -83,7 +97,7 @@ impl EventStateCallback<BookingWithUsers> for CarparkExempter {
             self.active_bookings
                 .lock()
                 .unwrap()
-                .insert(event.booking.id.clone());
+                .insert(event.booking.id);
         }
 
         Ok(())
@@ -113,7 +127,7 @@ impl EventStateCallback<BookingWithUsers> for CarparkExempter {
             self.active_bookings
                 .lock()
                 .unwrap()
-                .insert(event.booking.id.clone());
+                .insert(event.booking.id);
         }
 
         Ok(())

@@ -9,7 +9,7 @@ pub struct Timestamp(DateTime<Utc>);
 
 impl Timestamp {
     pub fn to_utc(&self) -> DateTime<Utc> {
-        self.0.clone()
+        self.0
     }
 }
 

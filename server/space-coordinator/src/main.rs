@@ -10,11 +10,12 @@ use crate::client::DxeClient;
 use crate::config::Config;
 use crate::services::carpark_exemption::CarparkExemptionService;
 use crate::services::mqtt::MqttService;
+use crate::services::notification::NotificationService;
 use crate::tasks::TaskContext;
 use crate::tasks::booking_state_manager::BookingStateManager;
 use crate::tasks::carpark_exempter::CarparkExempter;
-use crate::tasks::mqtt_controller::MqttController;
 use crate::tasks::presence_monitor::PresenceMonitor;
+use crate::tasks::z2m_controller::Z2mController;
 
 #[derive(clap::Parser, Debug)]
 struct Args {
@@ -37,34 +38,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     client.synchronize_clock().await?;
 
+    let notification_service = NotificationService::new(&config.notifications);
+
     let mut task_context = TaskContext::new().await?;
 
-    let (presence_state, presence_monitor) = PresenceMonitor::new(&config.presence_monitor);
-    let presence_monitor_task = presence_monitor.task();
+    let (_presence_state, mut presence_monitor) = PresenceMonitor::new(&config.presence_monitor);
 
     let (booking_states, mut booking_state_manager) =
         BookingStateManager::new(client.clone(), task_context.scheduler.clone());
 
     let (mqtt_service, mqtt_service_task) = MqttService::new(&config.mqtt);
-    for device in config.z2m.devices.iter() {
-        mqtt_service.subscribe(&device).await?;
-    }
 
-    let mqtt_controller =
-        MqttController::new(&config.z2m, mqtt_service.clone(), presence_state.clone());
-    let (mqtt_controller, mqtt_consumer, mqtt_controller_task) = mqtt_controller.task();
-    booking_state_manager.add_callback(mqtt_controller);
-    task_context.add_task(mqtt_controller_task).await?;
+    let mut z2m_controller = Z2mController::new(
+        &config.z2m,
+        mqtt_service.clone(),
+        notification_service.clone(),
+    );
+    z2m_controller.start().await;
 
+    let (z2m_controller, z2m_consumer_task, z2m_controller_task) = z2m_controller.task();
+    booking_state_manager.add_callback(z2m_controller.clone());
+    presence_monitor.add_callback(z2m_controller);
+
+    let presence_monitor_task = presence_monitor.task();
     let booking_state_manager_task = booking_state_manager.task();
 
     task_context.add_task(presence_monitor_task).await?;
     task_context.add_task(booking_state_manager_task).await?;
+    task_context.add_task(z2m_controller_task).await?;
 
     if let Some(carpark_exemption) = &config.carpark_exemption {
         let carpark_exempter = CarparkExempter::new(
             booking_states.clone(),
             CarparkExemptionService::new(carpark_exemption),
+            notification_service.clone(),
         );
 
         task_context.add_task(carpark_exempter.task()).await?;
@@ -72,8 +79,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     task_context.run().await;
 
+    z2m_consumer_task.abort();
     mqtt_service_task.abort();
-    mqtt_consumer.abort();
 
     Ok(())
 }

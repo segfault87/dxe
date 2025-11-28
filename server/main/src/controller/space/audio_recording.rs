@@ -38,10 +38,12 @@ pub async fn post(
             if let Err(e) = send_audio_recording(
                 &biztalk_sender,
                 &mut tx,
-                timezone_config,
+                &timezone_config,
                 &booking,
                 &audio_recording,
-            ) {
+            )
+            .await
+            {
                 log::warn!("Couldn't send audio recording notification: {e}");
             }
         }

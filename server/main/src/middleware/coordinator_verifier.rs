@@ -112,9 +112,7 @@ where
 
                 let request_body = request_body.freeze();
 
-                let (_, mut payload) = actix_http::h1::Payload::create(false);
-                payload.unread_data(request_body.clone());
-                req.set_payload(actix_http::Payload::H1 { payload });
+                req.set_payload(request_body.clone().into());
 
                 request_body
             } else {
@@ -168,8 +166,6 @@ where
             message.extend_from_slice(req.path().as_bytes());
             message.extend_from_slice(req.query_string().as_bytes());
             message.extend(request_body);
-
-            println!("message: {}", String::from_utf8_lossy(&message));
 
             public_key
                 .verify(message.freeze(), &signature)

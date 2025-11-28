@@ -59,3 +59,10 @@ export interface Reservation {
   temporary: boolean;
   remark: string | null;
 }
+
+export interface AudioRecording {
+  bookingId: BookingId;
+  url: string;
+  createdAt: DateTime;
+  expiresIn: DateTime | null;
+}

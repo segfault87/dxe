@@ -67,6 +67,7 @@ pub struct PresenceMonitorConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct MqttConfig {
+    pub endpoint_name: String,
     pub host: String,
     pub port: u16,
     pub username: String,

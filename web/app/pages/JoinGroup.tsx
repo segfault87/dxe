@@ -82,7 +82,9 @@ export function JoinGroup({ loaderData }: { loaderData: LoaderData }) {
 
   return (
     <div className="join-group">
-      <img className="logo" src={LogoType} alt="드림하우스 합주실" />
+      <Link to="/">
+        <img className="logo" src={LogoType} alt="드림하우스 합주실" />
+      </Link>
       {group ? (
         <>
           <p className="message">

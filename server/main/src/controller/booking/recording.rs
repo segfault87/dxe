@@ -13,7 +13,7 @@ use crate::utils::datetime::is_in_effect;
 
 pub async fn get(
     session: UserSession,
-    booking_id: web::Query<BookingId>,
+    booking_id: web::Path<BookingId>,
     database: web::Data<SqlitePool>,
     timezone_config: web::Data<TimeZoneConfig>,
 ) -> Result<web::Json<GetAudioRecordingResponse>, Error> {
@@ -30,7 +30,7 @@ pub async fn get(
         .ok_or(Error::AudioRecordingNotFound)?;
 
     let response = GetAudioRecordingResponse {
-        audio_recording: if !is_in_effect(&audio_recording.expires_in, &now) {
+        audio_recording: if is_in_effect(&audio_recording.expires_in, &now) {
             None
         } else {
             Some(AudioRecording::convert(

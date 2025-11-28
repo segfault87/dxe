@@ -110,7 +110,7 @@ impl DxeClient {
 
         let signature = self.private_key.sign(
             Self::make_signature_body(
-                Method::GET,
+                method.clone(),
                 &path,
                 query,
                 expires_in.as_str(),

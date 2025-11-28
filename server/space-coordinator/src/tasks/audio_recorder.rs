@@ -207,8 +207,6 @@ impl AudioRecorder {
                 }
             };
 
-            return;
-
             let expires_in = Utc::now() + TimeDelta::days(7);
 
             match dxe_client

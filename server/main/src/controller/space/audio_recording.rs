@@ -11,7 +11,7 @@ use crate::services::messaging::biztalk::BiztalkSender;
 use crate::utils::messaging::send_audio_recording;
 
 pub async fn post(
-    booking_id: web::Query<BookingId>,
+    booking_id: web::Path<BookingId>,
     body: web::Json<UpdateAudioRequest>,
     database: web::Data<SqlitePool>,
     timezone_config: web::Data<TimeZoneConfig>,

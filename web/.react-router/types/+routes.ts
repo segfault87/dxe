@@ -40,6 +40,11 @@ type Pages = {
   "/terms-of-service": {
     params: {};
   };
+  "/booking/:bookingId/recording": {
+    params: {
+      "bookingId": string;
+    };
+  };
   "/join/:groupId": {
     params: {
       "groupId": string;
@@ -68,7 +73,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/guide" | "/inquiries" | "/reservation" | "/reservation/:bookingId" | "/login" | "/register" | "/my" | "/terms-of-service" | "/join/:groupId" | "/admin" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/reservations";
+    page: "/" | "/guide" | "/inquiries" | "/reservation" | "/reservation/:bookingId" | "/login" | "/register" | "/my" | "/terms-of-service" | "/booking/:bookingId/recording" | "/join/:groupId" | "/admin" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/reservations";
   };
   "./components/Scaffold.tsx": {
     id: "components/Scaffold";
@@ -109,6 +114,10 @@ type RouteFiles = {
   "./pages/legal/TermsOfService.tsx": {
     id: "pages/legal/TermsOfService";
     page: "/terms-of-service";
+  };
+  "./pages/Recording.tsx": {
+    id: "pages/Recording";
+    page: "/booking/:bookingId/recording";
   };
   "./pages/JoinGroup.tsx": {
     id: "pages/JoinGroup";
@@ -156,6 +165,7 @@ type RouteModules = {
   "pages/Register": typeof import("./app/./pages/Register.tsx");
   "pages/MyPage": typeof import("./app/./pages/MyPage.tsx");
   "pages/legal/TermsOfService": typeof import("./app/./pages/legal/TermsOfService.tsx");
+  "pages/Recording": typeof import("./app/./pages/Recording.tsx");
   "pages/JoinGroup": typeof import("./app/./pages/JoinGroup.tsx");
   "components/AdminScaffold": typeof import("./app/./components/AdminScaffold.tsx");
   "pages/Admin/ConfirmedBookings": typeof import("./app/./pages/Admin/ConfirmedBookings.tsx");

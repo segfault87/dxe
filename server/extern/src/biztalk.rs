@@ -60,9 +60,13 @@ impl BiztalkClient {
             && let Some(token) = payload.token
         {
             *self.token.lock().await = Some(token);
+            Ok(())
+        } else {
+            Err(Error::Biztalk(
+                payload.response_code,
+                payload.message.clone().unwrap_or_default(),
+            ))
         }
-
-        Ok(())
     }
 
     async fn post(&self, request: reqwest::RequestBuilder) -> Result<reqwest::Response, Error> {

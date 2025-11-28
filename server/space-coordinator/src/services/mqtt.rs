@@ -12,8 +12,11 @@ pub struct MqttService {
 
 impl MqttService {
     pub fn new(mqtt_config: &MqttConfig) -> (Self, JoinHandle<()>) {
-        let mut options =
-            MqttOptions::new("mqtt_client", mqtt_config.host.as_str(), mqtt_config.port);
+        let mut options = MqttOptions::new(
+            mqtt_config.endpoint_name.as_str(),
+            mqtt_config.host.as_str(),
+            mqtt_config.port,
+        );
         options.set_credentials(mqtt_config.username.clone(), mqtt_config.password.clone());
 
         let (client, mut event_loop) = AsyncClient::new(options, 10);

@@ -13,15 +13,15 @@ const MESSAGE_RESERVATION_CANCEL_NRF_01: &str =
     include_str!("biztalk/RESERVATION_CANCEL_NRF_01.txt").trim_ascii();
 const MESSAGE_RESERVATION_CANCEL_RF_01: &str =
     include_str!("biztalk/RESERVATION_CANCEL_RF_01.txt").trim_ascii();
-const MESSAGE_RESERVATION_CONFIRMATION_01: &str =
-    include_str!("biztalk/RESERVATION_CONFIRMATION_01.txt").trim_ascii();
+const MESSAGE_RESERVATION_CONFIRMATION_02: &str =
+    include_str!("biztalk/RESERVATION_CONFIRMATION_02.txt").trim_ascii();
 
 const TEMPLATE_AUDIO_READY: &str = "AUDIO_READY_01";
 const TEMPLATE_RESERVATION_CANCEL_CONFIRM: &str = "RESERVATION_CONFIRM_01";
 const TEMPLATE_RESERVATION_CANCEL_NO_REFUND: &str = "RESERVATION_CANCEL_NRF_01";
 const TEMPLATE_RESERVATION_CANCEL_HALF_REFUND: &str = "RESERVATION_CANCEL_HRF_01";
 const TEMPLATE_RESERVATION_CANCEL_FULL_REFUND: &str = "RESERVATION_CANCEL_RF_01";
-const TEMPLATE_RESERVATION_CONFIRMATION: &str = "RESERVATION_CONFIRMATION_01";
+const TEMPLATE_RESERVATION_CONFIRMATION: &str = "RESERVATION_CONFIRMATION_02";
 
 pub type BiztalkRecipient = String;
 pub type BiztalkSender = super::MessagingSender<BiztalkRecipient>;
@@ -51,11 +51,11 @@ impl MessagingBackend for BiztalkClient {
         customer_name: &str,
         reservation_time: &str,
     ) -> Result<(), Self::Error> {
-        let message = MESSAGE_RESERVATION_CONFIRMATION_01
+        let message = MESSAGE_RESERVATION_CONFIRMATION_02
             .replace("#{customer}", customer_name)
             .replace("#{reservation_dt}", reservation_time);
 
-        let url_mobile = format!("https://dream-house.kr/reservation/{booking_id}");
+        let url = format!("https://dream-house.kr/reservation/{booking_id}");
 
         let mut error = None;
 
@@ -69,8 +69,8 @@ impl MessagingBackend for BiztalkClient {
                     Some(vec![AlimTalkButtonAttachment {
                         name: "이용 안내".to_owned(),
                         r#type: Default::default(),
-                        url_mobile: url_mobile.clone(),
-                        url_pc: None,
+                        url_mobile: url.clone(),
+                        url_pc: Some(url.clone()),
                     }]),
                 )
                 .await

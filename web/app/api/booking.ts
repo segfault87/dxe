@@ -6,6 +6,7 @@ import type {
   CancelBookingResponse,
   CheckRequest,
   CheckResponse,
+  GetAudioRecordingResponse,
   GetBookingResponse,
   SubmitBookingRequest,
   SubmitBookingResponse,
@@ -46,6 +47,10 @@ const openDoor = (bookingId: BookingId) => {
   return API.post(`/booking/${bookingId}/open`);
 };
 
+const getAudioRecording = (bookingId: BookingId) => {
+  return API.get<GetAudioRecordingResponse>(`/booking/${bookingId}/recording`);
+};
+
 const BookingService = {
   calendar,
   check,
@@ -54,6 +59,7 @@ const BookingService = {
   cancel,
   amend,
   openDoor,
+  getAudioRecording,
 };
 
 export default BookingService;

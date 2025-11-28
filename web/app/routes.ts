@@ -18,6 +18,8 @@ export default [
     route("my", "./pages/MyPage.tsx"),
     route("terms-of-service", "./pages/legal/TermsOfService.tsx"),
   ]),
+  route("booking/:bookingId/recording", "./pages/Recording.tsx"),
+  route("reservation/:bookingId/recording", "./pages/Recording.tsx"),
   route("join/:groupId", "./pages/JoinGroup.tsx"),
   ...prefix("/admin", [
     layout("./components/AdminScaffold.tsx", [

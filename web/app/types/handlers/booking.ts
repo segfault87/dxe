@@ -1,5 +1,6 @@
 import type { DateTime, IdentityId, UnitId } from "../models/base";
 import type {
+  AudioRecording,
   Booking,
   CashPaymentStatus,
   OccupiedSlot,
@@ -50,4 +51,8 @@ export interface AmendBookingRequest {
 
 export interface AmendBookingResponse {
   booking: Booking;
+}
+
+export interface GetAudioRecordingResponse {
+  audioRecording: AudioRecording | null;
 }

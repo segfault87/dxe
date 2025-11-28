@@ -7,7 +7,7 @@ interface LoaderData {
 }
 
 export async function clientLoader({}: Route.ClientLoaderArgs): Promise<LoaderData> {
-  const result = await AdminService.getBookings("confirmed");
+  const result = await AdminService.getBookings("confirmed", new Date());
 
   return {
     bookings: result.data.bookings,

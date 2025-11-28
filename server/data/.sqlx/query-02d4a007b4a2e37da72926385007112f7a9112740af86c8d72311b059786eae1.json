@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n        SELECT\n            g.id AS \"g_id: GroupId\",\n            g.name AS \"g_name\",\n            g.owner_id AS \"g_owner_id: UserId\",\n            g.is_open AS \"g_is_open: bool\",\n            g.created_at AS \"g_created_at: DateTime<Utc>\",\n            g.deleted_at AS \"g_deleted_at: DateTime<Utc>\",\n            u.id AS \"u_id: UserId\",\n            u.provider AS \"u_provider: IdentityProvider\",\n            u.foreign_id AS \"u_foreign_id\",\n            u.name AS \"u_name\",\n            u.created_at AS \"u_created_at: DateTime<Utc>\",\n            u.deactivated_at AS \"u_deactivated_at: DateTime<Utc>\",\n            u.license_plate_number AS \"u_license_plate_number\"\n        FROM \"group\" \"g\"\n        JOIN group_association \"ga\" ON g.id = ga.group_id\n        JOIN user \"u\" ON ga.user_id = u.id\n        WHERE\n            (g.deleted_at IS NULL OR g.deleted_at < ?1)\n        ORDER BY g.created_at DESC\n        ",
+  "query": "\n        SELECT\n            g.id AS \"g_id: GroupId\",\n            g.name AS \"g_name\",\n            g.owner_id AS \"g_owner_id: UserId\",\n            g.is_open AS \"g_is_open: bool\",\n            g.created_at AS \"g_created_at: DateTime<Utc>\",\n            g.deleted_at AS \"g_deleted_at: DateTime<Utc>\",\n            u.id AS \"u_id: UserId\",\n            u.provider AS \"u_provider: IdentityProvider\",\n            u.foreign_id AS \"u_foreign_id\",\n            u.name AS \"u_name\",\n            u.created_at AS \"u_created_at: DateTime<Utc>\",\n            u.deactivated_at AS \"u_deactivated_at: DateTime<Utc>\",\n            u.license_plate_number AS \"u_license_plate_number\"\n        FROM \"group\" \"g\"\n        JOIN group_association \"ga\" ON g.id = ga.group_id\n        JOIN user \"u\" ON ga.user_id = u.id\n        WHERE\n            (g.deleted_at IS NULL OR g.deleted_at < ?1)\n        ",
   "describe": {
     "columns": [
       {
@@ -88,5 +88,5 @@
       true
     ]
   },
-  "hash": "3860878853efd0b8987d3969d100b2c1db9ca078047325067397cbbf84410456"
+  "hash": "02d4a007b4a2e37da72926385007112f7a9112740af86c8d72311b059786eae1"
 }

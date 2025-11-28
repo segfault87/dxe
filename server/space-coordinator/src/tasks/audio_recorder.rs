@@ -209,7 +209,7 @@ impl AudioRecorder {
 
             match dxe_client
                 .post::<_, serde_json::Value>(
-                    &format!("/booking/{booking_id}/audio"),
+                    &format!("/booking/{booking_id}/recording"),
                     None,
                     UpdateAudioRequest {
                         url,

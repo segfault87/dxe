@@ -130,8 +130,8 @@ impl dxe_extern::google_cloud::GoogleCloudAuthConfig for GoogleApiConfig {
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct AudioRecorderConfig {
-    pub pw_record_bin: String,
-    pub lame_bin: String,
+    pub pw_record_bin: PathBuf,
+    pub lame_bin: PathBuf,
     pub target_device: String,
     pub mp3_bitrate: i32,
     pub sampling_rate: i32,

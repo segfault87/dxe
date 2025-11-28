@@ -106,12 +106,12 @@ pub async fn post(
     );
 
     Ok(web::Json(SubmitBookingResponse {
-        booking: Booking::convert(booking, &timezone_config, &now)
+        booking: Booking::convert(booking, &timezone_config, &now)?
             .finish(booking_config.as_ref(), &now),
         cash_payment_status: BookingCashPaymentStatus::convert(
             cash_payment_status,
             &timezone_config,
             &now,
-        ),
+        )?,
     }))
 }

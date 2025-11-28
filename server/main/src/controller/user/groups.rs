@@ -28,7 +28,7 @@ pub async fn get(
         groups: groups
             .into_iter()
             .map(|v| GroupWithUsers::convert(v, &timezone_config, &now))
-            .collect(),
+            .collect::<Result<Vec<_>, _>>()?,
     }))
 }
 
@@ -50,6 +50,6 @@ pub async fn post(
     tx.commit().await?;
 
     Ok(web::Json(CreateGroupResponse {
-        group: GroupWithUsers::convert(group, &timezone_config, &now),
+        group: GroupWithUsers::convert(group, &timezone_config, &now)?,
     }))
 }

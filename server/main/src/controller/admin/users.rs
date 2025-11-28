@@ -22,6 +22,6 @@ pub async fn get(
         users: users
             .into_iter()
             .map(|v| SelfUser::convert(v, &timezone_config, &now))
-            .collect(),
+            .collect::<Result<_, _>>()?,
     }))
 }

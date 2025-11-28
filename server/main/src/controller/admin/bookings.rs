@@ -54,12 +54,21 @@ pub async fn get(
     Ok(web::Json(GetBookingsResponse {
         bookings: bookings
             .into_iter()
-            .map(|(booking, payment)| BookingWithPayments {
-                booking: Booking::convert(booking, &timezone_config, &now)
-                    .finish(&booking_config, &now),
-                payment: payment
-                    .map(|v| BookingCashPaymentStatus::convert(v, &timezone_config, &now)),
+            .map(|(booking, payment)| -> Result<BookingWithPayments, Error> {
+                Ok(BookingWithPayments {
+                    booking: Booking::convert(booking, &timezone_config, &now)?
+                        .finish(&booking_config, &now),
+                    payment: if let Some(cash_payment_status) = payment {
+                        Some(BookingCashPaymentStatus::convert(
+                            cash_payment_status,
+                            &timezone_config,
+                            &now,
+                        )?)
+                    } else {
+                        None
+                    },
+                })
             })
-            .collect(),
+            .collect::<Result<_, _>>()?,
     }))
 }

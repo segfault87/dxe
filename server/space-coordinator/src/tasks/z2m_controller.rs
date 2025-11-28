@@ -264,8 +264,6 @@ impl Z2mController {
         name: DeviceName,
         states: &[serde_json::Value],
     ) -> Result<(), Error> {
-        return Ok(());
-
         let mut receiver = self.mqtt_service.receiver();
 
         let (tx, rx) = oneshot::channel();

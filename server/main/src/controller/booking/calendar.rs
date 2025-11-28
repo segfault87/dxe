@@ -37,6 +37,6 @@ pub async fn get(
         slots: slots
             .into_iter()
             .map(|v| OccupiedSlot::convert(v, &timezone_config, &now))
-            .collect(),
+            .collect::<Result<_, _>>()?,
     }))
 }

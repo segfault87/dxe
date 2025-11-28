@@ -1,4 +1,5 @@
 mod amend;
+mod audio;
 mod calendar;
 mod cancel;
 mod check;
@@ -24,4 +25,5 @@ pub fn booking_scope() -> actix_web::Scope {
                 .route(web::put().to(amend::put)),
         )
         .service(web::resource("/{booking_id}/open").route(web::post().to(doorlock::post)))
+        .service(web::resource("/{booking_id}/audio").route(web::get().to(audio::get)))
 }

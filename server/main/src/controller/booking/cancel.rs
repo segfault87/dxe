@@ -88,7 +88,14 @@ pub async fn delete(
     );
 
     Ok(web::Json(CancelBookingResponse {
-        cash_payment_status: cash_payment_status
-            .map(|v| BookingCashPaymentStatus::convert(v, &timezone_config, &now)),
+        cash_payment_status: if let Some(cash_payment_status) = cash_payment_status {
+            Some(BookingCashPaymentStatus::convert(
+                cash_payment_status,
+                &timezone_config,
+                &now,
+            )?)
+        } else {
+            None
+        },
     }))
 }

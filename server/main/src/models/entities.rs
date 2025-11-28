@@ -122,3 +122,12 @@ pub struct BookingWithPayments {
     pub booking: Booking,
     pub payment: Option<BookingCashPaymentStatus>,
 }
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioRecording {
+    pub booking_id: BookingId,
+    pub url: url::Url,
+    pub created_at: DateTime<FixedOffset>,
+    pub expires_in: Option<DateTime<FixedOffset>>,
+}

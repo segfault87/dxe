@@ -48,6 +48,6 @@ pub async fn put(
     tx.commit().await?;
 
     Ok(web::Json(AmendBookingResponse {
-        booking: Booking::convert(booking, timezone_config.as_ref(), &now),
+        booking: Booking::convert(booking, timezone_config.as_ref(), &now)?,
     }))
 }

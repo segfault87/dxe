@@ -22,6 +22,6 @@ pub async fn get(
         groups: groups
             .into_iter()
             .map(|v| GroupWithUsers::convert(v, &timezone_config, &now))
-            .collect(),
+            .collect::<Result<_, _>>()?,
     }))
 }

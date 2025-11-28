@@ -45,8 +45,8 @@ pub async fn get(
     for booking in bookings {
         let unit_id = booking.unit_id.clone();
 
-        let booking =
-            Booking::convert(booking, &timezone_config, &now).finish(booking_config.as_ref(), &now);
+        let booking = Booking::convert(booking, &timezone_config, &now)?
+            .finish(booking_config.as_ref(), &now);
 
         if !active_bookings.contains_key(&unit_id) && booking.status == BookingStatus::Buffered
             || booking.status == BookingStatus::InProgress

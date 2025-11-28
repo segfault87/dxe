@@ -28,9 +28,16 @@ pub async fn get(
     let cash_payment_status = get_cash_payment_status(&mut tx, booking_id.as_ref()).await?;
 
     Ok(web::Json(GetBookingResponse {
-        booking: Booking::convert(booking, &timezone_config, &now)
+        booking: Booking::convert(booking, &timezone_config, &now)?
             .finish(booking_config.as_ref(), &now),
-        cash_payment_status: cash_payment_status
-            .map(|v| BookingCashPaymentStatus::convert(v, &timezone_config, &now)),
+        cash_payment_status: if let Some(cash_payment_status) = cash_payment_status {
+            Some(BookingCashPaymentStatus::convert(
+                cash_payment_status,
+                &timezone_config,
+                &now,
+            )?)
+        } else {
+            None
+        },
     }))
 }

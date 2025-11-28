@@ -394,12 +394,13 @@ impl BookingStateManager {
     async fn on_new_booking(self: Arc<Self>, booking: BookingWithUsers, now: &DateTime<Utc>) {
         let start_w_buffer = booking.booking.date_start_w_buffer.to_utc();
         let start = booking.booking.date_start.to_utc();
+        let end = booking.booking.date_end.to_utc();
         let end_w_buffer = booking.booking.date_end_w_buffer.to_utc();
 
         let is_in_progress = &start_w_buffer <= now && now < &end_w_buffer;
 
         if is_in_progress {
-            let has_started = now > &start;
+            let has_started = &start < now && now < &end;
 
             for callback in self.callbacks.iter() {
                 if let Err(e) = callback.on_event_start(&booking, true).await {

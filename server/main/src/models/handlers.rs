@@ -117,6 +117,8 @@ pub mod auth {
 }
 
 pub mod booking {
+    use crate::models::entities::AudioRecording;
+
     use super::*;
 
     #[derive(Debug, Deserialize)]
@@ -192,6 +194,12 @@ pub mod booking {
     #[serde(rename_all = "camelCase")]
     pub struct AmendBookingResponse {
         pub booking: Booking,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct GetAudioRecordingResponse {
+        pub audio_recording: Option<AudioRecording>,
     }
 }
 

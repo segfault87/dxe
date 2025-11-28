@@ -25,6 +25,8 @@ pub enum Error {
     UserNotFound,
     #[error("예약을 찾을 수 없습니다.")]
     BookingNotFound,
+    #[error("녹음 파일을 찾을 수 없습니다.")]
+    AudioRecordingNotFound,
     #[error("이미 그룹에 속해있기 때문에 그룹으로 전환할 수 없습니다.")]
     BookingNotAssignableToGroup,
     #[error("해당 그룹에 속해있지 않습니다.")]
@@ -55,6 +57,9 @@ pub enum Error {
     Http(#[from] reqwest::Error),
     #[error("데이터베이스 오류가 발생했습니다: {0}")]
     Sqlx(#[from] sqlx::Error),
+    #[cfg_attr(debug_assertions, error("내부 오류가 발생했습니다: {0}"))]
+    #[cfg_attr(not(debug_assertions), error("내부 오류가 발생했습니다."))]
+    Internal(Box<dyn std::error::Error>),
 }
 
 impl From<actix_jwt_auth_middleware::AuthError> for Error {
@@ -98,6 +103,7 @@ impl ResponseError for Error {
             Self::GroupNotFound => StatusCode::NOT_FOUND,
             Self::UserNotFound => StatusCode::NOT_FOUND,
             Self::BookingNotFound => StatusCode::NOT_FOUND,
+            Self::AudioRecordingNotFound => StatusCode::NOT_FOUND,
             Self::BookingNotAssignableToGroup => StatusCode::BAD_REQUEST,
             Self::UserNotMemberOf => StatusCode::BAD_REQUEST,
             Self::CannotLeaveGroup => StatusCode::BAD_REQUEST,
@@ -113,6 +119,7 @@ impl ResponseError for Error {
             Self::Kakao(_) => StatusCode::UNAUTHORIZED,
             Self::Http(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::Sqlx(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
@@ -128,6 +135,7 @@ impl ResponseError for Error {
             Self::GroupNotFound => "GroupNotFound",
             Self::UserNotFound => "UserNotFound",
             Self::BookingNotFound => "BookingNotFound",
+            Self::AudioRecordingNotFound => "AudioRecordingNotFound",
             Self::BookingNotAssignableToGroup => "BookingNotAssignableToGroup",
             Self::UserNotMemberOf => "UserNotMemberOf",
             Self::CannotLeaveGroup => "CannotLeaveGroup",
@@ -143,6 +151,7 @@ impl ResponseError for Error {
             Self::Http(_) => "HttpError",
             Self::Kakao(_) => "KakaoApiError",
             Self::Sqlx(_) => "DatabaseError",
+            Self::Internal(_) => "InternalError",
         };
         let message = format!("{self}");
 

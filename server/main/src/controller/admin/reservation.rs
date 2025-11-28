@@ -33,7 +33,7 @@ pub async fn get(
         reservations: reservations
             .into_iter()
             .map(|v| Reservation::convert(v, &timezone_config, &now))
-            .collect(),
+            .collect::<Result<_, _>>()?,
     }))
 }
 
@@ -73,7 +73,7 @@ pub async fn post(
     tx.commit().await?;
 
     Ok(web::Json(CreateReservationResponse {
-        reservation: Reservation::convert(reservation, &timezone_config, &now),
+        reservation: Reservation::convert(reservation, &timezone_config, &now)?,
     }))
 }
 

@@ -33,7 +33,7 @@ pub async fn get(
     }
 
     Ok(web::Json(GetGroupResponse {
-        group: GroupWithUsers::convert(group, &timezone_config, &now),
+        group: GroupWithUsers::convert(group, &timezone_config, &now)?,
     }))
 }
 
@@ -76,7 +76,7 @@ pub async fn put(
     tx.commit().await?;
 
     Ok(web::Json(AmendGroupResponse {
-        group: Group::convert(group, &timezone_config, &now),
+        group: Group::convert(group, &timezone_config, &now)?,
     }))
 }
 

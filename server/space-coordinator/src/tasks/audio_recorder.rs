@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::error::Error as StdError;
+use std::path::PathBuf;
+use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 
 use chrono::{TimeDelta, Utc};
@@ -8,6 +10,8 @@ use dxe_extern::google_cloud::{Error as GcpError, get_token};
 use dxe_s2s_shared::entities::BookingWithUsers;
 use dxe_s2s_shared::handlers::UpdateAudioRequest;
 use dxe_types::{BookingId, UnitId};
+use tokio::fs::File;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process;
 use tokio_task_scheduler::{Task, TaskBuilder};
 
@@ -15,13 +19,116 @@ use crate::callback::EventStateCallback;
 use crate::client::DxeClient;
 use crate::config::{AudioRecorderConfig, GoogleApiConfig};
 
+struct RecorderProcess {
+    recorder: process::Child,
+    lame: process::Child,
+    stream_feeder: Option<tokio::task::JoinHandle<()>>,
+    file_writer: Option<tokio::task::JoinHandle<()>>,
+    has_stopped: Arc<Mutex<bool>>,
+}
+
+impl RecorderProcess {
+    pub async fn new(config: &AudioRecorderConfig, output_path: PathBuf) -> Result<Self, Error> {
+        let mut recorder_cmd = process::Command::new(config.pw_record_bin.clone());
+        recorder_cmd
+            .arg(format!("--rate={}", config.sampling_rate))
+            .arg(format!("--target={}", config.target_device))
+            .arg("-")
+            .stdout(Stdio::piped());
+
+        let mut lame_cmd = process::Command::new(config.lame_bin.clone());
+        lame_cmd
+            .arg("-r")
+            .arg("-b")
+            .arg(config.mp3_bitrate.to_string())
+            .arg("-")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped());
+
+        let mut recorder = recorder_cmd.spawn()?;
+        let mut recorder_stdout = recorder.stdout.take().unwrap();
+
+        let mut lame = lame_cmd.spawn()?;
+        let mut lame_stdout = lame.stdout.take().unwrap();
+        let mut lame_stdin = lame.stdin.take().unwrap();
+
+        let mut output_file = File::create(output_path).await?;
+
+        let has_stopped = Arc::new(Mutex::new(false));
+
+        let inner_has_stopped = has_stopped.clone();
+        let stream_feeder = tokio::task::spawn(async move {
+            let mut buffer = [0u8; 65536];
+
+            while let Ok(read) = recorder_stdout.read(&mut buffer).await {
+                if read == 0 {
+                    log::warn!("lame process stopped unexpectedly");
+                    break;
+                }
+
+                if let Err(e) = lame_stdin.write(&buffer[0..read]).await {
+                    log::warn!("IO error while writing to file: {e}");
+                    break;
+                }
+            }
+
+            *inner_has_stopped.lock().unwrap() = true;
+        });
+
+        let file_writer = tokio::task::spawn(async move {
+            let mut buffer = [0u8; 65536];
+
+            while let Ok(read) = lame_stdout.read(&mut buffer).await {
+                if read == 0 {
+                    log::warn!("lame process stopped unexpectedly");
+                    break;
+                }
+
+                if let Err(e) = output_file.write(&buffer[0..read]).await {
+                    log::warn!("IO error while writing to file: {e}");
+                    break;
+                }
+            }
+        });
+
+        Ok(RecorderProcess {
+            recorder,
+            lame,
+            stream_feeder: Some(stream_feeder),
+            file_writer: Some(file_writer),
+            has_stopped,
+        })
+    }
+
+    pub fn has_stopped(&self) -> bool {
+        *self.has_stopped.lock().unwrap()
+    }
+
+    pub async fn stop(&mut self) -> Result<(), Error> {
+        let Some(stream_feeder) = self.stream_feeder.take() else {
+            return Err(Error::AlreadyStopped);
+        };
+        let Some(file_writer) = self.file_writer.take() else {
+            return Err(Error::AlreadyStopped);
+        };
+
+        self.recorder.kill().await?;
+        self.lame.wait().await?;
+
+        let _ = stream_feeder.await;
+        let _ = file_writer.await;
+
+        Ok(())
+    }
+}
+
 pub struct AudioRecorder {
     drive_client: GoogleDriveClient,
     dxe_client: DxeClient,
 
     config: HashMap<UnitId, AudioRecorderConfig>,
 
-    tasks: Mutex<HashMap<BookingId, process::Child>>,
+    tasks: Mutex<HashMap<BookingId, RecorderProcess>>,
 }
 
 impl AudioRecorder {
@@ -43,7 +150,11 @@ impl AudioRecorder {
         })
     }
 
-    fn start(&self, config: &AudioRecorderConfig, booking: &BookingWithUsers) -> Result<(), Error> {
+    async fn start(
+        &self,
+        config: &AudioRecorderConfig,
+        booking: &BookingWithUsers,
+    ) -> Result<(), Error> {
         if self.tasks.lock().unwrap().contains_key(&booking.booking.id) {
             return Ok(());
         }
@@ -51,21 +162,12 @@ impl AudioRecorder {
         let mut path = config.path_prefix.clone();
         path.push(format!("{}.mp3", booking.booking.id));
 
-        let mut command = process::Command::new("sh");
-        command.arg("-c").arg(format!(
-            "{} --rate {} --target={} - | {} -s {} -r -b {} - -o {}",
-            config.pw_record_bin,
-            config.sampling_rate,
-            config.target_device,
-            config.lame_bin,
-            config.sampling_rate as f32 / 1000.0,
-            config.mp3_bitrate,
-            path.to_str().ok_or(Error::InvalidPath)?,
-        ));
+        let process = RecorderProcess::new(config, path).await?;
 
-        let child = command.spawn()?;
-
-        self.tasks.lock().unwrap().insert(booking.booking.id, child);
+        self.tasks
+            .lock()
+            .unwrap()
+            .insert(booking.booking.id, process);
 
         log::info!("Recording started for {}", booking.booking.id);
 
@@ -77,7 +179,9 @@ impl AudioRecorder {
             return;
         };
 
-        let _ = child.kill().await;
+        if let Err(e) = child.stop().await {
+            log::warn!("Cannot stop recorder process: {e}");
+        }
 
         log::info!(
             "Recording finished for {}. Uploading to Google Drive...",
@@ -103,6 +207,8 @@ impl AudioRecorder {
                 }
             };
 
+            return;
+
             let expires_in = Utc::now() + TimeDelta::days(7);
 
             match dxe_client
@@ -127,7 +233,7 @@ impl AudioRecorder {
 
         let mut tasks_to_collect = HashSet::new();
         for (key, task) in tasks.iter() {
-            if task.id().is_none() {
+            if task.has_stopped() {
                 log::error!("Audio recording process for {key} exited prematurely.");
                 tasks_to_collect.insert(key.clone());
             }
@@ -164,7 +270,7 @@ impl EventStateCallback<BookingWithUsers> for AudioRecorder {
     ) -> Result<(), Box<dyn StdError>> {
         if !buffered {
             if let Some(config) = self.config.get(&event.booking.unit_id) {
-                if let Err(e) = self.start(config, event) {
+                if let Err(e) = self.start(config, event).await {
                     log::warn!("Could not create audio recorder task: {e}");
                 }
             }
@@ -194,8 +300,8 @@ pub enum Error {
     GcpAuth(#[from] GcpError),
     #[error("Could not upload to Google Drive: {0}")]
     Drive(#[from] DriveError),
-    #[error("Invalid path")]
-    InvalidPath,
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
+    #[error("Recorder process has been already stopped.")]
+    AlreadyStopped,
 }

@@ -19,8 +19,10 @@
     -moz-osx-font-smoothing: grayscale;
 }
 
+html,
 body {
     margin: 0;
+    height: 100%;
 }
 
 a {
@@ -110,4 +112,18 @@ hr {
 
 p > a {
     text-decoration: underline;
+}
+
+.bottom-left-ribbon {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 56px;
+    height: 56px;
+
+    img {
+        width: 56px;
+        height: 56px;
+        opacity: 0.5;
+    }
 }

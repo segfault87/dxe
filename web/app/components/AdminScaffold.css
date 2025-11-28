@@ -10,7 +10,7 @@
         padding: 0;
         overflow-x: auto;
         width: 100%;
-        height: fit-content;
+        height: 32px;
         white-space: nowrap;
 
         > li {

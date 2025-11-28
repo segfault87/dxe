@@ -5,8 +5,8 @@ use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 
 use chrono::{TimeDelta, Utc};
-use dxe_extern::google_cloud::drive::{Error as DriveError, GoogleDriveClient, SCOPE};
-use dxe_extern::google_cloud::{Error as GcpError, get_token};
+use dxe_extern::google_cloud::drive::{Error as DriveError, GoogleDriveClient};
+use dxe_extern::google_cloud::{CredentialManager, Error as GcpError};
 use dxe_s2s_shared::entities::BookingWithUsers;
 use dxe_s2s_shared::handlers::UpdateAudioRequest;
 use dxe_types::{BookingId, UnitId};
@@ -135,8 +135,8 @@ impl AudioRecorder {
         config: HashMap<UnitId, AudioRecorderConfig>,
         dxe_client: DxeClient,
     ) -> Result<Self, Error> {
-        let token = get_token(google_api_config, &[SCOPE]).await?;
-        let drive_client = GoogleDriveClient::new(token, &google_api_config.drive);
+        let gcp_credential = CredentialManager::new(google_api_config)?;
+        let drive_client = GoogleDriveClient::new(gcp_credential, &google_api_config.drive);
 
         Ok(Self {
             drive_client,
@@ -294,10 +294,10 @@ impl EventStateCallback<BookingWithUsers> for AudioRecorder {
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("Could not obtain GCP credential: {0}")]
-    GcpAuth(#[from] GcpError),
     #[error("Could not upload to Google Drive: {0}")]
     Drive(#[from] DriveError),
+    #[error("GCP credential error: {0}")]
+    Gcp(#[from] GcpError),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
     #[error("Recorder process has been already stopped.")]

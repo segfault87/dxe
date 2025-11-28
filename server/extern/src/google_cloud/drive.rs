@@ -1,7 +1,5 @@
 use std::path::PathBuf;
-use std::sync::Arc;
 
-use gcp_auth::Token;
 use reqwest::StatusCode;
 use reqwest::multipart::{Form, Part};
 use serde::Deserialize;
@@ -24,16 +22,16 @@ struct UploadResult {
 
 #[derive(Debug, Clone)]
 pub struct GoogleDriveClient {
-    token: Arc<Token>,
+    credential: super::CredentialManager,
     client: reqwest::Client,
 
     parent: String,
 }
 
 impl GoogleDriveClient {
-    pub fn new(token: Arc<Token>, config: &impl GoogleDriveConfig) -> Self {
+    pub fn new(credential: super::CredentialManager, config: &impl GoogleDriveConfig) -> Self {
         Self {
-            token,
+            credential,
             client: reqwest::Client::new(),
 
             parent: config.parent().to_owned(),
@@ -41,6 +39,8 @@ impl GoogleDriveClient {
     }
 
     pub async fn upload(&self, path: PathBuf, content_type: &str) -> Result<url::Url, Error> {
+        let token = self.credential.get_token(&[SCOPE]).await?;
+
         let file_name = path
             .file_name()
             .ok_or(Error::InvalidFileName(path.clone()))?
@@ -69,7 +69,7 @@ impl GoogleDriveClient {
                 "fields": "id,webViewLink",
                 "supportsAllDrives": "true",
             }))
-            .bearer_auth(self.token.as_str())
+            .bearer_auth(token.as_str())
             .multipart(form)
             .send()
             .await?;
@@ -94,7 +94,7 @@ impl GoogleDriveClient {
                 "supportsAllDrives": "true",
             }))
             .json(&permission_payload)
-            .bearer_auth(self.token.as_str())
+            .bearer_auth(token.as_str())
             .send()
             .await?;
 
@@ -113,6 +113,8 @@ impl GoogleDriveClient {
 pub enum Error {
     #[error("HTTP error: {0}")]
     Http(#[from] reqwest::Error),
+    #[error("GCP authentication error: {0}")]
+    Gcp(#[from] super::Error),
     #[error("Invalid file name: {0}")]
     InvalidFileName(PathBuf),
     #[error("IO error: {0}")]

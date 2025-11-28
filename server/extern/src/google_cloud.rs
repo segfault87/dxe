@@ -10,6 +10,25 @@ pub trait GoogleCloudAuthConfig {
     fn service_account_path(&self) -> &PathBuf;
 }
 
+#[derive(Debug, Clone)]
+pub struct CredentialManager {
+    service_account: Arc<CustomServiceAccount>,
+}
+
+impl CredentialManager {
+    pub fn new(config: &impl GoogleCloudAuthConfig) -> Result<Self, Error> {
+        Ok(Self {
+            service_account: Arc::new(CustomServiceAccount::from_file(
+                config.service_account_path(),
+            )?),
+        })
+    }
+
+    pub async fn get_token(&self, scopes: &[&str]) -> Result<Arc<Token>, Error> {
+        Ok(self.service_account.token(scopes).await?)
+    }
+}
+
 pub async fn get_token(
     config: &impl GoogleCloudAuthConfig,
     scopes: &[&str],

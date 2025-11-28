@@ -18,7 +18,7 @@ const getBookings = (
 ) => {
   let query = `type=${type}`;
   if (dateFrom) {
-    query += `&date_from=${toUtcIso8601(dateFrom)}`;
+    query += `&date_from=${encodeURIComponent(toUtcIso8601(dateFrom))}`;
   }
 
   return API.get<GetBookingsResponse>(`/admin/bookings?${query}`);

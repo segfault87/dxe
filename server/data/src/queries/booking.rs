@@ -369,8 +369,8 @@ pub async fn get_bookings_by_unit_id(
         LEFT OUTER JOIN "group" "cg" ON ci.discriminator = 'group' AND ci.id = cg.id
         WHERE
             b.unit_id = ?1 AND
-            b.time_from >= ?2 AND
-            b.time_to < ?3
+            b.time_to >= ?2 AND
+            b.time_from < ?3
         "#,
         unit_id,
         time_from,

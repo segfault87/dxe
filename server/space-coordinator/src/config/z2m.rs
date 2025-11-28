@@ -7,15 +7,15 @@ use crate::tasks::z2m_controller::DeviceName;
 
 #[derive(Copy, Clone, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum PresencePolicy {
-    Default,
+pub enum SwitchPolicy {
+    Uncontrolled,
     StayOn,
-    TurnOnWhilePresent,
+    Off,
 }
 
-impl Default for PresencePolicy {
+impl Default for SwitchPolicy {
     fn default() -> Self {
-        Self::Default
+        Self::Uncontrolled
     }
 }
 
@@ -82,7 +82,9 @@ fn default_switch_condition() -> Vec<Condition> {
 #[derive(Clone, Debug, Deserialize)]
 pub struct DeviceClassSwitch {
     #[serde(default)]
-    pub presence_policy: PresencePolicy,
+    pub presence_policy: SwitchPolicy,
+    #[serde(default)]
+    pub booking_policy: SwitchPolicy,
     #[serde(default)]
     pub states: SwitchStates,
     #[serde(default = "default_switch_condition")]

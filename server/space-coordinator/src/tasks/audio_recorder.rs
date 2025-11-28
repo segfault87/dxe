@@ -157,36 +157,6 @@ impl AudioRecorder {
 
 #[async_trait::async_trait]
 impl EventStateCallback<BookingWithUsers> for AudioRecorder {
-    async fn on_event_created(
-        &self,
-        event: &BookingWithUsers,
-        is_in_progress: bool,
-    ) -> Result<(), Box<dyn StdError>> {
-        if is_in_progress {
-            if let Some(config) = self.config.get(&event.booking.unit_id) {
-                if let Err(e) = self.start(config, event) {
-                    log::warn!("Could not create audio recorder task: {e}");
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn on_event_deleted(
-        &self,
-        event: &BookingWithUsers,
-        is_in_progress: bool,
-    ) -> Result<(), Box<dyn StdError>> {
-        if is_in_progress {
-            if let Some(config) = self.config.get(&event.booking.unit_id) {
-                self.stop(config, event).await;
-            }
-        }
-
-        Ok(())
-    }
-
     async fn on_event_start(
         &self,
         event: &BookingWithUsers,

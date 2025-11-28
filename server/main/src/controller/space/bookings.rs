@@ -44,8 +44,8 @@ pub async fn get(
 
     let CoordinatorContext { space_id } = context;
 
-    let start = now - booking_config.buffer_time.0;
-    let end = now + TimeDelta::days(1) + booking_config.buffer_time.1;
+    let start = now - booking_config.buffer_time.1;
+    let end = now + TimeDelta::days(1);
 
     let mut tx = database.begin().await?;
 

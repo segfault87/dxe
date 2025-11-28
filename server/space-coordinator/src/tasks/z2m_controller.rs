@@ -15,7 +15,7 @@ use tokio::time::timeout;
 use tokio_task_scheduler::{Task, TaskBuilder};
 
 use crate::callback::{EventStateCallback, PresenceCallback};
-use crate::config::z2m;
+use crate::config::z2m::{self, SwitchPolicy};
 use crate::services::mqtt::{Error as MqttError, MqttService};
 use crate::services::notification::NotificationService;
 
@@ -264,6 +264,8 @@ impl Z2mController {
         name: DeviceName,
         states: &[serde_json::Value],
     ) -> Result<(), Error> {
+        return Ok(());
+
         let mut receiver = self.mqtt_service.receiver();
 
         let (tx, rx) = oneshot::channel();
@@ -374,15 +376,15 @@ impl Z2mController {
         }
     }
 
-    fn get_switch_state(&self, device: &z2m::Device) -> Result<z2m::SwitchState, Error> {
-        let Some(switch) = &device.classes.switch else {
-            return Err(Error::ClassMismatch("switch", device.name.clone()));
-        };
-
+    fn get_switch_state(
+        &self,
+        device_name: &DeviceName,
+        switch: &z2m::DeviceClassSwitch,
+    ) -> Result<z2m::SwitchState, Error> {
         let device_states = self.device_states.lock().unwrap();
 
-        let Some(state) = device_states.get(&device.name) else {
-            return Err(Error::StateNotFound(device.name.clone()));
+        let Some(state) = device_states.get(device_name) else {
+            return Err(Error::StateNotFound(device_name.clone()));
         };
 
         test_condition(state, &switch.is_on).map(|v| {
@@ -400,43 +402,80 @@ impl Z2mController {
         Some(guard.as_ref()?.values().any(|v| !v.is_empty()))
     }
 
-    async fn update_switch(
+    fn get_active_units(&self) -> Vec<UnitId> {
+        let guard = self.active_bookings.lock().unwrap();
+
+        guard
+            .as_ref()
+            .map(|bookings| {
+                bookings
+                    .iter()
+                    .filter_map(|(k, v)| if !v.is_empty() { Some(k.clone()) } else { None })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    async fn set_switch(
         &self,
-        device: &z2m::Device,
+        device_name: &DeviceName,
+        switch: &z2m::DeviceClassSwitch,
         state: z2m::SwitchState,
     ) -> Result<bool, Error> {
-        let current_state = self.get_switch_state(device)?;
+        let current_state = self.get_switch_state(device_name, switch)?;
 
-        let Some(switch) = &device.classes.switch else {
-            return Err(Error::ClassMismatch("switch", device.name.clone()));
-        };
+        if current_state == state {
+            Ok(false)
+        } else {
+            log::info!("Setting switch {} to {}", device_name, state);
+
+            self.set_state(
+                device_name.clone(),
+                match state {
+                    z2m::SwitchState::On => &switch.states.on,
+                    z2m::SwitchState::Off => &switch.states.off,
+                },
+            )
+            .await?;
+            Ok(true)
+        }
+    }
+
+    async fn sync_switch_state(
+        &self,
+        device_name: &DeviceName,
+        switch: &z2m::DeviceClassSwitch,
+    ) -> Result<bool, Error> {
+        let current_state = self.get_switch_state(device_name, switch)?;
 
         let Some(is_present) = *self.presence.lock().unwrap() else {
             return Err(Error::NotInitialized);
         };
+        let Some(is_active_bookings) = self.is_active_bookings() else {
+            return Err(Error::NotInitialized);
+        };
 
-        let desired_state = match (state, switch.presence_policy, is_present) {
-            (state, z2m::PresencePolicy::Default, _) => state,
-            (_, z2m::PresencePolicy::StayOn, true) => z2m::SwitchState::On,
-            (state, z2m::PresencePolicy::StayOn, false) => state,
-            (z2m::SwitchState::On, z2m::PresencePolicy::TurnOnWhilePresent, true) => {
-                z2m::SwitchState::On
-            }
-            (z2m::SwitchState::On, z2m::PresencePolicy::TurnOnWhilePresent, false) => {
-                z2m::SwitchState::Off
-            }
-            (z2m::SwitchState::Off, z2m::PresencePolicy::TurnOnWhilePresent, _) => {
-                z2m::SwitchState::Off
-            }
+        let switch_policy = if is_present {
+            switch.presence_policy
+        } else if is_active_bookings {
+            switch.booking_policy
+        } else {
+            z2m::SwitchPolicy::Off
+        };
+
+        let desired_state = match switch_policy {
+            SwitchPolicy::Uncontrolled => return Ok(false),
+            SwitchPolicy::StayOn => z2m::SwitchState::On,
+            SwitchPolicy::Off => z2m::SwitchState::Off,
         };
 
         if current_state == desired_state {
             Ok(false)
         } else {
-            log::info!("Setting switch {} to {}", device.name, desired_state);
+            log::info!("Setting switch {} to {}", device_name, desired_state);
 
             self.set_state(
-                device.name.clone(),
+                device_name.clone(),
                 match desired_state {
                     z2m::SwitchState::On => &switch.states.on,
                     z2m::SwitchState::Off => &switch.states.off,
@@ -447,39 +486,102 @@ impl Z2mController {
         }
     }
 
-    pub async fn update_switches(&self, switches: &HashMap<DeviceName, z2m::SwitchState>) {
-        for (key, state) in switches.iter() {
-            let Some(device) = self.devices.get(key) else {
-                log::warn!("Device {key} not found.");
-                continue;
-            };
-
-            if let Err(e) = self.update_switch(device, *state).await {
-                log::warn!("Couldn't update switch at {key}: {e}");
+    async fn sync_switch_states(&self) {
+        for device in self.devices.values() {
+            if let Some(switch) = &device.classes.switch {
+                if let Err(e) = self.sync_switch_state(&device.name, switch).await {
+                    log::warn!("Failed to sync switch state for {}: {e}", device.name);
+                }
             }
         }
     }
 
-    async fn sync_unit_states(&self, unit_id: &UnitId) {
-        let Some(hooks) = self.per_unit_hooks.get(unit_id) else {
+    fn aggregate_switch_states(
+        states: &mut HashMap<DeviceName, z2m::SwitchState>,
+        existing_states: &HashMap<DeviceName, z2m::SwitchState>,
+    ) {
+        for (k, unit_state) in existing_states.iter() {
+            if let Some(new_state) = states.get_mut(k) {
+                let new_value = match (unit_state, *new_state) {
+                    (z2m::SwitchState::Off, z2m::SwitchState::On) => z2m::SwitchState::On,
+                    (z2m::SwitchState::On, z2m::SwitchState::Off) => z2m::SwitchState::On,
+                    (_, new_state) => new_state,
+                };
+                *new_state = new_value;
+            }
+        }
+    }
+
+    async fn trigger_presence_switch_event(&self, enter: bool) {
+        let active_units = self.get_active_units();
+
+        let mut switches = if enter {
+            &self.presence_hooks.on_enter.switches
+        } else {
+            &self.presence_hooks.on_leave.switches
+        }
+        .clone();
+
+        for unit in active_units {
+            let Some(hooks) = self.per_unit_hooks.get(&unit) else {
+                continue;
+            };
+
+            let per_unit_switches = &hooks.on_booking_start.switches;
+            Self::aggregate_switch_states(&mut switches, per_unit_switches);
+        }
+
+        for (device_name, state) in switches {
+            let Some(switch) = self
+                .devices
+                .get(&device_name)
+                .and_then(|v| v.classes.switch.as_ref())
+            else {
+                log::warn!("Device {device_name} is not a switch.");
+                continue;
+            };
+
+            if let Err(e) = self.set_switch(&device_name, switch, state).await {
+                log::warn!("Could not change switch state of {device_name} to {state}: {e}");
+            }
+        }
+    }
+
+    async fn trigger_unit_event(&self, unit_id: &UnitId, start: bool) {
+        let Some(hook) = self.per_unit_hooks.get(unit_id) else {
             return;
         };
 
-        let is_active = {
-            let active_bookings = self.active_bookings.lock().unwrap();
-
-            active_bookings
-                .as_ref()
-                .and_then(|v| v.get(unit_id).map(|v| !v.is_empty()))
-                .unwrap_or(false)
+        let Some(presence) = *self.presence.lock().unwrap() else {
+            return;
         };
 
-        self.update_switches(if is_active {
-            &hooks.on_booking_start.switches
+        let mut switches = if start {
+            &hook.on_booking_start.switches
         } else {
-            &hooks.on_booking_end.switches
-        })
-        .await;
+            &hook.on_booking_end.switches
+        }
+        .clone();
+
+        if presence {
+            let presence_switches = &self.presence_hooks.on_enter.switches;
+            Self::aggregate_switch_states(&mut switches, presence_switches);
+        }
+
+        for (device_name, state) in switches {
+            let Some(switch) = self
+                .devices
+                .get(&device_name)
+                .and_then(|v| v.classes.switch.as_ref())
+            else {
+                log::warn!("Device {device_name} is not a switch.");
+                continue;
+            };
+
+            if let Err(e) = self.set_switch(&device_name, switch, state).await {
+                log::warn!("Could not change switch state of {device_name} to {state}: {e}");
+            }
+        }
     }
 
     fn read_power_meter(&self, device: &z2m::Device) -> Result<PowerUsage, Error> {
@@ -580,9 +682,7 @@ impl Z2mController {
         }
 
         self.handle_alert_tasks().await;
-        for unit_id in self.per_unit_hooks.keys() {
-            self.sync_unit_states(unit_id).await;
-        }
+        self.sync_switch_states().await;
     }
 
     pub fn task(self) -> (Arc<Self>, JoinHandle<()>, Task) {
@@ -623,50 +723,6 @@ impl EventStateCallback<BookingWithUsers> for Z2mController {
         *self.active_bookings.lock().unwrap() = Some(Default::default());
     }
 
-    async fn on_event_created(
-        &self,
-        event: &BookingWithUsers,
-        is_in_progress: bool,
-    ) -> Result<(), Box<dyn StdError>> {
-        if is_in_progress {
-            {
-                let mut guard = self.active_bookings.lock().unwrap();
-                if let Some(active_bookings) = guard.as_mut() {
-                    active_bookings
-                        .entry(event.booking.unit_id.clone())
-                        .or_default()
-                        .insert(event.booking.id);
-                }
-            }
-
-            self.sync_unit_states(&event.booking.unit_id).await;
-        }
-
-        Ok(())
-    }
-
-    async fn on_event_deleted(
-        &self,
-        event: &BookingWithUsers,
-        is_in_progress: bool,
-    ) -> Result<(), Box<dyn StdError>> {
-        if is_in_progress {
-            {
-                let mut guard = self.active_bookings.lock().unwrap();
-                if let Some(active_bookings) = guard.as_mut() {
-                    active_bookings
-                        .entry(event.booking.unit_id.clone())
-                        .or_default()
-                        .remove(&event.booking.id);
-                }
-            }
-
-            self.sync_unit_states(&event.booking.unit_id).await;
-        }
-
-        Ok(())
-    }
-
     async fn on_event_start(
         &self,
         event: &BookingWithUsers,
@@ -683,7 +739,7 @@ impl EventStateCallback<BookingWithUsers> for Z2mController {
                 }
             }
 
-            self.sync_unit_states(&event.booking.unit_id).await;
+            self.trigger_unit_event(&event.booking.unit_id, true).await;
         }
 
         Ok(())
@@ -705,7 +761,7 @@ impl EventStateCallback<BookingWithUsers> for Z2mController {
                 }
             }
 
-            self.sync_unit_states(&event.booking.unit_id).await;
+            self.trigger_unit_event(&event.booking.unit_id, false).await;
         }
 
         Ok(())
@@ -719,8 +775,7 @@ impl PresenceCallback for Z2mController {
 
         self.alert_flags.lock().unwrap().clear();
 
-        self.update_switches(&self.presence_hooks.on_enter.switches)
-            .await;
+        self.trigger_presence_switch_event(true).await;
 
         Ok(())
     }
@@ -728,8 +783,9 @@ impl PresenceCallback for Z2mController {
     async fn on_leave(&self) -> Result<(), Box<dyn StdError>> {
         *self.presence.lock().unwrap() = Some(false);
 
-        self.update_switches(&self.presence_hooks.on_leave.switches)
-            .await;
+        log::info!("leave");
+
+        self.trigger_presence_switch_event(false).await;
 
         Ok(())
     }

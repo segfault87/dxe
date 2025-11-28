@@ -88,36 +88,6 @@ impl CarparkExempter {
 
 #[async_trait::async_trait]
 impl EventStateCallback<BookingWithUsers> for CarparkExempter {
-    async fn on_event_created(
-        &self,
-        event: &BookingWithUsers,
-        is_in_progress: bool,
-    ) -> Result<(), Box<dyn Error>> {
-        if is_in_progress {
-            self.active_bookings
-                .lock()
-                .unwrap()
-                .insert(event.booking.id);
-        }
-
-        Ok(())
-    }
-
-    async fn on_event_deleted(
-        &self,
-        event: &BookingWithUsers,
-        is_in_progress: bool,
-    ) -> Result<(), Box<dyn Error>> {
-        if is_in_progress {
-            self.active_bookings
-                .lock()
-                .unwrap()
-                .remove(&event.booking.id);
-        }
-
-        Ok(())
-    }
-
     async fn on_event_start(
         &self,
         event: &BookingWithUsers,

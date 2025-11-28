@@ -25,19 +25,20 @@ pub struct BookingStateManager {
     pending_tasks: Mutex<HashMap<String, String>>,
 }
 
-enum BookingEventType {
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum BookingPhase {
     StartWithBuffer,
     Start,
     End,
     EndWithBuffer,
 }
 
-fn create_task_name(booking_id: &BookingId, r#type: BookingEventType) -> String {
-    let task_name = match r#type {
-        BookingEventType::StartWithBuffer => "start_with_buffer",
-        BookingEventType::Start => "start",
-        BookingEventType::End => "end",
-        BookingEventType::EndWithBuffer => "end_with_buffer",
+fn create_task_name(booking_id: &BookingId, phase: BookingPhase) -> String {
+    let task_name = match phase {
+        BookingPhase::StartWithBuffer => "start_with_buffer",
+        BookingPhase::Start => "start",
+        BookingPhase::End => "end",
+        BookingPhase::EndWithBuffer => "end_with_buffer",
     };
 
     format!("booking_{booking_id}_{task_name}")
@@ -102,7 +103,7 @@ impl BookingStateManager {
 
             // Remove outdated events
             for bookings in states.bookings_1d.values_mut() {
-                bookings.retain(|v| v.booking.date_end_w_buffer.to_utc() < now);
+                bookings.retain(|v| v.booking.date_end_w_buffer.to_utc() > now);
             }
 
             for (unit_id, bookings) in response.bookings.into_iter() {
@@ -140,6 +141,14 @@ impl BookingStateManager {
                 }
                 current_bookings.retain(|v| !previous_keys.contains(&v.booking.id));
             }
+
+            if !states.has_initialized {
+                states.has_initialized = true;
+
+                for callback in self.callbacks.iter() {
+                    callback.on_initialized();
+                }
+            }
         }
 
         for booking in bookings_to_add {
@@ -147,11 +156,11 @@ impl BookingStateManager {
         }
         for booking in bookings_to_delete {
             let booking_start_with_buffer =
-                create_task_name(&booking.booking.id, BookingEventType::StartWithBuffer);
-            let booking_start = create_task_name(&booking.booking.id, BookingEventType::Start);
-            let booking_end = create_task_name(&booking.booking.id, BookingEventType::End);
+                create_task_name(&booking.booking.id, BookingPhase::StartWithBuffer);
+            let booking_start = create_task_name(&booking.booking.id, BookingPhase::Start);
+            let booking_end = create_task_name(&booking.booking.id, BookingPhase::End);
             let booking_end_with_buffer =
-                create_task_name(&booking.booking.id, BookingEventType::EndWithBuffer);
+                create_task_name(&booking.booking.id, BookingPhase::EndWithBuffer);
 
             let mut tasks_to_remove = vec![];
 
@@ -185,17 +194,17 @@ impl BookingStateManager {
         for (_, bookings) in bookings_1d {
             for booking in bookings {
                 let start_with_buffer_task =
-                    create_task_name(&booking.booking.id, BookingEventType::StartWithBuffer);
+                    create_task_name(&booking.booking.id, BookingPhase::StartWithBuffer);
                 let start_with_buffer = booking.booking.date_start_w_buffer.to_utc();
 
-                let start_task = create_task_name(&booking.booking.id, BookingEventType::Start);
+                let start_task = create_task_name(&booking.booking.id, BookingPhase::Start);
                 let start = booking.booking.date_start.to_utc();
 
-                let end_task = create_task_name(&booking.booking.id, BookingEventType::End);
+                let end_task = create_task_name(&booking.booking.id, BookingPhase::End);
                 let end = booking.booking.date_end.to_utc();
 
                 let end_with_buffer_task =
-                    create_task_name(&booking.booking.id, BookingEventType::EndWithBuffer);
+                    create_task_name(&booking.booking.id, BookingPhase::EndWithBuffer);
                 let end_with_buffer = booking.booking.date_end_w_buffer.to_utc();
 
                 {
@@ -321,17 +330,6 @@ impl BookingStateManager {
                 }
             }
         }
-
-        {
-            let mut states = self.states.lock().unwrap();
-            if !states.has_initialized {
-                states.has_initialized = true;
-
-                for callback in self.callbacks.iter() {
-                    callback.on_initialized();
-                }
-            }
-        }
     }
 
     async fn schedule_task_if_required<F>(
@@ -394,56 +392,66 @@ impl BookingStateManager {
     }
 
     async fn on_new_booking(self: Arc<Self>, booking: BookingWithUsers, now: &DateTime<Utc>) {
-        let start = booking.booking.date_start_w_buffer.to_utc();
-        let end = booking.booking.date_end_w_buffer.to_utc();
+        let start_w_buffer = booking.booking.date_start_w_buffer.to_utc();
+        let start = booking.booking.date_start.to_utc();
+        let end_w_buffer = booking.booking.date_end_w_buffer.to_utc();
 
-        let is_in_progress = &start <= now && now < &end;
+        let is_in_progress = &start_w_buffer <= now && now < &end_w_buffer;
 
-        for callback in self.callbacks.iter() {
-            if let Err(e) = callback.on_event_created(&booking, is_in_progress).await {
-                log::error!("Error while create booking {}: {e}", booking.booking.id);
+        if is_in_progress {
+            let has_started = now > &start;
+
+            for callback in self.callbacks.iter() {
+                if let Err(e) = callback.on_event_start(&booking, true).await {
+                    log::error!("Error while starting booking {}: {e}", booking.booking.id);
+                }
+                if has_started && let Err(e) = callback.on_event_start(&booking, false).await {
+                    log::error!("Error while starting booking {}: {e}", booking.booking.id);
+                }
             }
         }
     }
 
     async fn on_booking_removed(self: Arc<Self>, booking: BookingWithUsers, now: &DateTime<Utc>) {
-        let start = booking.booking.date_start_w_buffer.to_utc();
-        let end = booking.booking.date_end_w_buffer.to_utc();
+        let start_w_buffer = booking.booking.date_start_w_buffer.to_utc();
+        let end = booking.booking.date_end.to_utc();
+        let end_w_buffer = booking.booking.date_end_w_buffer.to_utc();
 
-        let is_in_progress = &start <= now && now < &end;
+        let is_in_progress = &start_w_buffer <= now && now < &end_w_buffer;
 
-        for callback in self.callbacks.iter() {
-            if let Err(e) = callback.on_event_deleted(&booking, is_in_progress).await {
-                log::error!("Error while deleting booking {}: {e}", booking.booking.id);
+        if is_in_progress {
+            let is_in_buffer = now >= &end;
+
+            for callback in self.callbacks.iter() {
+                if !is_in_buffer && let Err(e) = callback.on_event_end(&booking, false).await {
+                    log::error!("Error while stopping booking {}: {e}", booking.booking.id);
+                }
+                if let Err(e) = callback.on_event_end(&booking, true).await {
+                    log::error!("Error while stopping booking {}: {e}", booking.booking.id);
+                }
             }
         }
 
         let _ = self
             .scheduler
-            .remove(&create_task_name(
-                &booking.booking.id,
-                BookingEventType::Start,
-            ))
+            .remove(&create_task_name(&booking.booking.id, BookingPhase::Start))
             .await;
         let _ = self
             .scheduler
             .remove(&create_task_name(
                 &booking.booking.id,
-                BookingEventType::StartWithBuffer,
+                BookingPhase::StartWithBuffer,
             ))
+            .await;
+        let _ = self
+            .scheduler
+            .remove(&create_task_name(&booking.booking.id, BookingPhase::End))
             .await;
         let _ = self
             .scheduler
             .remove(&create_task_name(
                 &booking.booking.id,
-                BookingEventType::End,
-            ))
-            .await;
-        let _ = self
-            .scheduler
-            .remove(&create_task_name(
-                &booking.booking.id,
-                BookingEventType::EndWithBuffer,
+                BookingPhase::EndWithBuffer,
             ))
             .await;
     }
@@ -459,7 +467,8 @@ impl BookingStateManager {
 
             Ok(())
         })
-        .every_minutes(10)
+        //.every_minutes(10)
+        .every_seconds(10)
         .build()
     }
 }

@@ -55,7 +55,9 @@ impl PresenceMonitor {
             })
             .await
             .unwrap();
-            if result.is_ok() {
+
+            // For some reason it fails to decode ICMP packet and we are ignoring it anyways.
+            if result.is_ok() || matches!(result, Err(ping::Error::DecodeV4Error)) {
                 let mut has_entered = false;
 
                 {

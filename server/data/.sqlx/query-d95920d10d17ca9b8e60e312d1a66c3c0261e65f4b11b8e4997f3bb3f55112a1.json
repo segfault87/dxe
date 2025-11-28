@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            booking_id AS \"booking_id: _\",\n            url,\n            created_at AS \"created_at: _\",\n            expires_in AS \"expires_in: _\"\n        FROM audio_recording\n        WHERE booking_id=?1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "booking_id: _",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "url",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at: _",
+        "ordinal": 2,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "expires_in: _",
+        "ordinal": 3,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "d95920d10d17ca9b8e60e312d1a66c3c0261e65f4b11b8e4997f3bb3f55112a1"
+}

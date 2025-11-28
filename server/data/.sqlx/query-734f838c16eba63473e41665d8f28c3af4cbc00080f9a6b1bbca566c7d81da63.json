@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO audio_recording(booking_id, url, created_at, expires_in)\n        VALUES(?1, ?2, ?3, ?4)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "734f838c16eba63473e41665d8f28c3af4cbc00080f9a6b1bbca566c7d81da63"
+}

@@ -25,6 +25,13 @@ pub enum MessagingEvent<R> {
         reservation_time: String,
         refunded_price: i64,
     },
+    AudioRecording {
+        recipients: Vec<R>,
+        booking_id: BookingId,
+        customer_name: String,
+        reservation_time: String,
+        expires_in: Option<String>,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -65,6 +72,14 @@ pub trait MessagingBackend {
         customer_name: &str,
         reservation_time: &str,
         refunded_price: i64,
+    ) -> Result<(), Self::Error>;
+    async fn send_audio_recording(
+        &self,
+        recipients: Vec<Self::Recipient>,
+        booking_id: &BookingId,
+        customer_name: &str,
+        reservation_time: &str,
+        expiry_time: Option<&str>,
     ) -> Result<(), Self::Error>;
 }
 
@@ -136,6 +151,26 @@ where
                         .await
                     {
                         log::warn!("Could not send refund confirmation: {e}");
+                    }
+                }
+                MessagingEvent::AudioRecording {
+                    recipients,
+                    booking_id,
+                    customer_name,
+                    reservation_time,
+                    expires_in,
+                } => {
+                    if let Err(e) = backend
+                        .send_audio_recording(
+                            recipients,
+                            &booking_id,
+                            customer_name.as_str(),
+                            reservation_time.as_str(),
+                            expires_in.as_ref().map(|v| v.as_str()),
+                        )
+                        .await
+                    {
+                        log::warn!("Could not send audio recording: {e}")
                     }
                 }
             }

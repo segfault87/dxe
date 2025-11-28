@@ -44,6 +44,10 @@ impl AudioRecorder {
     }
 
     fn start(&self, config: &AudioRecorderConfig, booking: &BookingWithUsers) -> Result<(), Error> {
+        if self.tasks.lock().unwrap().contains_key(&booking.booking.id) {
+            return Ok(());
+        }
+
         let mut path = config.path_prefix.clone();
         path.push(format!("{}.mp3", booking.booking.id));
 

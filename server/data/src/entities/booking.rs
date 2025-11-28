@@ -63,3 +63,11 @@ pub struct BookingChangeHistory {
     pub new_time_from: Option<DateTime<Utc>>,
     pub new_time_to: Option<DateTime<Utc>>,
 }
+
+#[derive(Debug, Clone, FromRow)]
+pub struct AudioRecording {
+    pub booking_id: BookingId,
+    pub url: String,
+    pub created_at: DateTime<Utc>,
+    pub expires_in: Option<DateTime<Utc>>,
+}

@@ -4,6 +4,7 @@ use dxe_types::BookingId;
 use super::MessagingBackend;
 use crate::config::BiztalkConfig;
 
+const MESSAGE_AUDIO_READY_01: &str = include_str!("biztalk/AUDIO_READY_01.txt").trim_ascii();
 const MESSAGE_RESERVATION_CANCEL_CONFIRM_01: &str =
     include_str!("biztalk/RESERVATION_CANCEL_CONFIRM_01.txt").trim_ascii();
 const MESSAGE_RESERVATION_CANCEL_HRF_01: &str =
@@ -15,6 +16,7 @@ const MESSAGE_RESERVATION_CANCEL_RF_01: &str =
 const MESSAGE_RESERVATION_CONFIRMATION_01: &str =
     include_str!("biztalk/RESERVATION_CONFIRMATION_01.txt").trim_ascii();
 
+const TEMPLATE_AUDIO_READY: &str = "AUDIO_READY_01";
 const TEMPLATE_RESERVATION_CANCEL_CONFIRM: &str = "RESERVATION_CONFIRM_01";
 const TEMPLATE_RESERVATION_CANCEL_NO_REFUND: &str = "RESERVATION_CANCEL_NRF_01";
 const TEMPLATE_RESERVATION_CANCEL_HALF_REFUND: &str = "RESERVATION_CANCEL_HRF_01";
@@ -68,6 +70,7 @@ impl MessagingBackend for BiztalkClient {
                         name: "이용 안내".to_owned(),
                         r#type: Default::default(),
                         url_mobile: url_mobile.clone(),
+                        url_pc: None,
                     }]),
                 )
                 .await
@@ -157,6 +160,50 @@ impl MessagingBackend for BiztalkClient {
             .await?;
 
         Ok(())
+    }
+
+    async fn send_audio_recording(
+        &self,
+        recipients: Vec<Self::Recipient>,
+        booking_id: &BookingId,
+        customer_name: &str,
+        reservation_time: &str,
+        expiry_time: Option<&str>,
+    ) -> Result<(), Self::Error> {
+        let mut message = MESSAGE_AUDIO_READY_01
+            .replace("#{customer}", customer_name)
+            .replace("#{reservation_dt}", reservation_time)
+            .replace("#{expires_dt}", expiry_time.unwrap_or("-"));
+
+        let url = format!("https://dream-house.kr/booking/{booking_id}/recording");
+
+        let mut error = None;
+
+        for recipient in recipients {
+            if let Err(e) = self
+                .client
+                .send_alimtalk(
+                    &recipient,
+                    TEMPLATE_AUDIO_READY,
+                    message.clone(),
+                    Some(vec![AlimTalkButtonAttachment {
+                        name: "음원 다운로드".to_owned(),
+                        r#type: Default::default(),
+                        url_mobile: url.to_owned(),
+                        url_pc: Some(url.to_owned()),
+                    }]),
+                )
+                .await
+            {
+                error = Some(e);
+            }
+        }
+
+        if let Some(error) = error {
+            Err(error.into())
+        } else {
+            Ok(())
+        }
     }
 }
 

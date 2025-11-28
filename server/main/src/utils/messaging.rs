@@ -1,4 +1,4 @@
-use dxe_data::entities::{Booking, Identity};
+use dxe_data::entities::{AudioRecording, Booking, Identity};
 use dxe_data::queries::identity::get_group_members;
 use dxe_types::IdentityProvider;
 use sqlx::SqliteConnection;
@@ -129,4 +129,54 @@ pub fn send_refund_confirmation(
         }
         _ => {}
     }
+}
+
+pub async fn send_audio_recording(
+    biztalk_sender: &Option<BiztalkSender>,
+    database: &mut SqliteConnection,
+    timezone_config: &TimeZoneConfig,
+    booking: &Booking,
+    audio_recording: &AudioRecording,
+) -> Result<(), Error> {
+    let start = timezone_config.convert(booking.time_from);
+    let end = timezone_config.convert(booking.time_to);
+
+    let time_str = format!(
+        "{} - {} ({} 시간)",
+        start.format("%Y-%m-%d %H:%M"),
+        end.format("%Y-%m-%d %H:%M"),
+        (end - start).num_hours()
+    );
+
+    let expires_in = audio_recording
+        .expires_in
+        .map(|v| v.format("%Y-%m-%d %H:%M:%S").to_string());
+
+    let recipients = match &booking.customer {
+        Identity::Group(g) => get_group_members(&mut *database, &g.id).await?,
+        Identity::User(u) => vec![u.clone()],
+    };
+
+    if let Some(biztalk_sender) = biztalk_sender {
+        let biztalk_recipients: Vec<_> = recipients
+            .iter()
+            .filter_map(|v| {
+                if v.provider == IdentityProvider::Kakao {
+                    Some(v.foreign_id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        biztalk_sender.send(MessagingEvent::AudioRecording {
+            recipients: biztalk_recipients,
+            booking_id: booking.id,
+            customer_name: booking.customer.name().to_owned(),
+            reservation_time: time_str,
+            expires_in: expires_in,
+        });
+    }
+
+    Ok(())
 }

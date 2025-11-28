@@ -4,8 +4,8 @@ use sqlx::SqliteConnection;
 
 use crate::Error;
 use crate::entities::{
-    Booking, CashPaymentStatus, Group, Identity, IdentityDiscriminator, ItsokeyCredential,
-    OccupiedSlot, Reservation, User,
+    AudioRecording, Booking, CashPaymentStatus, Group, Identity, IdentityDiscriminator,
+    ItsokeyCredential, OccupiedSlot, Reservation, User,
 };
 use crate::queries::unit::is_unit_enabled;
 
@@ -1341,4 +1341,48 @@ pub async fn get_itsokey_credential(
     )
     .fetch_optional(&mut *connection)
     .await?)
+}
+
+pub async fn get_audio_recording(
+    connection: &mut SqliteConnection,
+    booking_id: &BookingId,
+) -> Result<Option<AudioRecording>, Error> {
+    Ok(sqlx::query_as!(
+        AudioRecording,
+        r#"
+        SELECT
+            booking_id AS "booking_id: _",
+            url,
+            created_at AS "created_at: _",
+            expires_in AS "expires_in: _"
+        FROM audio_recording
+        WHERE booking_id=?1
+        "#,
+        booking_id
+    )
+    .fetch_optional(&mut *connection)
+    .await?)
+}
+
+pub async fn create_audio_recording(
+    connection: &mut SqliteConnection,
+    now: &DateTime<Utc>,
+    booking_id: &BookingId,
+    url: &str,
+    expires_in: Option<&DateTime<Utc>>,
+) -> Result<bool, Error> {
+    let result = sqlx::query!(
+        r#"
+        INSERT INTO audio_recording(booking_id, url, created_at, expires_in)
+        VALUES(?1, ?2, ?3, ?4)
+        "#,
+        booking_id,
+        url,
+        now,
+        expires_in
+    )
+    .execute(&mut *connection)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
 }

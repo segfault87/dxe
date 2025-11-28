@@ -47,6 +47,7 @@ pub struct AlimTalkButtonAttachment {
     pub name: String,
     pub r#type: ButtonType,
     pub url_mobile: String,
+    pub url_pc: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

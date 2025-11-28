@@ -76,7 +76,7 @@ impl BookingStateManager {
             .client
             .get::<GetBookingsResponse>(
                 "/pending-bookings",
-                Some(&format!("type={}", BookingType::Pending)),
+                Some(&format!("type={}", BookingType::Confirmed)),
             )
             .await
         {
@@ -468,8 +468,7 @@ impl BookingStateManager {
 
             Ok(())
         })
-        //.every_minutes(10)
-        .every_seconds(10)
+        .every_minutes(10)
         .build()
     }
 }

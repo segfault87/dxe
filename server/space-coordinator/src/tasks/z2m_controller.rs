@@ -708,8 +708,7 @@ impl Z2mController {
 
                 Ok(())
             })
-            //.every_minutes(1)
-            .every_seconds(10)
+            .every_minutes(1)
             .build(),
         )
     }
@@ -780,8 +779,6 @@ impl PresenceCallback for Z2mController {
 
     async fn on_leave(&self) -> Result<(), Box<dyn StdError>> {
         *self.presence.lock().unwrap() = Some(false);
-
-        log::info!("leave");
 
         self.trigger_presence_switch_event(false).await;
 

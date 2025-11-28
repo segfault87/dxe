@@ -674,11 +674,6 @@ impl Z2mController {
     }
 
     async fn update(self: Arc<Self>) {
-        if self.active_bookings.lock().unwrap().is_none() || self.presence.lock().unwrap().is_none()
-        {
-            return;
-        }
-
         self.handle_alert_tasks().await;
         self.sync_switch_states().await;
     }

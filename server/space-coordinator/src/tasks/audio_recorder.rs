@@ -62,7 +62,6 @@ impl RecorderProcess {
 
             while let Ok(read) = recorder_stdout.read(&mut buffer).await {
                 if read == 0 {
-                    log::warn!("lame process stopped unexpectedly");
                     break;
                 }
 
@@ -80,7 +79,6 @@ impl RecorderProcess {
 
             while let Ok(read) = lame_stdout.read(&mut buffer).await {
                 if read == 0 {
-                    log::warn!("lame process stopped unexpectedly");
                     break;
                 }
 

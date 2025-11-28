@@ -65,7 +65,7 @@ impl CarparkExempter {
                 Ok(()) => self.notification_service.notify(AlertPriority::Low, format!("Car parking exempted sucessfully for user {user_name} ({customer_name})")).await,
                 Err(e) => self.notification_service.notify(AlertPriority::Low, format!("Car parking exemption error: {e}")).await,
             } {
-                log::warn!("Could not send notification while processing parking exemtpion: {e}");
+                log::warn!("Could not send notification while processing parking exemption: {e}");
             }
         }
     }
@@ -91,14 +91,12 @@ impl EventStateCallback<BookingWithUsers> for CarparkExempter {
     async fn on_event_start(
         &self,
         event: &BookingWithUsers,
-        buffered: bool,
+        _buffered: bool,
     ) -> Result<(), Box<dyn Error>> {
-        if buffered {
-            self.active_bookings
-                .lock()
-                .unwrap()
-                .insert(event.booking.id);
-        }
+        self.active_bookings
+            .lock()
+            .unwrap()
+            .insert(event.booking.id);
 
         Ok(())
     }
@@ -106,14 +104,12 @@ impl EventStateCallback<BookingWithUsers> for CarparkExempter {
     async fn on_event_end(
         &self,
         event: &BookingWithUsers,
-        buffered: bool,
+        _buffered: bool,
     ) -> Result<(), Box<dyn Error>> {
-        if buffered {
-            self.active_bookings
-                .lock()
-                .unwrap()
-                .remove(&event.booking.id);
-        }
+        self.active_bookings
+            .lock()
+            .unwrap()
+            .remove(&event.booking.id);
 
         Ok(())
     }

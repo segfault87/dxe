@@ -195,9 +195,9 @@ impl AudioRecorder {
 
         let drive_client = self.drive_client.clone();
         let dxe_client = self.dxe_client.clone();
-        let booking_id = booking.booking.id.clone();
+        let booking_id = booking.booking.id;
         tokio::task::spawn(async move {
-            let url = match drive_client.upload(path, "audio/mp3").await {
+            let url = match drive_client.upload(path.clone(), "audio/mp3").await {
                 Ok(v) => v,
                 Err(e) => {
                     log::error!("Couldn't upload file to Google Drive: {e}");
@@ -209,7 +209,7 @@ impl AudioRecorder {
 
             match dxe_client
                 .post::<_, serde_json::Value>(
-                    &format!("/booking/{}/audio", booking_id),
+                    &format!("/booking/{booking_id}/audio"),
                     None,
                     UpdateAudioRequest {
                         url,
@@ -221,6 +221,8 @@ impl AudioRecorder {
                 Ok(_) => log::info!("Audio for {booking_id} updated successfully"),
                 Err(e) => log::error!("Couldn't post audio information to server: {e}"),
             }
+
+            let _ = tokio::fs::remove_file(path).await;
         });
     }
 
@@ -231,7 +233,7 @@ impl AudioRecorder {
         for (key, task) in tasks.iter() {
             if task.has_stopped() {
                 log::error!("Audio recording process for {key} exited prematurely.");
-                tasks_to_collect.insert(key.clone());
+                tasks_to_collect.insert(*key);
             }
         }
 
@@ -297,7 +299,7 @@ pub enum Error {
     #[error("Could not upload to Google Drive: {0}")]
     Drive(#[from] DriveError),
     #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
+    Io(#[from] std::io::Error),
     #[error("Recorder process has been already stopped.")]
     AlreadyStopped,
 }

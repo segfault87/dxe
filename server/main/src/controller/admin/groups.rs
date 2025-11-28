@@ -16,7 +16,8 @@ pub async fn get(
 
     let mut connection = database.acquire().await?;
 
-    let groups = get_all_groups_associated_with_members(&mut connection, &now).await?;
+    let mut groups = get_all_groups_associated_with_members(&mut connection, &now).await?;
+    groups.sort_by(|a, b| b.0.created_at.cmp(&a.0.created_at));
 
     Ok(web::Json(GetGroupsResponse {
         groups: groups

@@ -174,7 +174,7 @@ pub async fn send_audio_recording(
             booking_id: booking.id,
             customer_name: booking.customer.name().to_owned(),
             reservation_time: time_str,
-            expires_in: expires_in,
+            expires_in,
         });
     }
 

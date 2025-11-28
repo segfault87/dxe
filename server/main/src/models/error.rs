@@ -17,8 +17,6 @@ pub enum Error {
     MissingField(&'static str),
     #[error("잘못된 요청입니다.")]
     UnitNotFound,
-    #[error("잘못된 요청입니다.")]
-    SpaceNotFound,
     #[error("그룹을 찾을 수 없습니다.")]
     GroupNotFound,
     #[error("사용자를 찾을 수 없습니다.")]
@@ -99,7 +97,6 @@ impl ResponseError for Error {
             Self::TimeRangeOccupied => StatusCode::BAD_REQUEST,
             Self::MissingField(_) => StatusCode::BAD_REQUEST,
             Self::UnitNotFound => StatusCode::BAD_REQUEST,
-            Self::SpaceNotFound => StatusCode::BAD_REQUEST,
             Self::GroupNotFound => StatusCode::NOT_FOUND,
             Self::UserNotFound => StatusCode::NOT_FOUND,
             Self::BookingNotFound => StatusCode::NOT_FOUND,
@@ -131,7 +128,6 @@ impl ResponseError for Error {
             Self::TimeRangeOccupied => "TimeRangeOccupied",
             Self::MissingField(_) => "MissingField",
             Self::UnitNotFound => "UnitNotFound",
-            Self::SpaceNotFound => "SpaceNotFound",
             Self::GroupNotFound => "GroupNotFound",
             Self::UserNotFound => "UserNotFound",
             Self::BookingNotFound => "BookingNotFound",

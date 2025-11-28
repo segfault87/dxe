@@ -425,7 +425,7 @@ impl Z2mController {
         if current_state == state {
             Ok(false)
         } else {
-            log::info!("Setting switch {} to {}", device_name, state);
+            log::info!("Setting switch {device_name} to {state}");
 
             self.set_state(
                 device_name.clone(),
@@ -470,7 +470,7 @@ impl Z2mController {
         if current_state == desired_state {
             Ok(false)
         } else {
-            log::info!("Setting switch {} to {}", device_name, desired_state);
+            log::info!("Setting switch {device_name} to {desired_state}");
 
             self.set_state(
                 device_name.clone(),

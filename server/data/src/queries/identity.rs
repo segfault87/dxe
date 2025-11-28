@@ -219,7 +219,6 @@ pub async fn get_all_groups_associated_with_members(
         JOIN user "u" ON ga.user_id = u.id
         WHERE
             (g.deleted_at IS NULL OR g.deleted_at < ?1)
-        ORDER BY g.created_at DESC
         "#,
         now,
     )

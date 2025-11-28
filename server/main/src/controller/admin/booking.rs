@@ -70,6 +70,7 @@ pub async fn put(
         ModifyAction::Refund => {
             if let Some(cash_payment_status) = &cash_payment_status
                 && let Some(refund_price) = cash_payment_status.refund_price
+                && refund_price > 0
             {
                 send_refund_confirmation(
                     biztalk_sender.as_ref(),

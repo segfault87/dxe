@@ -25,7 +25,7 @@ pub async fn get(
 
     let mut connection = database.acquire().await?;
 
-    let bookings = match query.r#type {
+    let mut bookings = match query.r#type {
         GetBookingsType::Pending => get_bookings_pending(&mut connection, &now, false).await?,
         GetBookingsType::RefundPending => get_bookings_refund_pending(&mut connection)
             .await?
@@ -50,6 +50,16 @@ pub async fn get(
                 .collect()
         }
     };
+
+    match query.r#type {
+        GetBookingsType::Confirmed => bookings.sort_by(|a, b| a.0.time_from.cmp(&b.0.time_from)),
+        GetBookingsType::Canceled => bookings.sort_by(|a, b| {
+            b.0.canceled_at
+                .unwrap_or_default()
+                .cmp(&a.0.canceled_at.unwrap_or_default())
+        }),
+        _ => {}
+    }
 
     Ok(web::Json(GetBookingsResponse {
         bookings: bookings

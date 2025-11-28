@@ -166,7 +166,7 @@ where
                             &booking_id,
                             customer_name.as_str(),
                             reservation_time.as_str(),
-                            expires_in.as_ref().map(|v| v.as_str()),
+                            expires_in.as_deref(),
                         )
                         .await
                     {

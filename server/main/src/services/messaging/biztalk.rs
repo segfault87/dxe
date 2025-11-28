@@ -170,7 +170,7 @@ impl MessagingBackend for BiztalkClient {
         reservation_time: &str,
         expiry_time: Option<&str>,
     ) -> Result<(), Self::Error> {
-        let mut message = MESSAGE_AUDIO_READY_01
+        let message = MESSAGE_AUDIO_READY_01
             .replace("#{customer}", customer_name)
             .replace("#{reservation_dt}", reservation_time)
             .replace("#{expires_dt}", expiry_time.unwrap_or("-"));

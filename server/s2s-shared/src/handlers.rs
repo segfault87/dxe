@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 
-use dxe_types::{BookingId, UnitId};
+use dxe_types::UnitId;
 use serde::{Deserialize, Serialize};
 
 use crate::Timestamp;

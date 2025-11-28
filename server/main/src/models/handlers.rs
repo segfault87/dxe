@@ -14,7 +14,7 @@ pub mod admin {
 
     use super::*;
 
-    #[derive(Debug, Deserialize)]
+    #[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq)]
     #[serde(rename_all = "snake_case")]
     pub enum GetBookingsType {
         Confirmed,

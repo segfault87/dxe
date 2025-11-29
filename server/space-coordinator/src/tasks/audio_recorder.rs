@@ -135,7 +135,7 @@ impl AudioRecorder {
         config: HashMap<UnitId, AudioRecorderConfig>,
         dxe_client: DxeClient,
     ) -> Result<Self, Error> {
-        let gcp_credential = CredentialManager::new(google_api_config)?;
+        let gcp_credential = CredentialManager::new(google_api_config, None)?;
         let drive_client = GoogleDriveClient::new(gcp_credential, &google_api_config.drive);
 
         Ok(Self {

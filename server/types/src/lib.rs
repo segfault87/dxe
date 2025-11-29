@@ -116,3 +116,9 @@ impl From<i64> for ReservationId {
         Self(value)
     }
 }
+
+impl std::fmt::Display for ReservationId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}

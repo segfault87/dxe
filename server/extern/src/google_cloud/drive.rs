@@ -4,7 +4,7 @@ use reqwest::StatusCode;
 use reqwest::multipart::{Form, Part};
 use serde::Deserialize;
 
-pub const SCOPE: &str = "https://www.googleapis.com/auth/drive";
+const SCOPE: &str = "https://www.googleapis.com/auth/drive";
 
 const UPLOAD_URL: &str = "https://www.googleapis.com/upload/drive/v3/files";
 const PERMISSION_URL: &str = "https://www.googleapis.com/drive/v3/files/{id}/permissions";

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use chrono::{DateTime, FixedOffset, TimeDelta, Utc};
 use dxe_types::{SpaceId, UnitId};
@@ -264,6 +264,30 @@ pub struct SpaceConfig {
     pub security: SpaceSecurityConfig,
 }
 
+#[derive(Deserialize, Clone, Debug)]
+pub struct GoogleCalendarConfig {
+    pub calendar_id: String,
+    pub identity: String,
+}
+
+impl dxe_extern::google_cloud::calendar::GoogleCalendarConfig for GoogleCalendarConfig {
+    fn calendar_id(&self) -> &str {
+        &self.calendar_id
+    }
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct GoogleApiConfig {
+    pub service_account_path: PathBuf,
+    pub calendar: GoogleCalendarConfig,
+}
+
+impl dxe_extern::google_cloud::GoogleCloudAuthConfig for GoogleApiConfig {
+    fn service_account_path(&self) -> &PathBuf {
+        &self.service_account_path
+    }
+}
+
 #[derive(Deserialize, Debug)]
 pub struct Config {
     #[serde(flatten)]
@@ -278,4 +302,5 @@ pub struct Config {
     pub spaces: HashMap<SpaceId, SpaceConfig>,
     pub notifications: NotificationConfig,
     pub messaging: MessagingConfig,
+    pub google_apis: Option<GoogleApiConfig>,
 }

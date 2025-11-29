@@ -16,6 +16,7 @@ use jwt_compact::alg::Ed25519;
 
 use crate::config::Config;
 use crate::middleware::coordinator_verifier::PublicKeyBundle;
+use crate::services::calendar::CalendarService;
 use crate::services::doorlock::DoorLockService;
 use crate::services::messaging::biztalk::BiztalkClient;
 use crate::services::messaging::spawn_messaging_backend;
@@ -46,12 +47,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let aes = Data::new(aes);
 
     let booking_config = Data::new(config.booking.clone());
-
     let timezone_config = Data::new(config.timezone.clone());
-
     let doorlock_service = DoorLockService::new(&config.spaces);
-
     let s2s_public_keys = Arc::new(PublicKeyBundle::new(&config.spaces));
+    let calendar_service = if let Some(config) = &config.google_apis {
+        Some(CalendarService::new(config)?)
+    } else {
+        None
+    };
 
     let (biztalk_task, biztalk_sender) = if let Some(config) = &config.messaging.biztalk {
         let backend = BiztalkClient::new(config);
@@ -92,6 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .app_data(Data::new(doorlock_service.clone()))
             .app_data(Data::new(biztalk_sender.clone()))
             .app_data(Data::new(config.url.clone()))
+            .app_data(Data::new(calendar_service.clone()))
             .service(controller::api(authority, s2s_public_keys.clone()))
     })
     .bind(&args.address)?

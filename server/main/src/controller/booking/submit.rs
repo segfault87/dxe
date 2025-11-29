@@ -5,7 +5,7 @@ use dxe_data::queries::booking::{
     create_booking, create_cash_payment_status, get_booking_with_user_id, get_cash_payment_status,
     is_booking_available,
 };
-use dxe_data::queries::identity::{get_identity, is_member_of};
+use dxe_data::queries::identity::{get_group_members, get_identity, is_member_of};
 use dxe_data::queries::unit::is_unit_enabled;
 use sqlx::SqlitePool;
 
@@ -13,6 +13,7 @@ use crate::config::{BookingConfig, TimeZoneConfig};
 use crate::models::entities::{Booking, BookingCashPaymentStatus};
 use crate::models::handlers::booking::{SubmitBookingRequest, SubmitBookingResponse};
 use crate::models::{Error, IntoView};
+use crate::services::calendar::CalendarService;
 use crate::services::telemetry::{NotificationSender, Priority};
 use crate::session::UserSession;
 use crate::utils::datetime::truncate_time;
@@ -24,6 +25,7 @@ pub async fn post(
     booking_config: web::Data<BookingConfig>,
     timezone_config: web::Data<TimeZoneConfig>,
     notification_sender: web::Data<NotificationSender>,
+    calendar_service: web::Data<Option<CalendarService>>,
 ) -> Result<web::Json<SubmitBookingResponse>, Error> {
     let now = Utc::now();
 
@@ -48,18 +50,20 @@ pub async fn post(
         .await?
         .ok_or(Error::UserNotFound)?;
 
-    match &identity {
+    let customers = match &identity {
         Identity::User(u) => {
             if u.id != session.user_id {
                 return Err(Error::UserNotFound);
             }
+            vec![u.clone()]
         }
         Identity::Group(g) => {
             if !is_member_of(&mut tx, &g.id, &session.user_id).await? {
                 return Err(Error::GroupNotFound);
             }
+            get_group_members(&mut *tx, &g.id).await?
         }
-    }
+    };
 
     let booking_id = create_booking(
         &mut tx,
@@ -94,6 +98,15 @@ pub async fn post(
         .ok_or(Error::BookingNotFound)?;
 
     tx.commit().await?;
+
+    if let Some(calendar_service) = calendar_service.as_ref() {
+        if let Err(e) = calendar_service
+            .register_booking(&timezone_config, &booking, &customers)
+            .await
+        {
+            log::error!("Failed to register event on calendar: {e}");
+        }
+    }
 
     notification_sender.enqueue(
         Priority::High,

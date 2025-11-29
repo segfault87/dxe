@@ -14,6 +14,7 @@ use crate::models::handlers::admin::{
     GetReservationsResponse,
 };
 use crate::models::{Error, IntoView};
+use crate::services::calendar::CalendarService;
 use crate::session::UserSession;
 use crate::utils::datetime::truncate_time;
 
@@ -42,6 +43,7 @@ pub async fn post(
     body: web::Json<CreateReservationRequest>,
     database: web::Data<SqlitePool>,
     timezone_config: web::Data<TimeZoneConfig>,
+    calendar_service: web::Data<Option<CalendarService>>,
 ) -> Result<web::Json<CreateReservationResponse>, Error> {
     let now = Utc::now();
 
@@ -66,11 +68,20 @@ pub async fn post(
     )
     .await?;
 
-    let reservation = get_reservation(&mut tx, id)
+    let reservation = get_reservation(&mut tx, &id)
         .await?
         .ok_or(Error::BookingNotFound)?;
 
     tx.commit().await?;
+
+    if let Some(calendar_service) = calendar_service.as_ref() {
+        if let Err(e) = calendar_service
+            .register_adhoc_reservation(&reservation, &timezone_config)
+            .await
+        {
+            log::error!("Failed to create ad hoc reservation on calendar: {e}");
+        }
+    }
 
     Ok(web::Json(CreateReservationResponse {
         reservation: Reservation::convert(reservation, &timezone_config, &now)?,
@@ -78,18 +89,28 @@ pub async fn post(
 }
 
 pub async fn delete(
-    path: web::Path<ReservationId>,
+    reservation_id: web::Path<ReservationId>,
     database: web::Data<SqlitePool>,
+    calendar_service: web::Data<Option<CalendarService>>,
 ) -> Result<web::Json<serde_json::Value>, Error> {
     let mut tx = database.begin().await?;
 
-    let reservation = get_reservation(&mut tx, path.into_inner())
+    let reservation = get_reservation(&mut tx, &reservation_id)
         .await?
         .ok_or(Error::BookingNotFound)?;
 
     delete_reservation(&mut tx, reservation.id).await?;
 
     tx.commit().await?;
+
+    if let Some(calendar_service) = calendar_service.as_ref() {
+        if let Err(e) = calendar_service
+            .delete_adhoc_reservation(&reservation_id)
+            .await
+        {
+            log::error!("Failed to delete ad hoc reservation on calendar: {e}");
+        }
+    }
 
     Ok(web::Json(serde_json::json!({})))
 }

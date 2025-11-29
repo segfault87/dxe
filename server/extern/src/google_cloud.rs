@@ -16,26 +16,19 @@ pub struct CredentialManager {
 }
 
 impl CredentialManager {
-    pub fn new(config: &impl GoogleCloudAuthConfig) -> Result<Self, Error> {
+    pub fn new(config: &impl GoogleCloudAuthConfig, sub: Option<String>) -> Result<Self, Error> {
+        let mut service_account = CustomServiceAccount::from_file(config.service_account_path())?;
+        if let Some(sub) = sub {
+            service_account = service_account.with_subject(sub);
+        }
         Ok(Self {
-            service_account: Arc::new(CustomServiceAccount::from_file(
-                config.service_account_path(),
-            )?),
+            service_account: Arc::new(service_account),
         })
     }
 
     pub async fn get_token(&self, scopes: &[&str]) -> Result<Arc<Token>, Error> {
         Ok(self.service_account.token(scopes).await?)
     }
-}
-
-pub async fn get_token(
-    config: &impl GoogleCloudAuthConfig,
-    scopes: &[&str],
-) -> Result<Arc<Token>, Error> {
-    let service_account = CustomServiceAccount::from_file(config.service_account_path())?;
-
-    Ok(service_account.token(scopes).await?)
 }
 
 #[derive(Debug, thiserror::Error)]

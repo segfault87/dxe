@@ -12,6 +12,7 @@ use crate::config::{BookingConfig, TimeZoneConfig};
 use crate::models::entities::BookingCashPaymentStatus;
 use crate::models::handlers::booking::{CancelBookingRequest, CancelBookingResponse};
 use crate::models::{Error, IntoView};
+use crate::services::calendar::CalendarService;
 use crate::services::messaging::biztalk::BiztalkSender;
 use crate::services::telemetry::{NotificationSender, Priority};
 use crate::session::UserSession;
@@ -26,6 +27,7 @@ pub async fn delete(
     timezone_config: web::Data<TimeZoneConfig>,
     notification_sender: web::Data<NotificationSender>,
     biztalk_sender: web::Data<Option<BiztalkSender>>,
+    calendar_service: web::Data<Option<CalendarService>>,
 ) -> Result<web::Json<CancelBookingResponse>, Error> {
     let now = Utc::now();
 
@@ -77,6 +79,12 @@ pub async fn delete(
     }
 
     tx.commit().await?;
+
+    if let Some(calendar_service) = calendar_service.as_ref() {
+        if let Err(e) = calendar_service.delete_booking(&booking.id).await {
+            log::error!("Failed to delete event on calendar: {e}");
+        }
+    }
 
     notification_sender.enqueue(
         Priority::High,

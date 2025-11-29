@@ -1184,7 +1184,7 @@ pub async fn create_reservation(
 
 pub async fn get_reservation(
     connection: &mut SqliteConnection,
-    id: ReservationId,
+    id: &ReservationId,
 ) -> Result<Option<Reservation>, Error> {
     let result = sqlx::query!(
         r#"

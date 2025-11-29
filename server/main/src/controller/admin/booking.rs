@@ -11,6 +11,7 @@ use crate::config::{BookingConfig, TimeZoneConfig};
 use crate::models::entities::{Booking, BookingCashPaymentStatus};
 use crate::models::handlers::admin::{ModifyAction, ModifyBookingRequest, ModifyBookingResponse};
 use crate::models::{Error, IntoView};
+use crate::services::calendar::CalendarService;
 use crate::services::messaging::biztalk::BiztalkSender;
 use crate::session::UserSession;
 use crate::utils::datetime::is_in_effect;
@@ -24,6 +25,7 @@ pub async fn put(
     booking_config: web::Data<BookingConfig>,
     timezone_config: web::Data<TimeZoneConfig>,
     biztalk_sender: web::Data<Option<BiztalkSender>>,
+    calendar_service: web::Data<Option<CalendarService>>,
 ) -> Result<web::Json<ModifyBookingResponse>, Error> {
     let now = Utc::now();
 
@@ -53,6 +55,11 @@ pub async fn put(
         ModifyAction::Cancel => {
             if !is_in_effect(&booking.canceled_at, &now) {
                 cancel_booking(&mut tx, &now, booking_id.as_ref()).await?;
+                if let Some(calendar_service) = calendar_service.as_ref() {
+                    if let Err(e) = calendar_service.delete_booking(booking_id.as_ref()).await {
+                        log::error!("Failed to delete event on calendar: {e}");
+                    }
+                }
             }
         }
     }

@@ -61,7 +61,7 @@ pub async fn post(
             if !is_member_of(&mut tx, &g.id, &session.user_id).await? {
                 return Err(Error::GroupNotFound);
             }
-            get_group_members(&mut *tx, &g.id).await?
+            get_group_members(&mut tx, &g.id).await?
         }
     };
 

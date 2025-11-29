@@ -38,7 +38,7 @@ impl CalendarService {
         &self,
         timezone_config: &TimeZoneConfig,
         booking: &Booking,
-        users: &Vec<User>,
+        users: &[User],
     ) -> Result<(), Error> {
         let event = Event {
             id: booking_id_to_event_id(&booking.id),

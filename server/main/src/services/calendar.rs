@@ -113,7 +113,10 @@ impl CalendarService {
     }
 
     pub async fn delete_booking(&self, booking_id: &BookingId) -> Result<(), Error> {
-        Ok(self.client.delete_event(&booking_id.to_string()).await?)
+        Ok(self
+            .client
+            .delete_event(&booking_id_to_event_id(booking_id))
+            .await?)
     }
 
     pub async fn delete_adhoc_reservation(
@@ -122,7 +125,7 @@ impl CalendarService {
     ) -> Result<(), Error> {
         Ok(self
             .client
-            .delete_event(&format!("adhoc{adhoc_reservation_id}"))
+            .delete_event(&adhoc_reservation_id_to_event_id(adhoc_reservation_id))
             .await?)
     }
 }

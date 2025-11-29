@@ -58,6 +58,12 @@ impl From<String> for EventId {
     }
 }
 
+impl std::fmt::Display for EventId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct GoogleCalendarClient {
     credential: super::CredentialManager,
@@ -97,12 +103,12 @@ impl GoogleCalendarClient {
         }
     }
 
-    pub async fn delete_event(&self, event_id: &str) -> Result<(), Error> {
+    pub async fn delete_event(&self, event_id: &EventId) -> Result<(), Error> {
         let token = self.credential.get_token(&[SCOPE]).await?;
 
         let url = CALENDAR_EVENT_URL
             .replace("{calendar_id}", &self.calendar_id)
-            .replace("{event_id}", event_id);
+            .replace("{event_id}", &event_id.to_string());
 
         let response = self
             .client

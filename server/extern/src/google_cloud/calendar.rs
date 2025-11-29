@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, FixedOffset};
-use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
 pub const SCOPE: &str = "https://www.googleapis.com/auth/calendar.events";

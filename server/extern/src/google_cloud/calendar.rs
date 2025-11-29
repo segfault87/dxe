@@ -95,11 +95,10 @@ impl GoogleCalendarClient {
             .send()
             .await?;
 
-        if response.status() == StatusCode::OK {
+        if response.status().is_success() {
             Ok(())
         } else {
-            println!("Error {}: {}", response.status(), response.text().await?);
-            Err(Error::Tbd)
+            Err(Error::Calendar(response.json().await?))
         }
     }
 
@@ -117,11 +116,10 @@ impl GoogleCalendarClient {
             .send()
             .await?;
 
-        if response.status() == StatusCode::OK {
-            Ok(())
+        if response.status().is_client_error() {
+            Err(Error::Calendar(response.json().await?))
         } else {
-            println!("Error {}: {}", response.status(), response.text().await?);
-            Err(Error::Tbd)
+            Ok(())
         }
     }
 }
@@ -132,6 +130,6 @@ pub enum Error {
     Http(#[from] reqwest::Error),
     #[error("GCP authentication error: {0}")]
     Gcp(#[from] super::Error),
-    #[error("TBD")]
-    Tbd,
+    #[error("Calendar API error: {0}")]
+    Calendar(serde_json::Value),
 }

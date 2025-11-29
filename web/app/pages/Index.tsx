@@ -81,7 +81,7 @@ export function Actions() {
   const auth = useAuth();
 
   let action = (
-    <Link to="/reservation" className="cta">
+    <Link to="/reservation/" className="cta">
       예약하기
     </Link>
   );
@@ -140,7 +140,12 @@ export default function Index() {
               <li>Line 6 Powercab 112</li>
             </ul>
           </li>
-          <li>베이스 앰프: Ampeg SVT-2PRO Head × Ampeg SVT-810E Cabinet</li>
+          <li>
+            베이스 앰프: <s>Ampeg SVT-2PRO Head</s> × Ampeg SVT-810E Cabinet
+            <br />
+            (현재 헤드는 수리 중으로 임시로 Aguilar Tone Hammer 350으로
+            대체중입니다.)
+          </li>
           <li>
             드럼세트
             <ul>
@@ -153,8 +158,15 @@ export default function Index() {
             </ul>
           </li>
           <li>키보드: Yamaha MX88</li>
-          <li>마이크: Shure SM58 x3</li>
-          <li>PA 스피커: JBL EON 715 x2</li>
+          <li>
+            마이크
+            <ul>
+              <li>유선: Shure SM58 ×3</li>
+              <li>무선: Kanals KB-9700 ×2</li>
+            </ul>
+          </li>
+          <li>PA 스피커: JBL EON 715 ×2</li>
+          <li>모니터링 스피커: Behringer Eurolive F1220D</li>
           <li>믹서: Roland VM-3100Pro</li>
         </ul>
       </Section>
@@ -163,7 +175,7 @@ export default function Index() {
           <li>이용요금은 시간당 ₩20,000입니다.</li>
           <li>
             악기 대여시 별도의 비용이 발생할 수 있습니다. (대여가 필요하실 경우{" "}
-            <Link to="/inquiries">문의</Link> 바랍니다)
+            <Link to="/inquiries/">문의</Link> 바랍니다)
           </li>
         </ul>
       </Section>

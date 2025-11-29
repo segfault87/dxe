@@ -23,6 +23,9 @@ type Pages = {
   "/reservation": {
     params: {};
   };
+  "/reservation/login": {
+    params: {};
+  };
   "/reservation/:bookingId": {
     params: {
       "bookingId": string;
@@ -73,11 +76,11 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/guide" | "/inquiries" | "/reservation" | "/reservation/:bookingId" | "/login" | "/register" | "/my" | "/terms-of-service" | "/booking/:bookingId/recording" | "/join/:groupId" | "/admin" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/reservations";
+    page: "/" | "/guide" | "/inquiries" | "/reservation" | "/reservation/login" | "/reservation/:bookingId" | "/login" | "/register" | "/my" | "/terms-of-service" | "/booking/:bookingId/recording" | "/join/:groupId" | "/admin" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/reservations";
   };
   "./components/Scaffold.tsx": {
     id: "components/Scaffold";
-    page: "/" | "/guide" | "/inquiries" | "/reservation" | "/reservation/:bookingId" | "/login" | "/register" | "/my" | "/terms-of-service";
+    page: "/" | "/guide" | "/inquiries" | "/reservation" | "/reservation/login" | "/reservation/:bookingId" | "/login" | "/register" | "/my" | "/terms-of-service";
   };
   "./pages/Index.tsx": {
     id: "pages/Index";
@@ -94,6 +97,10 @@ type RouteFiles = {
   "./pages/Reservation/Create.tsx": {
     id: "pages/Reservation/Create";
     page: "/reservation";
+  };
+  "./pages/Reservation/Login.tsx": {
+    id: "pages/Reservation/Login";
+    page: "/reservation/login";
   };
   "./pages/Reservation/Show.tsx": {
     id: "pages/Reservation/Show";
@@ -160,6 +167,7 @@ type RouteModules = {
   "pages/Guide": typeof import("./app/./pages/Guide.tsx");
   "pages/Inquiries": typeof import("./app/./pages/Inquiries.tsx");
   "pages/Reservation/Create": typeof import("./app/./pages/Reservation/Create.tsx");
+  "pages/Reservation/Login": typeof import("./app/./pages/Reservation/Login.tsx");
   "pages/Reservation/Show": typeof import("./app/./pages/Reservation/Show.tsx");
   "pages/Login": typeof import("./app/./pages/Login.tsx");
   "pages/Register": typeof import("./app/./pages/Register.tsx");

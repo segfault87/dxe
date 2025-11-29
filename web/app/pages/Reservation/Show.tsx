@@ -149,7 +149,7 @@ function ShowReservation({ loaderData }: Route.ComponentProps) {
           </button>
           <br />
           <p>
-            문이 안 열리시면 <Link to="/inquiries">연락</Link> 바랍니다.
+            문이 안 열리시면 <Link to="/inquiries/">연락</Link> 바랍니다.
             <br />
             (엘리베이터 근처에 있는 음악연습실은 저희 업장이 아니며, 솔섬식품
             왼편에 있습니다.)

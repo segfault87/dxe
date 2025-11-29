@@ -40,7 +40,7 @@ export default function GroupSelection(props: GroupSelectionProps) {
           <p>
             현재 소속중인 그룹이 없습니다.
             <br />
-            그룹은 <Link to="/my">설정</Link> 페이지에서 만들 수 있습니다.
+            그룹은 <Link to="/my/">설정</Link> 페이지에서 만들 수 있습니다.
           </p>
         </div>
       ) : (

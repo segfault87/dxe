@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 
 export default function RequiresAuth<P extends object>(
   WrappedComponent: (props: P) => React.ReactElement | null | undefined,
+  redirectPath?: string,
 ) {
   return function RequiresAuth(props: P) {
     const auth = useAuth();
@@ -15,7 +16,7 @@ export default function RequiresAuth<P extends object>(
         redirectTo += location.search;
       }
 
-      const path = `/login?redirect_to=${redirectTo}`;
+      const path = redirectPath ?? `/login/?redirect_to=${redirectTo}`;
       window.location.href = path;
 
       return <></>;

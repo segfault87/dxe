@@ -30,7 +30,7 @@ export default function Guide() {
             악기 등의 장비는 합주실의 공용 물품이 아닙니다. 대기실에 비치된
             악기는 대여해드리나 개인 물품이기 때문에 직접 안내 후 대여해드리고
             있습니다. 만약 이용이 필요한 경우가 있다면 관리인에게{" "}
-            <Link to="/inquiries">문의</Link>해주시면 감사하겠습니다.
+            <Link to="/inquiries/">문의</Link>해주시면 감사하겠습니다.
           </li>
         </ul>
       </Section>

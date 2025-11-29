@@ -440,4 +440,4 @@ function Reservation() {
   );
 }
 
-export default RequiresAuth(Reservation);
+export default RequiresAuth(Reservation, "/reservation/login/");

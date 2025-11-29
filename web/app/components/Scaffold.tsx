@@ -19,20 +19,20 @@ export default function Scaffold() {
           <NavLink to="/" end>
             소개
           </NavLink>
-          <NavLink to="/guide" end>
+          <NavLink to="/guide/" end>
             이용 안내
           </NavLink>
-          <NavLink to="/inquiries" end>
+          <NavLink to="/inquiries/" end>
             문의
           </NavLink>
-          <NavLink to="/reservation" end>
+          <NavLink to="/reservation/" end>
             예약하기
           </NavLink>
-          <NavLink to="/my" end>
+          <NavLink to="/my/" end>
             조회
           </NavLink>
           {auth?.user.isAdministrator ? (
-            <NavLink to="/admin" end>
+            <NavLink to="/admin/" end>
               관리자
             </NavLink>
           ) : null}

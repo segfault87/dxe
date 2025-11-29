@@ -105,7 +105,7 @@ export function JoinGroup({ loaderData }: { loaderData: LoaderData }) {
               가입
             </button>
           ) : (
-            <Link to="/my" className="cta" replace>
+            <Link to="/my/" className="cta" replace>
               확인
             </Link>
           )}

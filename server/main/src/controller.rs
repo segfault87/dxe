@@ -2,7 +2,7 @@ mod admin;
 mod auth;
 mod booking;
 mod join_group;
-mod space;
+mod s2s;
 mod timestamp;
 mod user;
 
@@ -49,6 +49,6 @@ where
         .service(web::resource("/timestamp").route(web::get().to(timestamp::get)))
         .service(auth::scope())
         .service(join_group::resource())
-        .service(space::scope().wrap(CoordinatorVerifier::new(s2s_public_keys)))
+        .service(s2s::scope().wrap(CoordinatorVerifier::new(s2s_public_keys)))
         .service(scope_with_auth)
 }

@@ -1,7 +1,11 @@
 use std::collections::HashMap;
 
 use chrono::{Local, TimeDelta};
-use reqwest::{StatusCode, redirect::Policy};
+use reqwest::{
+    StatusCode,
+    header::{CONTENT_TYPE, HeaderValue},
+    redirect::Policy,
+};
 use url::Url;
 
 const PATH_LOGIN: &str = "/login";
@@ -77,7 +81,7 @@ impl AmanoClient {
         let mut list_url = self.url_base.clone();
         list_url.set_path(PATH_LIST);
 
-        let result = self
+        let mut request = self
             .client
             .post(list_url.clone())
             .form(&HashMap::from([
@@ -85,8 +89,10 @@ impl AmanoClient {
                 ("entryDate", entry_date.clone()),
                 ("carNo", license_plate_number.to_owned()),
             ]))
-            .send()
-            .await?;
+            .build()?;
+        *request.headers_mut().get_mut(CONTENT_TYPE).unwrap() =
+            HeaderValue::from_static("application/x-www-form-urlencoded; charset=UTF-8");
+        let result = self.client.execute(request).await?;
 
         let json_body: Vec<serde_json::Value> = result.json().await?;
         if json_body.len() > 1 {
@@ -116,21 +122,29 @@ impl AmanoClient {
             .as_i64()
             .ok_or(Error::InvalidJsonType("id"))?
             .to_string();
+        let card_type = entry_object
+            .get("iCardType")
+            .ok_or(Error::MissingField("iCardType", list_url.clone()))?
+            .as_str()
+            .ok_or(Error::InvalidJsonType("iCardtype"))?
+            .to_string();
 
         let mut get_url = self.url_base.clone();
         get_url.set_path(PATH_GET);
 
-        let result = self
+        let mut request = self
             .client
             .post(get_url.clone())
             .form(&HashMap::from([
                 ("id", pe_id.to_owned()),
-                ("iCardType", "0".to_owned()),
+                ("iCardType", card_type.clone()),
                 ("member_id", self.user_id.clone()),
                 ("startDate", entry_date.clone()),
             ]))
-            .send()
-            .await?;
+            .build()?;
+        *request.headers_mut().get_mut(CONTENT_TYPE).unwrap() =
+            HeaderValue::from_static("application/x-www-form-urlencoded; charset=UTF-8");
+        let result = self.client.execute(request).await?;
 
         let details_data: serde_json::Map<String, serde_json::Value> = result.json().await?;
         let list_discount_type = details_data
@@ -183,20 +197,22 @@ impl AmanoClient {
         let mut exemption_url = self.url_base.clone();
         exemption_url.set_path(PATH_EXEMPTION);
 
-        let exemption_result = self
+        let mut request = self
             .client
             .post(exemption_url)
             .form(&HashMap::from([
                 ("peId", pe_id),
                 ("discountType", free_discount_id),
                 ("saveCnt", "1".to_owned()),
-                ("iCardType", "0".to_owned()),
+                ("iCardType", card_type),
                 ("carNo", car_no),
                 ("acPlate2", ac_plate_2),
                 ("memo", String::new()),
             ]))
-            .send()
-            .await?;
+            .build()?;
+        *request.headers_mut().get_mut(CONTENT_TYPE).unwrap() =
+            HeaderValue::from_static("application/x-www-form-urlencoded; charset=UTF-8");
+        let exemption_result = self.client.execute(request).await?;
 
         if exemption_result.status() != StatusCode::OK {
             Err(Error::ExemptionFailed(exemption_result.status()))

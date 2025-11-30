@@ -62,27 +62,31 @@ impl CarparkExempter {
 
         for (customer_name, user_name, license_plate_number) in license_plate_numbers {
             if let Err(e) = match self.service.exempt(&license_plate_number).await {
-                Ok(()) => self.notification_service.notify(AlertPriority::Low, format!("Car parking exempted sucessfully for user {user_name} ({customer_name})")).await,
+                Ok(true) => self.notification_service.notify(AlertPriority::Low, format!("Car parking exempted sucessfully for user {user_name} ({customer_name})")).await,
+                Ok(false) => continue,
                 Err(e) => self.notification_service.notify(AlertPriority::Low, format!("Car parking exemption error: {e}")).await,
             } {
-                log::warn!("Could not send notification while processing parking exemption: {e}");
+                log::error!("Could not send notification while processing parking exemption: {e}");
             }
         }
     }
 
-    pub fn task(self) -> Task {
+    pub fn task(self) -> (Arc<Self>, Task) {
         let arc_self = Arc::new(self);
 
-        TaskBuilder::new("carpark_exempter", move || {
-            let arc_self = arc_self.clone();
-            tokio::task::spawn(async move {
-                arc_self.update().await;
-            });
+        (
+            arc_self.clone(),
+            TaskBuilder::new("carpark_exempter", move || {
+                let arc_self = arc_self.clone();
+                tokio::task::spawn(async move {
+                    arc_self.update().await;
+                });
 
-            Ok(())
-        })
-        .every_minutes(10)
-        .build()
+                Ok(())
+            })
+            .every_seconds(10)
+            .build(),
+        )
     }
 }
 
@@ -91,12 +95,14 @@ impl EventStateCallback<BookingWithUsers> for CarparkExempter {
     async fn on_event_start(
         &self,
         event: &BookingWithUsers,
-        _buffered: bool,
+        buffered: bool,
     ) -> Result<(), Box<dyn Error>> {
-        self.active_bookings
-            .lock()
-            .unwrap()
-            .insert(event.booking.id);
+        if buffered {
+            self.active_bookings
+                .lock()
+                .unwrap()
+                .insert(event.booking.id);
+        }
 
         Ok(())
     }
@@ -104,12 +110,14 @@ impl EventStateCallback<BookingWithUsers> for CarparkExempter {
     async fn on_event_end(
         &self,
         event: &BookingWithUsers,
-        _buffered: bool,
+        buffered: bool,
     ) -> Result<(), Box<dyn Error>> {
-        self.active_bookings
-            .lock()
-            .unwrap()
-            .remove(&event.booking.id);
+        if buffered {
+            self.active_bookings
+                .lock()
+                .unwrap()
+                .remove(&event.booking.id);
+        }
 
         Ok(())
     }

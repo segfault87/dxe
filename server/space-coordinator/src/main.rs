@@ -72,14 +72,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     presence_monitor.add_callback(z2m_controller);
 
-    let presence_monitor_task = presence_monitor.task();
-    let booking_state_manager_task = booking_state_manager.task();
-
-    task_context.add_task(presence_monitor_task).await?;
-    task_context.add_task(booking_state_manager_task).await?;
-    task_context.add_task(z2m_controller_task).await?;
-    task_context.add_task(audio_recorder_task).await?;
-
     if let Some(carpark_exemption) = &config.carpark_exemption {
         let carpark_exempter = CarparkExempter::new(
             booking_states.clone(),
@@ -87,8 +79,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             notification_service.clone(),
         );
 
-        task_context.add_task(carpark_exempter.task()).await?;
+        let (carpark_exempter, task) = carpark_exempter.task();
+
+        booking_state_manager.add_callback(carpark_exempter);
+        task_context.add_task(task).await?;
     }
+
+    let presence_monitor_task = presence_monitor.task();
+    let booking_state_manager_task = booking_state_manager.task();
+
+    task_context.add_task(presence_monitor_task).await?;
+    task_context.add_task(z2m_controller_task).await?;
+    task_context.add_task(audio_recorder_task).await?;
+
+    task_context.add_task(booking_state_manager_task).await?;
 
     task_context.run().await;
 

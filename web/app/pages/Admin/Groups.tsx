@@ -1,5 +1,6 @@
 import type { Route } from "./+types/Groups";
 import AdminService from "../../api/admin";
+import { handleUnauthorizedError } from "../../lib/error";
 import type { GroupWithUsers } from "../../types/models/group";
 
 interface LoaderData {
@@ -7,11 +8,17 @@ interface LoaderData {
 }
 
 export async function clientLoader({}: Route.ClientLoaderArgs): Promise<LoaderData> {
-  const result = await AdminService.getGroups();
+  try {
+    const result = await AdminService.getGroups();
 
-  return {
-    groups: result.data.groups,
-  };
+    return {
+      groups: result.data.groups,
+    };
+  } catch (error) {
+    handleUnauthorizedError(error);
+
+    return { groups: [] };
+  }
 }
 
 export default function PendingBookings({ loaderData }: Route.ComponentProps) {

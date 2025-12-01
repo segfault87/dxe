@@ -76,7 +76,6 @@ impl GoogleDriveClient {
 
         if response.status() != StatusCode::OK {
             let status = response.status();
-            println!("Error response: {}", response.text().await?);
             return Err(Error::Status(status));
         }
 
@@ -100,7 +99,6 @@ impl GoogleDriveClient {
 
         if response.status() != StatusCode::OK {
             let status = response.status();
-            println!("{}", response.text().await?);
 
             return Err(Error::Status(status));
         }

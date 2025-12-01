@@ -1,33 +1,45 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
-import type { Route } from "./+types/Reservations";
+import type { Route } from "./+types/AdhocReservations";
 import AdminService from "../../api/admin";
 import { DEFAULT_UNIT_ID } from "../../constants";
 import { toUtcIso8601 } from "../../lib/datetime";
-import { defaultErrorHandler } from "../../lib/error";
-import type { ReservationId } from "../../types/models/base";
-import type { Reservation } from "../../types/models/booking";
+import { defaultErrorHandler, handleUnauthorizedError } from "../../lib/error";
+import type { AdhocReservationId } from "../../types/models/base";
+import type { AdhocReservation } from "../../types/models/booking";
 
 interface LoaderData {
-  reservations: Reservation[];
+  reservations: AdhocReservation[];
 }
 
 export async function clientLoader({}: Route.ClientActionArgs): Promise<LoaderData> {
-  const result = await AdminService.getReservations(DEFAULT_UNIT_ID);
+  try {
+    const result = await AdminService.getAdhocReservations(DEFAULT_UNIT_ID);
 
-  return {
-    reservations: result.data.reservations,
-  };
+    return {
+      reservations: result.data.reservations,
+    };
+  } catch (error) {
+    handleUnauthorizedError(error);
+
+    return { reservations: [] };
+  }
 }
 
-export default function Reservations({ loaderData }: Route.ComponentProps) {
+export default function AdhocReservations({
+  loaderData,
+}: Route.ComponentProps) {
   const { reservations } = loaderData;
   const navigate = useNavigate();
 
-  const deleteReservation = async (reservationId: ReservationId) => {
+  const deleteReservation = async (reservationId: AdhocReservationId) => {
+    if (!confirm("정말로 삭제하시겠습니까?")) {
+      return;
+    }
+
     try {
-      await AdminService.deleteReservation(reservationId);
+      await AdminService.deleteAdhocReservation(reservationId);
       navigate(0);
     } catch (error) {
       defaultErrorHandler(error);
@@ -35,14 +47,16 @@ export default function Reservations({ loaderData }: Route.ComponentProps) {
   };
 
   const [startTime, setStartTime] = useState(toUtcIso8601(new Date()));
+  const [identityId, setIdentityId] = useState("");
   const [desiredHours, setDesiredHours] = useState("2");
   const [isTemporary, setTemporary] = useState(false);
   const [remark, setRemark] = useState("");
 
   const createReservation = async () => {
     try {
-      await AdminService.createReservation({
+      await AdminService.createAdhocReservation({
         unitId: DEFAULT_UNIT_ID,
+        customerId: identityId,
         timeFrom: startTime,
         desiredHours: parseInt(desiredHours),
         temporary: isTemporary,
@@ -109,6 +123,15 @@ export default function Reservations({ loaderData }: Route.ComponentProps) {
         value={remark}
         onChange={(e) => {
           setRemark(e.target.value);
+        }}
+      />
+      <br />
+      고객 ID:{" "}
+      <input
+        type="text"
+        value={identityId}
+        onChange={(e) => {
+          setIdentityId(e.target.value);
         }}
       />
       <br />

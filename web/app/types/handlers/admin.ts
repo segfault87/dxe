@@ -1,9 +1,9 @@
-import type { DateTime, UnitId } from "../models/base";
+import type { DateTime, IdentityId, UnitId } from "../models/base";
 import type {
+  AdhocReservation,
   Booking,
   BookingWithPayments,
   CashPaymentStatus,
-  Reservation,
 } from "../models/booking";
 import type { GroupWithUsers } from "../models/group";
 import type { SelfUser } from "../models/user";
@@ -23,20 +23,21 @@ export interface ModifyBookingResponse {
   cashPaymentStatus: CashPaymentStatus;
 }
 
-export interface GetReservationsResponse {
-  reservations: Reservation[];
+export interface GetAdhocReservationsResponse {
+  reservations: AdhocReservation[];
 }
 
-export interface CreateReservationRequest {
+export interface CreateAdhocReservationRequest {
   unitId: UnitId;
+  customerId: IdentityId;
   timeFrom: DateTime;
   desiredHours: number;
   temporary: boolean;
   remark: string | null;
 }
 
-export interface CreateReservationResponse {
-  reservation: Reservation;
+export interface CreateAdhocReservationResponse {
+  reservation: AdhocReservation;
 }
 
 export interface GetGroupsResponse {

@@ -50,7 +50,17 @@ pub async fn post(
         IdentityProvider::Kakao,
         me.id.to_string().as_str(),
         body.name.as_str(),
-        body.license_plate_number.as_deref(),
+        if body
+            .license_plate_number
+            .as_ref()
+            .map(String::len)
+            .unwrap_or_default()
+            > 0
+        {
+            body.license_plate_number.as_deref()
+        } else {
+            None
+        },
     )
     .await?;
 

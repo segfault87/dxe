@@ -1,17 +1,17 @@
 use actix_web::web;
 use chrono::{TimeDelta, Utc};
 use dxe_data::queries::booking::{
-    create_reservation, delete_reservation, get_reservation, get_reservations_by_unit_id,
-    is_booking_available,
+    create_adhoc_reservation, delete_adhoc_reservation, get_adhoc_reservation,
+    get_adhoc_reservations_by_unit_id, is_booking_available,
 };
-use dxe_types::ReservationId;
+use dxe_types::AdhocReservationId;
 use sqlx::SqlitePool;
 
 use crate::config::TimeZoneConfig;
-use crate::models::entities::Reservation;
+use crate::models::entities::AdhocReservation;
 use crate::models::handlers::admin::{
-    CreateReservationRequest, CreateReservationResponse, GetReservationsQuery,
-    GetReservationsResponse,
+    CreateAdhocReservationRequest, CreateAdhocReservationResponse, GetAdhocReservationsQuery,
+    GetAdhocReservationsResponse,
 };
 use crate::models::{Error, IntoView};
 use crate::services::calendar::CalendarService;
@@ -19,32 +19,32 @@ use crate::session::UserSession;
 use crate::utils::datetime::truncate_time;
 
 pub async fn get(
-    query: web::Query<GetReservationsQuery>,
+    query: web::Query<GetAdhocReservationsQuery>,
     database: web::Data<SqlitePool>,
     timezone_config: web::Data<TimeZoneConfig>,
-) -> Result<web::Json<GetReservationsResponse>, Error> {
+) -> Result<web::Json<GetAdhocReservationsResponse>, Error> {
     let now = Utc::now();
 
     let mut connection = database.acquire().await?;
 
     let reservations =
-        get_reservations_by_unit_id(&mut connection, &query.unit_id, Some(now)).await?;
+        get_adhoc_reservations_by_unit_id(&mut connection, &query.unit_id, Some(now)).await?;
 
-    Ok(web::Json(GetReservationsResponse {
+    Ok(web::Json(GetAdhocReservationsResponse {
         reservations: reservations
             .into_iter()
-            .map(|v| Reservation::convert(v, &timezone_config, &now))
+            .map(|v| AdhocReservation::convert(v, &timezone_config, &now))
             .collect::<Result<_, _>>()?,
     }))
 }
 
 pub async fn post(
     session: UserSession,
-    body: web::Json<CreateReservationRequest>,
+    body: web::Json<CreateAdhocReservationRequest>,
     database: web::Data<SqlitePool>,
     timezone_config: web::Data<TimeZoneConfig>,
     calendar_service: web::Data<Option<CalendarService>>,
-) -> Result<web::Json<CreateReservationResponse>, Error> {
+) -> Result<web::Json<CreateAdhocReservationResponse>, Error> {
     let now = Utc::now();
 
     let mut tx = database.begin().await?;
@@ -56,10 +56,11 @@ pub async fn post(
         return Err(Error::TimeRangeOccupied);
     }
 
-    let id = create_reservation(
+    let id = create_adhoc_reservation(
         &mut tx,
         &now,
         &body.unit_id,
+        &body.customer_id,
         &session.user_id,
         &time_from,
         &time_to,
@@ -68,7 +69,7 @@ pub async fn post(
     )
     .await?;
 
-    let reservation = get_reservation(&mut tx, &id)
+    let reservation = get_adhoc_reservation(&mut tx, &id)
         .await?
         .ok_or(Error::BookingNotFound)?;
 
@@ -83,23 +84,23 @@ pub async fn post(
         }
     }
 
-    Ok(web::Json(CreateReservationResponse {
-        reservation: Reservation::convert(reservation, &timezone_config, &now)?,
+    Ok(web::Json(CreateAdhocReservationResponse {
+        reservation: AdhocReservation::convert(reservation, &timezone_config, &now)?,
     }))
 }
 
 pub async fn delete(
-    reservation_id: web::Path<ReservationId>,
+    reservation_id: web::Path<AdhocReservationId>,
     database: web::Data<SqlitePool>,
     calendar_service: web::Data<Option<CalendarService>>,
 ) -> Result<web::Json<serde_json::Value>, Error> {
     let mut tx = database.begin().await?;
 
-    let reservation = get_reservation(&mut tx, &reservation_id)
+    let reservation = get_adhoc_reservation(&mut tx, &reservation_id)
         .await?
         .ok_or(Error::BookingNotFound)?;
 
-    delete_reservation(&mut tx, reservation.id).await?;
+    delete_adhoc_reservation(&mut tx, reservation.id).await?;
 
     tx.commit().await?;
 

@@ -4,6 +4,6 @@ export type BookingId = string;
 export type GroupId = string;
 export type UserId = string;
 export type UnitId = string;
-export type ReservationId = number;
+export type AdhocReservationId = number;
 
 export type IdentityId = UserId | GroupId;

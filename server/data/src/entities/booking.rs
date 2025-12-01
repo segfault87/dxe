@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use dxe_types::{BookingId, IdentityId, ReservationId, UnitId};
+use dxe_types::{AdhocReservationId, BookingId, IdentityId, UnitId};
 use sqlx::FromRow;
 
 use crate::entities::{Identity, User};
@@ -44,10 +44,11 @@ pub struct ItsokeyCredential {
 }
 
 #[derive(Debug, Clone, FromRow)]
-pub struct Reservation {
-    pub id: ReservationId,
+pub struct AdhocReservation {
+    pub id: AdhocReservationId,
     pub unit_id: UnitId,
     pub holder: User,
+    pub customer: Identity,
     pub time_from: DateTime<Utc>,
     pub time_to: DateTime<Utc>,
     pub temporary: bool,

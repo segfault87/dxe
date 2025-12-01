@@ -1,6 +1,5 @@
-import { isAxiosError } from "axios";
 import { useState } from "react";
-import { redirect, useNavigate, Link } from "react-router";
+import { useNavigate, Link } from "react-router";
 
 import "./Show.css";
 import type { Route } from "./+types/Show";
@@ -18,7 +17,7 @@ export function meta({}: Route.MetaArgs) {
 }
 
 interface LoaderData {
-  booking: Booking;
+  booking?: Booking;
   cashPaymentStatus?: CashPaymentStatus;
 }
 
@@ -37,23 +36,24 @@ export async function clientLoader({
       cashPaymentStatus: result.data.cashPaymentStatus,
     };
   } catch (error) {
-    if (isAxiosError(error)) {
-      if (error.status === 401) {
-        throw redirect(`/login?redirect_to=/reservation/${params.bookingId}`);
-      } else {
-        throw error;
-      }
-    } else {
-      throw error;
-    }
+    defaultErrorHandler(error);
+    return {
+      booking: undefined,
+      cashPaymentStatus: undefined,
+    };
   }
 }
 
-function ShowReservation({ loaderData }: Route.ComponentProps) {
+function ShowReservationInner({
+  booking,
+  cashPaymentStatus,
+}: {
+  booking: Booking;
+  cashPaymentStatus?: CashPaymentStatus;
+}) {
   const auth = useAuth();
   const navigate = useNavigate();
 
-  const { booking, cashPaymentStatus } = loaderData;
   const bookingStart = new Date(booking.bookingStart);
   const bookingEnd = new Date(booking.bookingEnd);
 
@@ -240,6 +240,19 @@ function ShowReservation({ loaderData }: Route.ComponentProps) {
       />
     </>
   );
+}
+
+function ShowReservation({ loaderData }: Route.ComponentProps) {
+  if (loaderData.booking) {
+    return (
+      <ShowReservationInner
+        booking={loaderData.booking}
+        cashPaymentStatus={loaderData.cashPaymentStatus}
+      />
+    );
+  } else {
+    return <></>;
+  }
 }
 
 export default RequiresAuth(ShowReservation);

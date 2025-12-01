@@ -1,17 +1,24 @@
 import type { Route } from "./+types/Users";
 import AdminService from "../../api/admin";
 import type { SelfUser } from "../../types/models/user";
+import { handleUnauthorizedError } from "../../lib/error";
 
 interface LoaderData {
   users: SelfUser[];
 }
 
 export async function clientLoader({}: Route.ClientLoaderArgs): Promise<LoaderData> {
-  const result = await AdminService.getUsers();
+  try {
+    const result = await AdminService.getUsers();
 
-  return {
-    users: result.data.users,
-  };
+    return {
+      users: result.data.users,
+    };
+  } catch (error) {
+    handleUnauthorizedError(error);
+
+    return { users: [] };
+  }
 }
 
 export default function PendingBookings({ loaderData }: Route.ComponentProps) {

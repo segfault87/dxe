@@ -1,5 +1,6 @@
 import type { Route } from "./+types/ConfirmedBookings";
 import AdminService from "../../api/admin";
+import { handleUnauthorizedError } from "../../lib/error";
 import type { BookingWithPayments } from "../../types/models/booking";
 
 interface LoaderData {
@@ -7,11 +8,17 @@ interface LoaderData {
 }
 
 export async function clientLoader({}: Route.ClientLoaderArgs): Promise<LoaderData> {
-  const result = await AdminService.getBookings("confirmed", new Date());
+  try {
+    const result = await AdminService.getBookings("confirmed", new Date());
 
-  return {
-    bookings: result.data.bookings,
-  };
+    return {
+      bookings: result.data.bookings,
+    };
+  } catch (error) {
+    handleUnauthorizedError(error);
+
+    return { bookings: [] };
+  }
 }
 
 export default function PendingBookings({ loaderData }: Route.ComponentProps) {

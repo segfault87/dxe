@@ -2,7 +2,7 @@ import { useNavigate } from "react-router";
 
 import type { Route } from "./+types/PendingBookings";
 import AdminService from "../../api/admin";
-import { defaultErrorHandler } from "../../lib/error";
+import { defaultErrorHandler, handleUnauthorizedError } from "../../lib/error";
 import type { BookingId } from "../../types/models/base";
 import type { BookingWithPayments } from "../../types/models/booking";
 import type { BookingAction } from "../../types/handlers/admin";
@@ -12,11 +12,17 @@ interface LoaderData {
 }
 
 export async function clientLoader({}: Route.ClientLoaderArgs): Promise<LoaderData> {
-  const result = await AdminService.getBookings("pending");
+  try {
+    const result = await AdminService.getBookings("pending");
 
-  return {
-    bookings: result.data.bookings,
-  };
+    return {
+      bookings: result.data.bookings,
+    };
+  } catch (error) {
+    handleUnauthorizedError(error);
+
+    return { bookings: [] };
+  }
 }
 
 export default function PendingBookings({ loaderData }: Route.ComponentProps) {
@@ -24,6 +30,10 @@ export default function PendingBookings({ loaderData }: Route.ComponentProps) {
   const navigate = useNavigate();
 
   const modifyBooking = async (bookingId: BookingId, action: BookingAction) => {
+    if (!confirm(`정말로 변경하시겠습니까? (${action})`)) {
+      return;
+    }
+
     try {
       await AdminService.modifyBooking(bookingId, {
         action,
@@ -44,6 +54,8 @@ export default function PendingBookings({ loaderData }: Route.ComponentProps) {
           <th>시작시간</th>
           <th>종료시간</th>
           <th>상태</th>
+          <th>입금자명</th>
+          <th>입금금액</th>
           <th>동작</th>
         </tr>
         {bookings.map((e) => (
@@ -52,6 +64,8 @@ export default function PendingBookings({ loaderData }: Route.ComponentProps) {
             <td>{new Date(e.booking.bookingStart).toLocaleString()}</td>
             <td>{new Date(e.booking.bookingEnd).toLocaleString()}</td>
             <td>{e.booking.status}</td>
+            <td>{e.payment?.depositorName}</td>
+            <td>{e.payment?.price}</td>
             <td>
               {e.booking.status === "PENDING" ? (
                 <button onClick={() => modifyBooking(e.booking.id, "CONFIRM")}>

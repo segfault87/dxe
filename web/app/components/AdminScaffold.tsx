@@ -16,22 +16,39 @@ export default function AdminScaffold() {
         <div className="navigation">
           <ul>
             <li>
-              <NavLink to="/admin/">확정 예약 목록</NavLink>
+              <NavLink to="/" end>
+                처음으로{" "}
+              </NavLink>
             </li>
             <li>
-              <NavLink to="/admin/pending-bookings/">대기중 예약 목록</NavLink>
+              <NavLink to="/admin/" end>
+                확정 예약 목록
+              </NavLink>
             </li>
             <li>
-              <NavLink to="/admin/pending-refunds/">환불 요청 목록</NavLink>
+              <NavLink to="/admin/pending-bookings/" end>
+                대기중 예약 목록
+              </NavLink>
             </li>
             <li>
-              <NavLink to="/admin/reservations/">임의 예약</NavLink>
+              <NavLink to="/admin/pending-refunds/" end>
+                환불 요청 목록
+              </NavLink>
             </li>
             <li>
-              <NavLink to="/admin/users/">고객 목록</NavLink>
+              <NavLink to="/admin/adhoc-reservations/" end>
+                임의 예약
+              </NavLink>
             </li>
             <li>
-              <NavLink to="/admin/groups/">그룹 목록</NavLink>
+              <NavLink to="/admin/users/" end>
+                고객 목록
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/admin/groups/" end>
+                그룹 목록
+              </NavLink>
             </li>
           </ul>
         </div>

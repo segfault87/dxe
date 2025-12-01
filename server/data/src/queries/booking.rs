@@ -1,11 +1,13 @@
 use chrono::{DateTime, Utc};
-use dxe_types::{BookingId, GroupId, IdentityId, IdentityProvider, ReservationId, UnitId, UserId};
+use dxe_types::{
+    AdhocReservationId, BookingId, GroupId, IdentityId, IdentityProvider, UnitId, UserId,
+};
 use sqlx::SqliteConnection;
 
 use crate::Error;
 use crate::entities::{
-    AudioRecording, Booking, CashPaymentStatus, Group, Identity, IdentityDiscriminator,
-    ItsokeyCredential, OccupiedSlot, Reservation, User,
+    AdhocReservation, AudioRecording, Booking, CashPaymentStatus, Group, Identity,
+    IdentityDiscriminator, ItsokeyCredential, OccupiedSlot, User,
 };
 use crate::queries::unit::is_unit_enabled;
 
@@ -27,7 +29,7 @@ pub async fn is_booking_available(
                     (canceled_at IS NULL OR canceled_at > ?4) AND
                     unit_id = ?3) +
                 (SELECT COUNT(*)
-                FROM reservation
+                FROM adhoc_reservation
                 WHERE
                     time_to >= ?1 AND
                     MAX(time_from, ?1) < MIN(time_to, ?2) AND
@@ -93,7 +95,7 @@ pub async fn get_occupied_slots(
             remark,
             time_from AS "time_from: DateTime<Utc>",
             time_to AS "time_to: DateTime<Utc>"
-        FROM reservation
+        FROM adhoc_reservation
         WHERE
             time_from >= ?1 AND time_from < ?2 AND
             unit_id = ?3
@@ -1145,16 +1147,17 @@ pub async fn cancel_booking(
     Ok(result.rows_affected() > 0)
 }
 
-pub async fn create_reservation(
+pub async fn create_adhoc_reservation(
     connection: &mut SqliteConnection,
     now: &DateTime<Utc>,
     unit_id: &UnitId,
+    customer_id: &IdentityId,
     user_id: &UserId,
     time_from: &DateTime<Utc>,
     time_to: &DateTime<Utc>,
     remark: &Option<String>,
     temporary: bool,
-) -> Result<ReservationId, Error> {
+) -> Result<AdhocReservationId, Error> {
     if is_unit_enabled(connection, unit_id).await? != Some(true) {
         return Err(Error::UnitNotFound);
     }
@@ -1165,12 +1168,13 @@ pub async fn create_reservation(
 
     let result = sqlx::query!(
         r#"
-        INSERT INTO reservation(unit_id, holder_id, time_from, time_to, remark, temporary)
-        VALUES(?1, ?2, ?3, ?4, ?5, ?6)
+        INSERT INTO adhoc_reservation(unit_id, holder_id, customer_id, time_from, time_to, remark, temporary)
+        VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)
         RETURNING id
         "#,
         unit_id,
         user_id,
+        customer_id,
         time_from,
         time_to,
         remark,
@@ -1182,28 +1186,46 @@ pub async fn create_reservation(
     Ok(result.id.into())
 }
 
-pub async fn get_reservation(
+pub async fn get_adhoc_reservation(
     connection: &mut SqliteConnection,
-    id: &ReservationId,
-) -> Result<Option<Reservation>, Error> {
+    id: &AdhocReservationId,
+) -> Result<Option<AdhocReservation>, Error> {
     let result = sqlx::query!(
         r#"
         SELECT
-            r.id AS "id: ReservationId",
+            r.id AS "id: AdhocReservationId",
             r.unit_id AS "unit_id: UnitId",
             r.time_from AS "time_from: DateTime<Utc>",
             r.time_to AS "time_to: DateTime<Utc>",
             r.temporary,
             r.remark,
-            u.id AS "u_id: UserId",
-            u.provider AS "u_provider: IdentityProvider",
-            u.foreign_id AS "u_foreign_id: String",
-            u.name AS "u_name: String",
-            u.created_at AS "u_created_at: DateTime<Utc>",
-            u.deactivated_at AS "u_deactivated_at: DateTime<Utc>",
-            u.license_plate_number AS "u_license_plate_number"
-        FROM reservation "r"
-        JOIN user "u" ON r.holder_id=u.id
+            hu.id AS "hu_id: UserId",
+            hu.provider AS "hu_provider: IdentityProvider",
+            hu.foreign_id AS "hu_foreign_id: String",
+            hu.name AS "hu_name: String",
+            hu.created_at AS "hu_created_at: DateTime<Utc>",
+            hu.deactivated_at AS "hu_deactivated_at: DateTime<Utc>",
+            hu.license_plate_number AS "hu_license_plate_number",
+            ci.id AS "ci_id: IdentityId",
+            ci.discriminator AS "ci_discriminator: IdentityDiscriminator",
+            cu.id AS "cu_id: UserId",
+            cu.provider AS "cu_provider: IdentityProvider",
+            cu.foreign_id AS "cu_foreign_id: String",
+            cu.name AS "cu_name: String",
+            cu.created_at AS "cu_created_at: DateTime<Utc>",
+            cu.deactivated_at AS "cu_deactivated_at: DateTime<Utc>",
+            cu.license_plate_number AS "cu_license_plate_number",
+            cg.id AS "cg_id: GroupId",
+            cg.name AS "cg_name: String",
+            cg.owner_id AS "cg_owner_id: UserId",
+            cg.is_open AS "cg_is_open: bool",
+            cg.created_at AS "cg_created_at: DateTime<Utc>",
+            cg.deleted_at AS "cg_deleted_at: DateTime<Utc>"
+        FROM adhoc_reservation "r"
+        JOIN user "hu" ON r.holder_id = hu.id
+        JOIN identity "ci" ON r.customer_id = ci.id
+        LEFT OUTER JOIN user "cu" ON ci.discriminator = 'user' AND ci.id = cu.id
+        LEFT OUTER JOIN "group" "cg" ON ci.discriminator = 'group' AND ci.id = cg.id
         WHERE
             r.id = ?1
         "#,
@@ -1212,7 +1234,11 @@ pub async fn get_reservation(
     .fetch_optional(&mut *connection)
     .await?;
 
-    Ok(result.map(|v| Reservation {
+    let Some(v) = result else {
+        return Ok(None);
+    };
+
+    Ok(Some(AdhocReservation {
         id: v.id,
         unit_id: v.unit_id,
         time_from: v.time_from,
@@ -1220,24 +1246,49 @@ pub async fn get_reservation(
         temporary: v.temporary,
         remark: v.remark,
         holder: User {
-            id: v.u_id,
-            provider: v.u_provider,
-            foreign_id: v.u_foreign_id,
-            name: v.u_name,
-            created_at: v.u_created_at,
-            deactivated_at: v.u_deactivated_at,
-            license_plate_number: v.u_license_plate_number,
+            id: v.hu_id,
+            provider: v.hu_provider,
+            foreign_id: v.hu_foreign_id,
+            name: v.hu_name,
+            created_at: v.hu_created_at,
+            deactivated_at: v.hu_deactivated_at,
+            license_plate_number: v.hu_license_plate_number,
+        },
+        customer: match v.ci_discriminator {
+            IdentityDiscriminator::User => Identity::User(User {
+                id: v.cu_id.ok_or(Error::MissingField("cu_id"))?,
+                provider: v.cu_provider.ok_or(Error::MissingField("cu_provider"))?,
+                foreign_id: v
+                    .cu_foreign_id
+                    .ok_or(Error::MissingField("cu_foreign_id"))?,
+                name: v.cu_name.ok_or(Error::MissingField("cu_name"))?,
+                created_at: v
+                    .cu_created_at
+                    .ok_or(Error::MissingField("cu_created_at"))?,
+                deactivated_at: v.cu_deactivated_at,
+                license_plate_number: v.cu_license_plate_number,
+            }),
+            IdentityDiscriminator::Group => Identity::Group(Group {
+                id: v.cg_id.ok_or(Error::MissingField("cg_id"))?,
+                name: v.cg_name.ok_or(Error::MissingField("cg_name"))?,
+                owner_id: v.cg_owner_id.ok_or(Error::MissingField("cg_owner_id"))?,
+                is_open: v.cg_is_open.ok_or(Error::MissingField("cg_is_open"))?,
+                created_at: v
+                    .cg_created_at
+                    .ok_or(Error::MissingField("cg_created_at"))?,
+                deleted_at: v.cg_deleted_at,
+            }),
         },
     }))
 }
 
-pub async fn delete_reservation(
+pub async fn delete_adhoc_reservation(
     connection: &mut SqliteConnection,
-    reservation_id: ReservationId,
+    reservation_id: AdhocReservationId,
 ) -> Result<bool, Error> {
     let result = sqlx::query!(
         r#"
-        DELETE FROM reservation WHERE id=?1
+        DELETE FROM adhoc_reservation WHERE id=?1
         "#,
         reservation_id
     )
@@ -1247,31 +1298,49 @@ pub async fn delete_reservation(
     Ok(result.rows_affected() > 0)
 }
 
-pub async fn get_reservations_by_unit_id(
+pub async fn get_adhoc_reservations_by_unit_id(
     connection: &mut SqliteConnection,
     unit_id: &UnitId,
     date_from: Option<DateTime<Utc>>,
-) -> Result<Vec<Reservation>, Error> {
+) -> Result<Vec<AdhocReservation>, Error> {
     let date_from = date_from.unwrap_or_default();
 
     let result = sqlx::query!(
         r#"
         SELECT
-            r.id AS "id: ReservationId",
+            r.id AS "id: AdhocReservationId",
             r.unit_id AS "unit_id: UnitId",
             r.time_from AS "time_from: DateTime<Utc>",
             r.time_to AS "time_to: DateTime<Utc>",
             r.temporary,
             r.remark,
-            u.id AS "u_id: UserId",
-            u.provider AS "u_provider: IdentityProvider",
-            u.foreign_id AS "u_foreign_id: String",
-            u.name AS "u_name: String",
-            u.created_at AS "u_created_at: DateTime<Utc>",
-            u.deactivated_at AS "u_deactivated_at: DateTime<Utc>",
-            u.license_plate_number AS "u_license_plate_number"
-        FROM reservation "r"
-        JOIN user "u" ON r.holder_id=u.id
+            hu.id AS "hu_id: UserId",
+            hu.provider AS "hu_provider: IdentityProvider",
+            hu.foreign_id AS "hu_foreign_id: String",
+            hu.name AS "hu_name: String",
+            hu.created_at AS "hu_created_at: DateTime<Utc>",
+            hu.deactivated_at AS "hu_deactivated_at: DateTime<Utc>",
+            hu.license_plate_number AS "hu_license_plate_number",
+            ci.id AS "ci_id: IdentityId",
+            ci.discriminator AS "ci_discriminator: IdentityDiscriminator",
+            cu.id AS "cu_id: Option<UserId>",
+            cu.provider AS "cu_provider: Option<IdentityProvider>",
+            cu.foreign_id AS "cu_foreign_id: Option<String>",
+            cu.name AS "cu_name: Option<String>",
+            cu.created_at AS "cu_created_at: Option<DateTime<Utc>>",
+            cu.deactivated_at AS "cu_deactivated_at: DateTime<Utc>",
+            cu.license_plate_number AS "cu_license_plate_number",
+            cg.id AS "cg_id: Option<GroupId>",
+            cg.name AS "cg_name: Option<String>",
+            cg.owner_id AS "cg_owner_id: Option<UserId>",
+            cg.is_open AS "cg_is_open: Option<bool>",
+            cg.created_at AS "cg_created_at: Option<DateTime<Utc>>",
+            cg.deleted_at AS "cg_deleted_at: DateTime<Utc>"
+        FROM adhoc_reservation "r"
+        JOIN user "hu" ON r.holder_id=hu.id
+        JOIN identity "ci" ON r.customer_id = ci.id
+        LEFT OUTER JOIN user "cu" ON ci.discriminator = 'user' AND ci.id = cu.id
+        LEFT OUTER JOIN "group" "cg" ON ci.discriminator = 'group' AND ci.id = cg.id
         WHERE
             unit_id = ?1 AND
             time_to > ?2
@@ -1285,24 +1354,51 @@ pub async fn get_reservations_by_unit_id(
 
     Ok(result
         .into_iter()
-        .map(|v| Reservation {
-            id: v.id,
-            unit_id: v.unit_id,
-            time_from: v.time_from,
-            time_to: v.time_to,
-            temporary: v.temporary,
-            remark: v.remark,
-            holder: User {
-                id: v.u_id,
-                provider: v.u_provider,
-                foreign_id: v.u_foreign_id,
-                name: v.u_name,
-                created_at: v.u_created_at,
-                deactivated_at: v.u_deactivated_at,
-                license_plate_number: v.u_license_plate_number,
-            },
+        .map(|v| {
+            Ok(AdhocReservation {
+                id: v.id,
+                unit_id: v.unit_id,
+                time_from: v.time_from,
+                time_to: v.time_to,
+                temporary: v.temporary,
+                remark: v.remark,
+                holder: User {
+                    id: v.hu_id,
+                    provider: v.hu_provider,
+                    foreign_id: v.hu_foreign_id,
+                    name: v.hu_name,
+                    created_at: v.hu_created_at,
+                    deactivated_at: v.hu_deactivated_at,
+                    license_plate_number: v.hu_license_plate_number,
+                },
+                customer: match v.ci_discriminator {
+                    IdentityDiscriminator::User => Identity::User(User {
+                        id: v.cu_id.ok_or(Error::MissingField("cu_id"))?,
+                        provider: v.cu_provider.ok_or(Error::MissingField("cu_provider"))?,
+                        foreign_id: v
+                            .cu_foreign_id
+                            .ok_or(Error::MissingField("cu_foreign_id"))?,
+                        name: v.cu_name.ok_or(Error::MissingField("cu_name"))?,
+                        created_at: v
+                            .cu_created_at
+                            .ok_or(Error::MissingField("cu_created_at"))?,
+                        deactivated_at: v.cu_deactivated_at,
+                        license_plate_number: v.cu_license_plate_number,
+                    }),
+                    IdentityDiscriminator::Group => Identity::Group(Group {
+                        id: v.cg_id.ok_or(Error::MissingField("cg_id"))?,
+                        name: v.cg_name.ok_or(Error::MissingField("cg_name"))?,
+                        owner_id: v.cg_owner_id.ok_or(Error::MissingField("cg_owner_id"))?,
+                        is_open: v.cg_is_open.ok_or(Error::MissingField("cg_is_open"))?,
+                        created_at: v
+                            .cg_created_at
+                            .ok_or(Error::MissingField("cg_created_at"))?,
+                        deleted_at: v.cg_deleted_at,
+                    }),
+                },
+            })
         })
-        .collect())
+        .collect::<Result<Vec<_>, Error>>()?)
 }
 
 pub async fn create_itsokey_credential(

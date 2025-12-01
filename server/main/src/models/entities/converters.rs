@@ -2,8 +2,8 @@ use chrono::{DateTime, Utc};
 use dxe_data::entities;
 
 use super::{
-    AudioRecording, Booking, BookingCashPaymentStatus, BookingStatus, Group, GroupWithUsers,
-    Identity, OccupiedSlot, Reservation, SelfUser, User,
+    AdhocReservation, AudioRecording, Booking, BookingCashPaymentStatus, BookingStatus, Group,
+    GroupWithUsers, Identity, OccupiedSlot, SelfUser, User,
 };
 use crate::config::{BookingConfig, TimeZoneConfig};
 use crate::models::Error;
@@ -222,8 +222,8 @@ impl IntoView for BookingCashPaymentStatus {
     }
 }
 
-impl IntoView for Reservation {
-    type Entity = entities::Reservation;
+impl IntoView for AdhocReservation {
+    type Entity = entities::AdhocReservation;
     type Error = Error;
 
     fn convert(
@@ -234,6 +234,7 @@ impl IntoView for Reservation {
         Ok(Self {
             id: entity.id,
             holder: User::convert(entity.holder, timezone, now)?,
+            customer: Identity::convert(entity.customer, timezone, now)?,
             reservation_start: timezone.convert(entity.time_from),
             reservation_end: timezone.convert(entity.time_to),
             reserved_hours: (entity.time_to - entity.time_from).num_hours(),

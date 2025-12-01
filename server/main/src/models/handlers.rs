@@ -5,12 +5,11 @@ use dxe_types::{IdentityId, UnitId, UserId};
 use serde::{Deserialize, Serialize};
 
 use crate::models::entities::{
-    Booking, BookingCashPaymentStatus, BookingWithPayments, Group, GroupWithUsers, OccupiedSlot,
-    SelfUser,
+    AdhocReservation, Booking, BookingCashPaymentStatus, BookingWithPayments, Group,
+    GroupWithUsers, OccupiedSlot, SelfUser,
 };
 
 pub mod admin {
-    use crate::models::entities::Reservation;
 
     use super::*;
 
@@ -58,20 +57,21 @@ pub mod admin {
     }
 
     #[derive(Debug, Deserialize)]
-    pub struct GetReservationsQuery {
+    pub struct GetAdhocReservationsQuery {
         pub unit_id: UnitId,
     }
 
     #[derive(Debug, Serialize)]
     #[serde(rename_all = "camelCase")]
-    pub struct GetReservationsResponse {
-        pub reservations: Vec<Reservation>,
+    pub struct GetAdhocReservationsResponse {
+        pub reservations: Vec<AdhocReservation>,
     }
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
-    pub struct CreateReservationRequest {
+    pub struct CreateAdhocReservationRequest {
         pub unit_id: UnitId,
+        pub customer_id: IdentityId,
         pub time_from: DateTime<FixedOffset>,
         pub desired_hours: i64,
         pub temporary: bool,
@@ -80,8 +80,8 @@ pub mod admin {
 
     #[derive(Debug, Serialize)]
     #[serde(rename_all = "camelCase")]
-    pub struct CreateReservationResponse {
-        pub reservation: Reservation,
+    pub struct CreateAdhocReservationResponse {
+        pub reservation: AdhocReservation,
     }
 
     #[derive(Debug, Serialize)]

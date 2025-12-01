@@ -84,7 +84,7 @@ impl CarparkExempter {
 
                 Ok(())
             })
-            .every_seconds(10)
+            .every_minutes(10)
             .build(),
         )
     }

@@ -68,7 +68,7 @@ type Pages = {
   "/admin/users": {
     params: {};
   };
-  "/admin/reservations": {
+  "/admin/adhoc-reservations": {
     params: {};
   };
 };
@@ -76,7 +76,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/guide" | "/inquiries" | "/reservation" | "/reservation/login" | "/reservation/:bookingId" | "/login" | "/register" | "/my" | "/terms-of-service" | "/booking/:bookingId/recording" | "/join/:groupId" | "/admin" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/reservations";
+    page: "/" | "/guide" | "/inquiries" | "/reservation" | "/reservation/login" | "/reservation/:bookingId" | "/login" | "/register" | "/my" | "/terms-of-service" | "/booking/:bookingId/recording" | "/join/:groupId" | "/admin" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/adhoc-reservations";
   };
   "./components/Scaffold.tsx": {
     id: "components/Scaffold";
@@ -132,7 +132,7 @@ type RouteFiles = {
   };
   "./components/AdminScaffold.tsx": {
     id: "components/AdminScaffold";
-    page: "/admin" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/reservations";
+    page: "/admin" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/adhoc-reservations";
   };
   "./pages/Admin/ConfirmedBookings.tsx": {
     id: "pages/Admin/ConfirmedBookings";
@@ -154,9 +154,9 @@ type RouteFiles = {
     id: "pages/Admin/Users";
     page: "/admin/users";
   };
-  "./pages/Admin/Reservations.tsx": {
-    id: "pages/Admin/Reservations";
-    page: "/admin/reservations";
+  "./pages/Admin/AdhocReservations.tsx": {
+    id: "pages/Admin/AdhocReservations";
+    page: "/admin/adhoc-reservations";
   };
 };
 
@@ -181,5 +181,5 @@ type RouteModules = {
   "pages/Admin/RefundPendingBookings": typeof import("./app/./pages/Admin/RefundPendingBookings.tsx");
   "pages/Admin/Groups": typeof import("./app/./pages/Admin/Groups.tsx");
   "pages/Admin/Users": typeof import("./app/./pages/Admin/Users.tsx");
-  "pages/Admin/Reservations": typeof import("./app/./pages/Admin/Reservations.tsx");
+  "pages/Admin/AdhocReservations": typeof import("./app/./pages/Admin/AdhocReservations.tsx");
 };

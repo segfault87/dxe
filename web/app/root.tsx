@@ -6,7 +6,7 @@ import ReactGA from "react-ga4";
 
 import GitHubRibbon from "./assets/GitHubRibbon.svg";
 import { AuthProvider } from "./context/AuthContext";
-import { EnvProvider } from "./context/EnvContext";
+import { EnvProvider, useEnv } from "./context/EnvContext";
 import KakaoSDK from "./lib/KakaoSDK";
 import type { Route } from "./+types/root";
 import "./index.css";
@@ -25,9 +25,13 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const env = useEnv();
+
   useEffect(() => {
+    TagManager.initialize({ gtmId: env.gtmId });
+    ReactGA.initialize(env.gaMeasurementId);
     Modal.setAppElement(document.getElementById("root")!);
-  }, []);
+  }, [env]);
 
   return (
     <html lang="ko">
@@ -53,11 +57,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  useEffect(() => {
-    TagManager.initialize({ gtmId: "GTM-K2MNLT2P" });
-    ReactGA.initialize("G-2RQMYRGB4Q");
-  }, []);
-
   return (
     <EnvProvider>
       <AuthProvider>

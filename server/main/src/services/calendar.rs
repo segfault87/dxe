@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use dxe_data::entities::{Booking, Reservation, User};
+use dxe_data::entities::{AdhocReservation, Booking, User};
 use dxe_extern::google_cloud::calendar::{
     DateTimeRepresentation, Error as CalendarError, Event, EventId, EventVisibility,
     ExtendedProperties, GoogleCalendarClient,
 };
 use dxe_extern::google_cloud::{CredentialManager, Error as GcpError};
-use dxe_types::{BookingId, ReservationId};
+use dxe_types::{AdhocReservationId, BookingId};
 
 use crate::config::{GoogleApiConfig, TimeZoneConfig};
 
@@ -20,7 +20,7 @@ fn booking_id_to_event_id(booking_id: &BookingId) -> EventId {
     booking_id.to_string().replace("-", "").into()
 }
 
-fn adhoc_reservation_id_to_event_id(reservation_id: &ReservationId) -> EventId {
+fn adhoc_reservation_id_to_event_id(reservation_id: &AdhocReservationId) -> EventId {
     format!("adhoc{reservation_id}").into()
 }
 
@@ -89,12 +89,15 @@ impl CalendarService {
 
     pub async fn register_adhoc_reservation(
         &self,
-        adhoc_reservation: &Reservation,
+        adhoc_reservation: &AdhocReservation,
         timezone_config: &TimeZoneConfig,
     ) -> Result<(), Error> {
         let event = Event {
             id: adhoc_reservation_id_to_event_id(&adhoc_reservation.id),
-            summary: adhoc_reservation.holder.name.clone(),
+            summary: adhoc_reservation
+                .remark
+                .clone()
+                .unwrap_or(adhoc_reservation.customer.name().to_owned()),
             description: Default::default(),
             start: DateTimeRepresentation {
                 date_time: timezone_config.convert(adhoc_reservation.time_from),
@@ -121,7 +124,7 @@ impl CalendarService {
 
     pub async fn delete_adhoc_reservation(
         &self,
-        adhoc_reservation_id: &ReservationId,
+        adhoc_reservation_id: &AdhocReservationId,
     ) -> Result<(), Error> {
         Ok(self
             .client

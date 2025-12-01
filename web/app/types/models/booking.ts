@@ -1,4 +1,4 @@
-import type { BookingId, DateTime, ReservationId, UnitId } from "./base";
+import type { BookingId, DateTime, AdhocReservationId, UnitId } from "./base";
 import type { Identity } from "./identity";
 import type { User } from "./user";
 
@@ -28,7 +28,7 @@ export interface Booking {
 }
 
 export interface CashPaymentStatus {
-  depisitorName: string;
+  depositorName: string;
   price: number;
   confirmedAt: DateTime | null;
   refundPrice: number | null;
@@ -50,8 +50,8 @@ export interface OccupiedSlot {
   confirmed: boolean;
 }
 
-export interface Reservation {
-  id: ReservationId;
+export interface AdhocReservation {
+  id: AdhocReservationId;
   holder: User;
   reservationStart: DateTime;
   reservationEnd: DateTime;

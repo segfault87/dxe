@@ -28,7 +28,7 @@ export default [
       route("pending-refunds/", "./pages/Admin/RefundPendingBookings.tsx"),
       route("groups/", "./pages/Admin/Groups.tsx"),
       route("users/", "./pages/Admin/Users.tsx"),
-      route("reservations/", "./pages/Admin/Reservations.tsx"),
+      route("adhoc-reservations/", "./pages/Admin/AdhocReservations.tsx"),
     ]),
   ]),
 ] satisfies RouteConfig;

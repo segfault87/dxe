@@ -1,7 +1,7 @@
 mod converters;
 
 use chrono::{DateTime, FixedOffset};
-use dxe_types::{BookingId, GroupId, ReservationId, UnitId, UserId};
+use dxe_types::{AdhocReservationId, BookingId, GroupId, UnitId, UserId};
 use serde::Serialize;
 
 pub use converters::IntoView;
@@ -97,9 +97,10 @@ pub struct BookingCashPaymentStatus {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Reservation {
-    pub id: ReservationId,
+pub struct AdhocReservation {
+    pub id: AdhocReservationId,
     pub holder: User,
+    pub customer: Identity,
     pub reservation_start: DateTime<FixedOffset>,
     pub reservation_end: DateTime<FixedOffset>,
     pub reserved_hours: i64,

@@ -1,16 +1,20 @@
 import API from "../api";
 import { toUtcIso8601 } from "../lib/datetime";
 import type {
+  CreateAdhocReservationRequest,
+  CreateAdhocReservationResponse,
+  GetAdhocReservationsResponse,
   GetBookingsResponse,
-  GetReservationsResponse,
   ModifyBookingResponse,
   ModifyBookingRequest,
-  CreateReservationRequest,
-  CreateReservationResponse,
   GetUsersResponse,
   GetGroupsResponse,
 } from "../types/handlers/admin";
-import type { BookingId, ReservationId, UnitId } from "../types/models/base";
+import type {
+  BookingId,
+  AdhocReservationId,
+  UnitId,
+} from "../types/models/base";
 
 const getBookings = (
   type: "confirmed" | "pending" | "refund_pending" | "canceled",
@@ -36,18 +40,21 @@ const modifyBooking = (bookingId: BookingId, data: ModifyBookingRequest) => {
   return API.put<ModifyBookingResponse>(`/admin/booking/${bookingId}`, data);
 };
 
-const getReservations = (unitId: UnitId) => {
-  return API.get<GetReservationsResponse>(
-    `/admin/reservations?unit_id=${unitId}`,
+const getAdhocReservations = (unitId: UnitId) => {
+  return API.get<GetAdhocReservationsResponse>(
+    `/admin/adhoc-reservations?unit_id=${unitId}`,
   );
 };
 
-const createReservation = (data: CreateReservationRequest) => {
-  return API.post<CreateReservationResponse>("/admin/reservations", data);
+const createAdhocReservation = (data: CreateAdhocReservationRequest) => {
+  return API.post<CreateAdhocReservationResponse>(
+    "/admin/adhoc-reservations",
+    data,
+  );
 };
 
-const deleteReservation = (id: ReservationId) => {
-  return API.delete(`/admin/reservation/${id}`);
+const deleteAdhocReservation = (id: AdhocReservationId) => {
+  return API.delete(`/admin/adhoc-reservation/${id}`);
 };
 
 const AdminService = {
@@ -55,9 +62,9 @@ const AdminService = {
   getUsers,
   getGroups,
   modifyBooking,
-  getReservations,
-  createReservation,
-  deleteReservation,
+  getAdhocReservations,
+  createAdhocReservation,
+  deleteAdhocReservation,
 };
 
 export default AdminService;

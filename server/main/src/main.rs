@@ -28,6 +28,8 @@ use crate::utils::aes::AesCrypto;
 
 #[derive(clap::Parser, Debug)]
 struct Args {
+    #[arg(short, default_value = "false")]
+    migrate: bool,
     #[arg(short)]
     config_path: std::path::PathBuf,
     #[arg(default_value = "127.0.0.1:8000")]
@@ -44,6 +46,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let database = sqlx::SqlitePool::connect(config.database.url.as_str()).await?;
     let database = Data::new(database);
+
+    if args.migrate {
+        let mut connection = database.acquire().await?;
+
+        sqlx::migrate!("../data/migrations")
+            .run(&mut connection)
+            .await?;
+        return Ok(());
+    }
 
     let aes = AesCrypto::new(config.aes_key.as_slice());
     let aes = Data::new(aes);

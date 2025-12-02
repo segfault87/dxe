@@ -64,8 +64,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .clone()
         .register_tables_from_config(&mut z2m_controller, &config.telemetry.tables)?;
 
-    telemetry_manager.clone().test();
-
     let (z2m_controller, z2m_consumer_task, z2m_controller_task) = z2m_controller.task();
 
     let audio_recorder = AudioRecorder::new(

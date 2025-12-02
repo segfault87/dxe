@@ -10,6 +10,7 @@ use tokio::fs::File;
 use tokio::sync::Mutex;
 
 struct FileHandle {
+    path: PathBuf,
     started_at: Instant,
     csv: AsyncSerializer<File>,
 }
@@ -20,8 +21,9 @@ pub struct Timestamp {
 }
 
 impl FileHandle {
-    pub fn new(file: File) -> Self {
+    pub fn new(file: File, path: PathBuf) -> Self {
         Self {
+            path,
             started_at: Instant::now(),
             csv: AsyncSerializer::from_writer(file),
         }
@@ -44,12 +46,12 @@ impl<K: Hash + Eq + PartialEq + Display> TelemetryService<K> {
     pub async fn start(&self, key: K, file_name: PathBuf) -> Result<(), Error> {
         let mut path = self.path.clone();
         path.push(file_name);
-        let file = File::create(path).await?;
+        let file = File::create(path.clone()).await?;
 
         self.documents
             .lock()
             .await
-            .insert(key, Mutex::new(FileHandle::new(file)));
+            .insert(key, Mutex::new(FileHandle::new(file, path)));
 
         Ok(())
     }
@@ -70,7 +72,7 @@ impl<K: Hash + Eq + PartialEq + Display> TelemetryService<K> {
         Ok(())
     }
 
-    pub async fn stop(&self, key: &K) -> Result<(), Error> {
+    pub async fn stop(&self, key: &K) -> Result<PathBuf, Error> {
         let document = self
             .documents
             .lock()
@@ -78,9 +80,10 @@ impl<K: Hash + Eq + PartialEq + Display> TelemetryService<K> {
             .remove(key)
             .ok_or(Error::NotFound(key.to_string()))?;
 
-        document.lock().await.csv.flush().await?;
+        let mut guard = document.lock().await;
+        guard.csv.flush().await?;
 
-        Ok(())
+        Ok(guard.path.clone())
     }
 }
 

@@ -9,13 +9,16 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use dxe_s2s_shared::entities::BookingWithUsers;
-use dxe_types::BookingId;
+use dxe_s2s_shared::handlers::UploadTelemetryFileRequest;
+use dxe_types::{BookingId, TelemetryType};
 use futures::{FutureExt, select};
 use parking_lot::Mutex;
+use reqwest::multipart::{Form, Part};
 use serde::Serialize;
 use tokio::sync::{broadcast, mpsc};
 
 use crate::callback::EventStateCallback;
+use crate::client::DxeClient;
 use crate::config::telemetry::{Config, TableClass, TableConfig, TableKey};
 use crate::services::telemetry::TelemetryService;
 use crate::tasks::telemetry_manager::sound_meter::{SoundMeter, SoundMeterTable};
@@ -47,22 +50,25 @@ pub trait TableSpec {
 
     fn new_state(&self) -> Self::State;
     fn table_key(&self) -> TableKey;
+    fn remote_type(&self) -> Option<TelemetryType>;
     fn create_row(&self, state: &mut Self::State, value: Self::Value) -> Self::Row;
 }
 
 pub struct TelemetryManager {
     service: TelemetryService<TableEntry>,
+    client: DxeClient,
 
     table_update_handlers: Mutex<HashMap<TableKey, tokio::task::JoinHandle<()>>>,
     event_state_handler: broadcast::Sender<(BookingId, bool)>,
 }
 
 impl TelemetryManager {
-    pub fn new(config: &Config) -> Arc<Self> {
+    pub fn new(config: &Config, client: DxeClient) -> Arc<Self> {
         let service = TelemetryService::new(config.output_path.clone());
 
         Arc::new(Self {
             service,
+            client,
             table_update_handlers: Mutex::new(HashMap::new()),
             event_state_handler: broadcast::channel(10).0,
         })
@@ -83,6 +89,38 @@ impl TelemetryManager {
         }
     }
 
+    async fn upload_telemetry_file(
+        self: Arc<Self>,
+        path: PathBuf,
+        booking_id: BookingId,
+        remote_type: TelemetryType,
+    ) -> Result<(), Box<dyn StdError>> {
+        let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
+
+        let form = Form::new()
+            .part(
+                "file",
+                Part::file(path)
+                    .await?
+                    .file_name(file_name)
+                    .mime_str("text/csv")?,
+            )
+            .part(
+                "request",
+                Part::text(serde_json::to_string(&UploadTelemetryFileRequest {
+                    r#type: remote_type,
+                })?)
+                .mime_str("application/json;charset=UTF-8")?,
+            );
+
+        let _: serde_json::Value = self
+            .client
+            .post_multipart(&format!("/booking/{booking_id}/telemetry"), None, form)
+            .await?;
+
+        Ok(())
+    }
+
     async fn table_handler_loop<S: TableSpec + Send + Sync + 'static>(
         self: Arc<Self>,
         spec: &S,
@@ -98,12 +136,11 @@ impl TelemetryManager {
                         Ok((booking_id, started)) => {
                             let table_entry = TableEntry {
                                 table_key: spec.table_key(),
-                                booking_id: booking_id.clone(),
+                                booking_id,
                             };
 
                             if started {
                                 let path = table_entry.path();
-
                                 match self.service.start(table_entry.clone(), path).await {
                                     Ok(()) => {
                                         log::info!("Telemetry {table_entry} started for {booking_id}...");
@@ -115,8 +152,15 @@ impl TelemetryManager {
                                 }
                             } else {
                                 match self.service.stop(&table_entry).await {
-                                    Ok(()) => {
-                                        log::info!("Telemetry {table_entry} finished. Uploading...");
+                                    Ok(path) => {
+                                        if let Some(remote_type) = spec.remote_type() {
+                                            log::info!("Telemetry {table_entry} finished. Uploading...");
+                                            if let Err(e) = Arc::clone(&self).upload_telemetry_file(path, booking_id, remote_type).await {
+                                                log::error!("Could not upload file to server: {e}");
+                                            }
+                                        } else {
+                                            log::info!("Telemetry {table_entry} finished.");
+                                        }
                                     }
                                     Err(e) => {
                                         log::error!("Could not stop telemetry logging: {e}");
@@ -177,7 +221,8 @@ impl TelemetryManager {
         for table in config {
             match &table.class {
                 TableClass::Z2mPowerMeter(power_meter) => {
-                    let z2m_power_meter_table = Z2mPowerMeterTable::new(table.name.clone());
+                    let z2m_power_meter_table =
+                        Z2mPowerMeterTable::new(table.name.clone(), table.remote_type);
                     for device_name in power_meter.devices.iter() {
                         if let Some(device) = z2m_controller.get_device(device_name) {
                             z2m_power_meter_table.update_power_usage(
@@ -195,7 +240,8 @@ impl TelemetryManager {
                     );
                 }
                 TableClass::SoundMeter(sound_meter) => {
-                    let sound_meter_table = SoundMeterTable::new(table.name.clone());
+                    let sound_meter_table =
+                        SoundMeterTable::new(table.name.clone(), table.remote_type);
                     let tx = Arc::clone(&self).register_spec(sound_meter_table);
 
                     let sound_meter = SoundMeter::new(sound_meter.clone(), tx);

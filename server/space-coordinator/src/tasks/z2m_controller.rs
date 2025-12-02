@@ -603,6 +603,22 @@ impl Z2mController {
             return;
         };
 
+        let active_booking_count = {
+            let guard = self.active_bookings.lock();
+            let Some(active_bookings) = &*guard else {
+                return;
+            };
+
+            active_bookings
+                .get(unit_id)
+                .map(|v| v.len())
+                .unwrap_or_default()
+        };
+
+        if (start && active_booking_count > 1) || (!start && active_booking_count != 0) {
+            return;
+        }
+
         let mut switches = if start {
             &hook.on_booking_start.switches
         } else {
@@ -732,7 +748,7 @@ impl Z2mController {
             Mutex::new(PowerMeterTelemetryContext {
                 devices,
                 usage: Default::default(),
-                tx: tx,
+                tx,
                 last_sent_at: Instant::now(),
             }),
         );

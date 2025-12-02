@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            booking_id AS \"booking_id: _\",\n            type AS \"type: _\",\n            file_name,\n            uploaded_at AS \"uploaded_at: _\"\n        FROM telemetry_file\n        WHERE\n            booking_id = ?1 AND\n            type = ?2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "booking_id: _",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "type: _",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "file_name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "uploaded_at: _",
+        "ordinal": 3,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ffbb580cda42dea292151e1d826071e5528badf830df2dcafb09a76069ebc273"
+}

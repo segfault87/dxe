@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 
-use dxe_types::UnitId;
+use dxe_types::{TelemetryType, UnitId};
 use serde::{Deserialize, Serialize};
 
 use crate::Timestamp;
@@ -46,4 +46,9 @@ pub struct GetUnitsResponse {
 pub struct UpdateAudioRequest {
     pub url: url::Url,
     pub expires_in: Timestamp,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UploadTelemetryFileRequest {
+    pub r#type: TelemetryType,
 }

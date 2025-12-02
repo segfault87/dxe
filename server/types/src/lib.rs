@@ -122,3 +122,12 @@ impl std::fmt::Display for AdhocReservationId {
         self.0.fmt(f)
     }
 }
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::Type), sqlx(rename_all = "snake_case"))]
+#[serde(rename_all = "snake_case")]
+pub enum TelemetryType {
+    PowerUsageTotal,
+    PowerUsageRoom,
+    AudioMeter,
+}

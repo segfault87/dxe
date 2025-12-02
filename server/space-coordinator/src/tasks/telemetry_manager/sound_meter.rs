@@ -1,3 +1,4 @@
+use dxe_types::TelemetryType;
 use futures::StreamExt;
 use serde::Serialize;
 use tasi_sound_level_meter::TasiSoundLevelMeter;
@@ -59,11 +60,15 @@ impl SoundMeter {
 
 pub struct SoundMeterTable {
     table_key: TableKey,
+    remote_type: Option<TelemetryType>,
 }
 
 impl SoundMeterTable {
-    pub fn new(table_key: TableKey) -> Self {
-        Self { table_key }
+    pub fn new(table_key: TableKey, remote_type: Option<TelemetryType>) -> Self {
+        Self {
+            table_key,
+            remote_type,
+        }
     }
 }
 
@@ -78,6 +83,10 @@ impl super::TableSpec for SoundMeterTable {
 
     fn table_key(&self) -> TableKey {
         self.table_key.clone()
+    }
+
+    fn remote_type(&self) -> Option<TelemetryType> {
+        self.remote_type
     }
 
     fn create_row(&self, _state: &mut Self::State, value: Self::Value) -> Self::Row {

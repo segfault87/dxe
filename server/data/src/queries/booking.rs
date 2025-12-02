@@ -1,13 +1,14 @@
 use chrono::{DateTime, Utc};
 use dxe_types::{
-    AdhocReservationId, BookingId, GroupId, IdentityId, IdentityProvider, UnitId, UserId,
+    AdhocReservationId, BookingId, GroupId, IdentityId, IdentityProvider, TelemetryType, UnitId,
+    UserId,
 };
 use sqlx::SqliteConnection;
 
 use crate::Error;
 use crate::entities::{
     AdhocReservation, AudioRecording, Booking, CashPaymentStatus, Group, Identity,
-    IdentityDiscriminator, ItsokeyCredential, OccupiedSlot, User,
+    IdentityDiscriminator, OccupiedSlot, TelemetryFile, User,
 };
 use crate::queries::unit::is_unit_enabled;
 
@@ -1352,7 +1353,7 @@ pub async fn get_adhoc_reservations_by_unit_id(
     .fetch_all(&mut *connection)
     .await?;
 
-    Ok(result
+    result
         .into_iter()
         .map(|v| {
             Ok(AdhocReservation {
@@ -1398,45 +1399,7 @@ pub async fn get_adhoc_reservations_by_unit_id(
                 },
             })
         })
-        .collect::<Result<Vec<_>, Error>>()?)
-}
-
-pub async fn create_itsokey_credential(
-    connection: &mut SqliteConnection,
-    booking_id: &BookingId,
-    key: &str,
-) -> Result<(), Error> {
-    sqlx::query!(
-        r#"
-        INSERT INTO itsokey_credential(booking_id, key)
-        VALUES(?1, ?2)
-        "#,
-        booking_id,
-        key
-    )
-    .execute(&mut *connection)
-    .await?;
-
-    Ok(())
-}
-
-pub async fn get_itsokey_credential(
-    connection: &mut SqliteConnection,
-    booking_id: &BookingId,
-) -> Result<Option<ItsokeyCredential>, Error> {
-    Ok(sqlx::query_as!(
-        ItsokeyCredential,
-        r#"
-        SELECT
-            booking_id AS "booking_id: _",
-            key
-        FROM itsokey_credential
-        WHERE booking_id=?1
-        "#,
-        booking_id
-    )
-    .fetch_optional(&mut *connection)
-    .await?)
+        .collect::<Result<Vec<_>, Error>>()
 }
 
 pub async fn get_audio_recording(
@@ -1481,4 +1444,74 @@ pub async fn create_audio_recording(
     .await?;
 
     Ok(result.rows_affected() > 0)
+}
+
+pub async fn get_telemetry_file(
+    connection: &mut SqliteConnection,
+    booking_id: &BookingId,
+    r#type: TelemetryType,
+) -> Result<Option<TelemetryFile>, Error> {
+    Ok(sqlx::query_as!(
+        TelemetryFile,
+        r#"
+        SELECT
+            booking_id AS "booking_id: _",
+            type AS "type: _",
+            file_name,
+            uploaded_at AS "uploaded_at: _"
+        FROM telemetry_file
+        WHERE
+            booking_id = ?1 AND
+            type = ?2
+        "#,
+        booking_id,
+        r#type
+    )
+    .fetch_optional(&mut *connection)
+    .await?)
+}
+
+pub async fn get_telemetry_files(
+    connection: &mut SqliteConnection,
+    booking_id: &BookingId,
+) -> Result<Vec<TelemetryFile>, Error> {
+    Ok(sqlx::query_as!(
+        TelemetryFile,
+        r#"
+        SELECT
+            booking_id AS "booking_id: _",
+            type AS "type: _",
+            file_name,
+            uploaded_at AS "uploaded_at: _"
+        FROM telemetry_file
+        WHERE
+            booking_id = ?1
+        "#,
+        booking_id
+    )
+    .fetch_all(&mut *connection)
+    .await?)
+}
+
+pub async fn create_telemetry_file(
+    connection: &mut SqliteConnection,
+    now: &DateTime<Utc>,
+    booking_id: &BookingId,
+    r#type: TelemetryType,
+    file_name: String,
+) -> Result<(), Error> {
+    let _ = sqlx::query!(
+        r#"
+        INSERT INTO telemetry_file(booking_id, type, file_name, uploaded_at)
+        VALUES(?1, ?2, ?3, ?4)
+        "#,
+        booking_id,
+        r#type,
+        file_name,
+        now,
+    )
+    .execute(&mut *connection)
+    .await?;
+
+    Ok(())
 }

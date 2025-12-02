@@ -109,6 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .app_data(Data::new(biztalk_sender.clone()))
             .app_data(Data::new(config.url.clone()))
             .app_data(Data::new(calendar_service.clone()))
+            .app_data(Data::new(config.telemetry.clone()))
             .service(controller::api(authority, s2s_public_keys.clone()))
     })
     .bind(&args.address)?

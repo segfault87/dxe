@@ -288,6 +288,12 @@ impl dxe_extern::google_cloud::GoogleCloudAuthConfig for GoogleApiConfig {
     }
 }
 
+#[derive(Clone, Deserialize, Debug)]
+pub struct TelemetryConfig {
+    #[serde(rename = "telemetry_file_path")]
+    pub path: PathBuf,
+}
+
 #[derive(Deserialize, Debug)]
 pub struct Config {
     #[serde(flatten)]
@@ -303,4 +309,6 @@ pub struct Config {
     pub notifications: NotificationConfig,
     pub messaging: MessagingConfig,
     pub google_apis: Option<GoogleApiConfig>,
+    #[serde(flatten)]
+    pub telemetry: TelemetryConfig,
 }

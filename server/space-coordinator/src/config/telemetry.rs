@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use dxe_types::TelemetryType;
 use serde::Deserialize;
 
 use crate::tasks::z2m_controller::DeviceName;
@@ -46,6 +47,7 @@ pub struct TableConfig {
     #[serde(flatten)]
     pub class: TableClass,
     pub name: TableKey,
+    pub remote_type: Option<TelemetryType>,
 }
 
 #[derive(Debug, Deserialize)]

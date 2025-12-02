@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use dxe_types::{AdhocReservationId, BookingId, IdentityId, UnitId};
+use dxe_types::{AdhocReservationId, BookingId, IdentityId, TelemetryType, UnitId};
 use sqlx::FromRow;
 
 use crate::entities::{Identity, User};
@@ -38,12 +38,6 @@ pub struct CashPaymentStatus {
 }
 
 #[derive(Debug, Clone, FromRow)]
-pub struct ItsokeyCredential {
-    pub booking_id: BookingId,
-    pub key: String,
-}
-
-#[derive(Debug, Clone, FromRow)]
 pub struct AdhocReservation {
     pub id: AdhocReservationId,
     pub unit_id: UnitId,
@@ -71,4 +65,12 @@ pub struct AudioRecording {
     pub url: String,
     pub created_at: DateTime<Utc>,
     pub expires_in: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct TelemetryFile {
+    pub booking_id: BookingId,
+    pub r#type: TelemetryType,
+    pub file_name: String,
+    pub uploaded_at: DateTime<Utc>,
 }

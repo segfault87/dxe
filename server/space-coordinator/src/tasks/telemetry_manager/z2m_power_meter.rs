@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use dxe_types::TelemetryType;
 use parking_lot::Mutex;
 use serde::Serialize;
 
@@ -20,13 +21,15 @@ pub struct Z2mPowerMeterRow {
 
 pub struct Z2mPowerMeterTable {
     table_key: TableKey,
+    remote_type: Option<TelemetryType>,
     current_power_usage_kwh: Mutex<HashMap<DeviceName, f64>>,
 }
 
 impl Z2mPowerMeterTable {
-    pub fn new(name: TableKey) -> Self {
+    pub fn new(name: TableKey, remote_type: Option<TelemetryType>) -> Self {
         Self {
             table_key: name,
+            remote_type,
             current_power_usage_kwh: Default::default(),
         }
     }
@@ -51,6 +54,10 @@ impl super::TableSpec for Z2mPowerMeterTable {
 
     fn table_key(&self) -> TableKey {
         self.table_key.clone()
+    }
+
+    fn remote_type(&self) -> Option<TelemetryType> {
+        self.remote_type
     }
 
     fn create_row(&self, state: &mut Self::State, value: Self::Value) -> Self::Row {

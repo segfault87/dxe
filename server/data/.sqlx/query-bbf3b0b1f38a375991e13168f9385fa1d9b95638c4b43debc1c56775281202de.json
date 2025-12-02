@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO telemetry_file(booking_id, type, file_name, uploaded_at)\n        VALUES(?1, ?2, ?3, ?4)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "bbf3b0b1f38a375991e13168f9385fa1d9b95638c4b43debc1c56775281202de"
+}

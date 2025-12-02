@@ -191,7 +191,7 @@ impl AmanoClient {
             .get("acPlate2")
             .ok_or(Error::MissingField("acPlate2", get_url.clone()))?
             .as_str()
-            .ok_or(Error::InvalidJsonType("acPlate2"))?
+            .unwrap_or("")
             .to_owned();
 
         let mut exemption_url = self.url_base.clone();

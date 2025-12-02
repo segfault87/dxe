@@ -3,7 +3,7 @@ use dxe_types::{GroupId, IdentityId, IdentityProvider, UserId};
 use sqlx::FromRow;
 
 #[derive(Clone, Debug, sqlx::Type)]
-#[sqlx(rename_all = "lowercase")]
+#[sqlx(rename_all = "snake_case")]
 pub enum IdentityDiscriminator {
     User,
     Group,

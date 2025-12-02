@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 actix-http = "3"
 actix-jwt-auth-middleware = "0.5"
+actix-multipart = "0.7"
 actix-state-guards = "0.1.0"
 actix-web = { version = "4.11", features = ["cookies"] }
 aes-gcm = "0.10"

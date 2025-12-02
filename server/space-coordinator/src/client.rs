@@ -1,8 +1,10 @@
 use base64::prelude::*;
+use bytes::BytesMut;
 use chrono::{TimeDelta, Utc};
 use dxe_types::SpaceId;
 use ed25519_compact::{Noise, SecretKey};
-use reqwest::{Method, StatusCode};
+use futures::StreamExt;
+use reqwest::{Method, StatusCode, multipart::Form};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use url::Url;
 
@@ -19,6 +21,11 @@ pub struct DxeClient {
     url_base: Url,
     server_clock_delta: TimeDelta,
     request_expires_in: TimeDelta,
+}
+
+enum Body {
+    Json(serde_json::Value),
+    Multipart(Form),
 }
 
 impl DxeClient {
@@ -72,7 +79,7 @@ impl DxeClient {
         path: &str,
         query: Option<&str>,
         expires_in: &str,
-        body: Option<&str>,
+        body: Option<&[u8]>,
     ) -> Vec<u8> {
         let mut result = vec![];
 
@@ -83,7 +90,7 @@ impl DxeClient {
             result.extend(query.as_bytes());
         }
         if let Some(body) = body {
-            result.extend(body.as_bytes());
+            result.extend(body);
         }
 
         result
@@ -94,7 +101,7 @@ impl DxeClient {
         method: Method,
         path: &str,
         query: Option<&str>,
-        body: Option<serde_json::Value>,
+        body: Option<Body>,
     ) -> Result<serde_json::Value, Error> {
         let expires_in = (Utc::now() + self.server_clock_delta + self.request_expires_in)
             .timestamp_millis()
@@ -106,7 +113,26 @@ impl DxeClient {
         url.set_path(&path);
         url.set_query(query);
 
-        let body = body.map(|v| v.to_string());
+        let body = match body {
+            None => None,
+            Some(Body::Json(json)) => {
+                Some((json.to_string().into_bytes(), "application/json".into()))
+            }
+            Some(Body::Multipart(body)) => {
+                let boundary = body.boundary().to_owned();
+                let mut stream = body.into_stream();
+                let mut bytes = BytesMut::new();
+
+                while let Some(Ok(data)) = stream.next().await {
+                    bytes.extend(data);
+                }
+
+                Some((
+                    bytes.to_vec(),
+                    format!("multipart/form-data; boundary={boundary}"),
+                ))
+            }
+        };
 
         let signature = self.private_key.sign(
             Self::make_signature_body(
@@ -114,7 +140,11 @@ impl DxeClient {
                 &path,
                 query,
                 expires_in.as_str(),
-                body.as_deref(),
+                if let Some((body, _)) = &body {
+                    Some(body.as_slice())
+                } else {
+                    None
+                },
             ),
             Some(Noise::generate()),
         );
@@ -128,10 +158,8 @@ impl DxeClient {
             .header("X-Signature", signature_base64)
             .header("X-Space-Id", self.space_id.to_string());
 
-        if let Some(body) = body {
-            request = request
-                .header("Content-Type", "application/json")
-                .body(body);
+        if let Some((body, content_type)) = body {
+            request = request.header("Content-Type", content_type).body(body);
         }
 
         let response = request.send().await?;
@@ -182,7 +210,25 @@ impl DxeClient {
         body: T,
     ) -> Result<R, Error> {
         let response = self
-            .request(Method::POST, path, query, Some(serde_json::to_value(body)?))
+            .request(
+                Method::POST,
+                path,
+                query,
+                Some(Body::Json(serde_json::to_value(body)?)),
+            )
+            .await?;
+
+        Ok(serde_json::from_value(response)?)
+    }
+
+    pub async fn post_multipart<R: DeserializeOwned>(
+        &self,
+        path: &str,
+        query: Option<&str>,
+        form: Form,
+    ) -> Result<R, Error> {
+        let response = self
+            .request(Method::POST, path, query, Some(Body::Multipart(form)))
             .await?;
 
         Ok(serde_json::from_value(response)?)
@@ -195,7 +241,12 @@ impl DxeClient {
         body: T,
     ) -> Result<R, Error> {
         let response = self
-            .request(Method::PUT, path, query, Some(serde_json::to_value(body)?))
+            .request(
+                Method::PUT,
+                path,
+                query,
+                Some(Body::Json(serde_json::to_value(body)?)),
+            )
             .await?;
 
         Ok(serde_json::from_value(response)?)

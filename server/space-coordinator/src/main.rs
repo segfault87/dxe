@@ -59,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     z2m_controller.start().await;
 
-    let telemetry_manager = TelemetryManager::new(&config.telemetry);
+    let telemetry_manager = TelemetryManager::new(&config.telemetry, client.clone());
     let telemetry_tasks = telemetry_manager
         .clone()
         .register_tables_from_config(&mut z2m_controller, &config.telemetry.tables)?;
@@ -76,6 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     booking_state_manager.add_callback(z2m_controller.clone());
     booking_state_manager.add_callback(audio_recorder);
+    booking_state_manager.add_callback(telemetry_manager.clone());
 
     presence_monitor.add_callback(z2m_controller);
 

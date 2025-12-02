@@ -47,6 +47,8 @@ pub enum Error {
     DoorNotOpened(String),
     #[error("이미 확정된 예약입니다.")]
     BookingAlreadyConfirmed,
+    #[error("잘못된 파일 업로드입니다.")]
+    BadFileUpload,
     #[error("인증에 실패했습니다.")]
     Jwt(actix_jwt_auth_middleware::AuthError),
     #[error("카카오 API 에러가 발생했습니다: {0}")]
@@ -112,6 +114,7 @@ impl ResponseError for Error {
             Self::BookingNotActive => StatusCode::BAD_REQUEST,
             Self::DoorNotOpened(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::BookingAlreadyConfirmed => StatusCode::BAD_REQUEST,
+            Self::BadFileUpload => StatusCode::BAD_REQUEST,
             Self::Jwt(_) => StatusCode::UNAUTHORIZED,
             Self::Kakao(_) => StatusCode::UNAUTHORIZED,
             Self::Http(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -143,6 +146,7 @@ impl ResponseError for Error {
             Self::BookingNotActive => "BookingNotActive",
             Self::DoorNotOpened(_) => "DoorNotOpened",
             Self::BookingAlreadyConfirmed => "BookingAlreadyConfirmed",
+            Self::BadFileUpload => "BadFileUpload",
             Self::Jwt(_) => "AuthError",
             Self::Http(_) => "HttpError",
             Self::Kakao(_) => "KakaoApiError",

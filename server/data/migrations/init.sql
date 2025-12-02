@@ -127,9 +127,3 @@ CREATE TABLE cash_payment_status(
     refund_account VARCHAR(80),
     FOREIGN KEY(booking_id) REFERENCES booking(id)
 );
-
-CREATE TABLE itsokey_credential(
-    booking_id BLOB NOT NULL PRIMARY KEY,
-    key TEXT NOT NULL,
-    FOREIGN KEY(booking_id) REFERENCES booking(id)
-);

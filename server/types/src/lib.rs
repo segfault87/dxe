@@ -129,5 +129,5 @@ impl std::fmt::Display for AdhocReservationId {
 pub enum TelemetryType {
     PowerUsageTotal,
     PowerUsageRoom,
-    AudioMeter,
+    SoundMeter,
 }

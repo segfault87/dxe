@@ -1,8 +1,9 @@
+use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use std::{net::IpAddr, sync::Mutex};
 
 use chrono::{DateTime, TimeDelta, Utc};
+use parking_lot::Mutex;
 use tokio_task_scheduler::{Task, TaskBuilder};
 
 use crate::callback::PresenceCallback;
@@ -61,7 +62,7 @@ impl PresenceMonitor {
                 let mut has_entered = false;
 
                 {
-                    let mut state = self.state.lock().unwrap();
+                    let mut state = self.state.lock();
                     if !state.last_state && state.is_present {
                         log::info!("Presence detected. endpoint: {address}");
                     } else if !state.is_present {
@@ -88,7 +89,7 @@ impl PresenceMonitor {
 
         let mut has_left = false;
         {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.state.lock();
 
             if !state.has_initialized {
                 state.has_initialized = true;

@@ -35,6 +35,14 @@ em {
     font-weight: bold;
 }
 
+main {
+    max-width: 1280px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 30px;
+    padding-right: 30px;
+}
+
 .cta {
     border: none;
     font-family: Gowun Batang;

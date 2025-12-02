@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error as StdError;
 use std::path::PathBuf;
 use std::process::Stdio;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use chrono::{TimeDelta, Utc};
 use dxe_extern::google_cloud::drive::{Error as DriveError, GoogleDriveClient};
@@ -10,6 +10,7 @@ use dxe_extern::google_cloud::{CredentialManager, Error as GcpError};
 use dxe_s2s_shared::entities::BookingWithUsers;
 use dxe_s2s_shared::handlers::UpdateAudioRequest;
 use dxe_types::{BookingId, UnitId};
+use parking_lot::Mutex;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process;
@@ -71,7 +72,7 @@ impl RecorderProcess {
                 }
             }
 
-            *inner_has_stopped.lock().unwrap() = true;
+            *inner_has_stopped.lock() = true;
         });
 
         let file_writer = tokio::task::spawn(async move {
@@ -99,7 +100,7 @@ impl RecorderProcess {
     }
 
     pub fn has_stopped(&self) -> bool {
-        *self.has_stopped.lock().unwrap()
+        *self.has_stopped.lock()
     }
 
     pub async fn stop(&mut self) -> Result<(), Error> {
@@ -153,7 +154,7 @@ impl AudioRecorder {
         config: &AudioRecorderConfig,
         booking: &BookingWithUsers,
     ) -> Result<(), Error> {
-        if self.tasks.lock().unwrap().contains_key(&booking.booking.id) {
+        if self.tasks.lock().contains_key(&booking.booking.id) {
             return Ok(());
         }
 
@@ -162,10 +163,7 @@ impl AudioRecorder {
 
         let process = RecorderProcess::new(config, path).await?;
 
-        self.tasks
-            .lock()
-            .unwrap()
-            .insert(booking.booking.id, process);
+        self.tasks.lock().insert(booking.booking.id, process);
 
         log::info!("Recording started for {}", booking.booking.id);
 
@@ -173,7 +171,7 @@ impl AudioRecorder {
     }
 
     async fn stop(&self, config: &AudioRecorderConfig, booking: &BookingWithUsers) {
-        let Some(mut child) = self.tasks.lock().unwrap().remove(&booking.booking.id) else {
+        let Some(mut child) = self.tasks.lock().remove(&booking.booking.id) else {
             return;
         };
 
@@ -227,7 +225,7 @@ impl AudioRecorder {
     }
 
     async fn update(self: Arc<Self>) {
-        let mut tasks = self.tasks.lock().unwrap();
+        let mut tasks = self.tasks.lock();
 
         let mut tasks_to_collect = HashSet::new();
         for (key, task) in tasks.iter() {

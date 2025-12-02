@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 chrono = { workspace = true }
 gcp_auth = "0.12"
+parking_lot = { workspace = true }
 reqwest = { workspace = true, features = ["multipart", "stream"] }
 serde = { workspace = true }
 serde_json = { workspace = true }

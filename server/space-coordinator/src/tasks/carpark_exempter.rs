@@ -1,9 +1,10 @@
 use std::collections::HashSet;
 use std::error::Error;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use dxe_s2s_shared::entities::BookingWithUsers;
 use dxe_types::BookingId;
+use parking_lot::Mutex;
 use tokio_task_scheduler::{Task, TaskBuilder};
 
 use crate::callback::EventStateCallback;
@@ -39,9 +40,9 @@ impl CarparkExempter {
         let mut license_plate_numbers = HashSet::new();
 
         {
-            let active_bookings = self.active_bookings.lock().unwrap();
+            let active_bookings = self.active_bookings.lock();
 
-            for bookings in self.booking_states.lock().unwrap().bookings_1d.values() {
+            for bookings in self.booking_states.lock().bookings_1d.values() {
                 for booking in bookings {
                     if active_bookings.contains(&booking.booking.id) {
                         for user in booking.users.iter() {
@@ -98,10 +99,7 @@ impl EventStateCallback<BookingWithUsers> for CarparkExempter {
         buffered: bool,
     ) -> Result<(), Box<dyn Error>> {
         if buffered {
-            self.active_bookings
-                .lock()
-                .unwrap()
-                .insert(event.booking.id);
+            self.active_bookings.lock().insert(event.booking.id);
         }
 
         Ok(())
@@ -113,10 +111,7 @@ impl EventStateCallback<BookingWithUsers> for CarparkExempter {
         buffered: bool,
     ) -> Result<(), Box<dyn Error>> {
         if buffered {
-            self.active_bookings
-                .lock()
-                .unwrap()
-                .remove(&event.booking.id);
+            self.active_bookings.lock().remove(&event.booking.id);
         }
 
         Ok(())

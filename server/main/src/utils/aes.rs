@@ -1,5 +1,4 @@
 use std::string::FromUtf8Error;
-use std::sync::Mutex;
 
 use aes_gcm::aead::Aead;
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce};
@@ -7,7 +6,7 @@ use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 
 pub struct AesCrypto {
-    cipher: Mutex<Aes256Gcm>,
+    cipher: Aes256Gcm,
 }
 
 impl AesCrypto {
@@ -15,7 +14,7 @@ impl AesCrypto {
         let key: &Key<Aes256Gcm> = Key::<Aes256Gcm>::from_slice(key);
 
         Self {
-            cipher: Mutex::new(Aes256Gcm::new(key)),
+            cipher: Aes256Gcm::new(key),
         }
     }
 
@@ -24,8 +23,6 @@ impl AesCrypto {
 
         let ciphertext = self
             .cipher
-            .lock()
-            .unwrap()
             .encrypt(&nonce, plaintext)
             .map_err(Error::Encrypt)?;
 
@@ -42,8 +39,6 @@ impl AesCrypto {
         let bytes = BASE64_STANDARD.decode(base64_ciphertext)?;
         let plaintext = self
             .cipher
-            .lock()
-            .unwrap()
             .decrypt(&nonce, bytes.as_slice())
             .map_err(Error::Decrypt)?;
 

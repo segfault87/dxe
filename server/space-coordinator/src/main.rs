@@ -16,6 +16,7 @@ use crate::tasks::audio_recorder::AudioRecorder;
 use crate::tasks::booking_state_manager::BookingStateManager;
 use crate::tasks::carpark_exempter::CarparkExempter;
 use crate::tasks::presence_monitor::PresenceMonitor;
+use crate::tasks::telemetry_manager::TelemetryManager;
 use crate::tasks::z2m_controller::Z2mController;
 
 #[derive(clap::Parser, Debug)]
@@ -57,6 +58,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         notification_service.clone(),
     );
     z2m_controller.start().await;
+
+    let telemetry_manager = TelemetryManager::new(&config.telemetry);
+    let telemetry_tasks = telemetry_manager
+        .clone()
+        .register_tables_from_config(&mut z2m_controller, &config.telemetry.tables)?;
+
+    telemetry_manager.clone().test();
+
     let (z2m_controller, z2m_consumer_task, z2m_controller_task) = z2m_controller.task();
 
     let audio_recorder = AudioRecorder::new(
@@ -95,6 +104,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     task_context.add_task(booking_state_manager_task).await?;
 
     task_context.run().await;
+
+    for task in telemetry_tasks {
+        task.abort();
+    }
+
+    telemetry_manager.abort();
 
     z2m_consumer_task.abort();
     mqtt_service_task.abort();

@@ -2,8 +2,8 @@ pub mod models;
 
 use std::sync::Arc;
 
+use parking_lot::Mutex;
 use reqwest::{Client, StatusCode};
-use tokio::sync::Mutex;
 
 use crate::biztalk::models::{
     AlimTalkButtonAttachment, AllimTalkAttachment, GetTokenResponse, SendAlimTalkRequest,
@@ -59,7 +59,7 @@ impl BiztalkClient {
         if payload.response_code == BIZTALK_RESPONSE_OK
             && let Some(token) = payload.token
         {
-            *self.token.lock().await = Some(token);
+            *self.token.lock() = Some(token);
             Ok(())
         } else {
             Err(Error::Biztalk(
@@ -70,11 +70,11 @@ impl BiztalkClient {
     }
 
     async fn post(&self, request: reqwest::RequestBuilder) -> Result<reqwest::Response, Error> {
-        if self.token.lock().await.is_none() {
+        if self.token.lock().is_none() {
             self.refresh_token().await?;
         }
 
-        let token = self.token.lock().await.clone().unwrap();
+        let token = self.token.lock().clone().unwrap();
         let request = request.header("bt-token", token).build()?;
 
         let response = self.client.execute(request).await?;

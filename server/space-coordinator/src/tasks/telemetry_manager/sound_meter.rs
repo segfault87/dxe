@@ -1,0 +1,86 @@
+use futures::StreamExt;
+use serde::Serialize;
+use tasi_sound_level_meter::TasiSoundLevelMeter;
+use tokio::sync::mpsc;
+
+use crate::config::telemetry::{SoundMeterConfig, SoundMeterDevice, TableKey};
+
+pub struct State;
+
+#[derive(Clone, Debug, Serialize)]
+pub struct SoundMeterRow {
+    decibel_level_10: i16,
+}
+
+pub struct SoundMeter {
+    config: SoundMeterConfig,
+    tx: mpsc::UnboundedSender<SoundMeterRow>,
+}
+
+impl SoundMeter {
+    pub fn new(config: SoundMeterConfig, tx: mpsc::UnboundedSender<SoundMeterRow>) -> Self {
+        Self { config, tx }
+    }
+
+    pub fn start(self) -> tokio::task::JoinHandle<()> {
+        tokio::task::spawn(async move {
+            let mut subsequent = false;
+            loop {
+                if !subsequent {
+                    subsequent = true;
+                } else {
+                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                }
+
+                match &self.config.device {
+                    SoundMeterDevice::Tasi653b(device) => {
+                        let mut meter = match TasiSoundLevelMeter::new(device.serial_number.clone())
+                        {
+                            Ok(v) => v,
+                            Err(e) => {
+                                log::error!("Cannot open TASI sound meter: {e}");
+                                continue;
+                            }
+                        };
+
+                        while let Some(level) = meter.next().await {
+                            let _ = self.tx.send(SoundMeterRow {
+                                decibel_level_10: level,
+                            });
+                        }
+
+                        log::warn!("Sound meter disconnected. retrying...");
+                    }
+                };
+            }
+        })
+    }
+}
+
+pub struct SoundMeterTable {
+    table_key: TableKey,
+}
+
+impl SoundMeterTable {
+    pub fn new(table_key: TableKey) -> Self {
+        Self { table_key }
+    }
+}
+
+impl super::TableSpec for SoundMeterTable {
+    type State = State;
+    type Value = SoundMeterRow;
+    type Row = SoundMeterRow;
+
+    fn new_state(&self) -> Self::State {
+        State
+    }
+
+    fn table_key(&self) -> TableKey {
+        self.table_key.clone()
+    }
+
+    fn create_row(&self, _state: &mut Self::State, value: Self::Value) -> Self::Row {
+        value
+    }
+}

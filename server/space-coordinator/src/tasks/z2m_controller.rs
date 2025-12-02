@@ -1,23 +1,26 @@
 use std::collections::{HashMap, HashSet};
 use std::error::Error as StdError;
 use std::fmt::Display;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use dxe_s2s_shared::entities::BookingWithUsers;
 use dxe_types::{BookingId, UnitId};
+use parking_lot::Mutex;
 use rumqttc::Publish;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tokio::time::timeout;
 use tokio_task_scheduler::{Task, TaskBuilder};
 
 use crate::callback::{EventStateCallback, PresenceCallback};
+use crate::config::telemetry::TableKey;
 use crate::config::z2m::{self, SwitchPolicy};
 use crate::services::mqtt::{Error as MqttError, MqttService};
 use crate::services::notification::NotificationService;
+use crate::tasks::telemetry_manager::z2m_power_meter::{PUBLISH_DURATION, Z2mPowerMeterRow};
 
 #[derive(Debug)]
 pub enum Z2mPublishTopic {
@@ -61,10 +64,44 @@ impl Display for DeviceName {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct PowerUsage {
-    instant_wattage: f64,
-    sum_kwh: f64,
+    pub instant_wattage: f64,
+    pub sum_kwh: f64,
+}
+
+struct PowerMeterTelemetryContext {
+    devices: HashSet<DeviceName>,
+    usage: HashMap<DeviceName, PowerUsage>,
+    tx: mpsc::UnboundedSender<Z2mPowerMeterRow>,
+    last_sent_at: Instant,
+}
+
+impl PowerMeterTelemetryContext {
+    pub fn update(&mut self, device_name: DeviceName, power_usage: &PowerUsage) {
+        let current = self.usage.entry(device_name).or_default();
+        if current.instant_wattage < power_usage.instant_wattage {
+            current.instant_wattage = power_usage.instant_wattage;
+        }
+        current.sum_kwh = power_usage.sum_kwh;
+
+        if self.last_sent_at.elapsed() > PUBLISH_DURATION {
+            let mut watt_sum = 0.0;
+            let mut usage_sum = 0.0;
+            for usage in self.usage.values_mut() {
+                watt_sum += usage.instant_wattage;
+                usage.instant_wattage = 0.0;
+                usage_sum += usage.sum_kwh;
+            }
+
+            let _ = self.tx.send(Z2mPowerMeterRow {
+                instantaneous_wattage: watt_sum,
+                power_usage_kwh: usage_sum,
+            });
+
+            self.last_sent_at = Instant::now();
+        }
+    }
 }
 
 pub struct Z2mController {
@@ -82,6 +119,7 @@ pub struct Z2mController {
     active_bookings: Mutex<Option<HashMap<UnitId, HashSet<BookingId>>>>,
     presence: Mutex<Option<bool>>,
     alert_flags: Mutex<HashSet<String>>,
+    power_meters: HashMap<TableKey, Mutex<PowerMeterTelemetryContext>>,
 }
 
 fn test_condition(
@@ -173,7 +211,12 @@ impl Z2mController {
             active_bookings: Mutex::new(Default::default()),
             presence: Mutex::new(None),
             alert_flags: Mutex::new(HashSet::new()),
+            power_meters: HashMap::new(),
         }
+    }
+
+    pub fn get_device(&self, device_name: &DeviceName) -> Option<&z2m::Device> {
+        self.devices.get(device_name)
     }
 
     pub async fn start(&mut self) {
@@ -195,10 +238,7 @@ impl Z2mController {
             log::info!("Got initial state for {name}");
             device_count -= 1;
 
-            self.device_states
-                .lock()
-                .unwrap()
-                .insert(name.clone(), value);
+            self.device_states.lock().insert(name.clone(), value);
         }
 
         if device_count == 0 {
@@ -357,7 +397,7 @@ impl Z2mController {
 
     pub fn handle_publishment(self: Arc<Self>, publish: Publish) {
         if let Some(device_name) = DeviceName::from_topic_name(&publish.topic)
-            && self.devices.contains_key(&device_name)
+            && let Some(device) = self.devices.get(&device_name)
         {
             let value = match serde_json::from_slice::<serde_json::Value>(&publish.payload) {
                 Ok(v) => v,
@@ -367,10 +407,19 @@ impl Z2mController {
                 }
             };
 
-            self.device_states
-                .lock()
-                .unwrap()
-                .insert(device_name, value);
+            self.device_states.lock().insert(device_name.clone(), value);
+
+            if device.classes.power_meter.is_some() {
+                if let Ok(power_meter) = self.read_power_meter(device) {
+                    for hook in self.power_meters.values() {
+                        let mut guard = hook.lock();
+
+                        if guard.devices.contains(&device_name) {
+                            guard.update(device_name.clone(), &power_meter);
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -379,7 +428,7 @@ impl Z2mController {
         device_name: &DeviceName,
         switch: &z2m::DeviceClassSwitch,
     ) -> Result<z2m::SwitchState, Error> {
-        let device_states = self.device_states.lock().unwrap();
+        let device_states = self.device_states.lock();
 
         let Some(state) = device_states.get(device_name) else {
             return Err(Error::StateNotFound(device_name.clone()));
@@ -395,13 +444,13 @@ impl Z2mController {
     }
 
     fn is_active_bookings(&self) -> Option<bool> {
-        let guard = self.active_bookings.lock().unwrap();
+        let guard = self.active_bookings.lock();
 
         Some(guard.as_ref()?.values().any(|v| !v.is_empty()))
     }
 
     fn get_active_units(&self) -> Vec<UnitId> {
-        let guard = self.active_bookings.lock().unwrap();
+        let guard = self.active_bookings.lock();
 
         guard
             .as_ref()
@@ -446,7 +495,7 @@ impl Z2mController {
     ) -> Result<bool, Error> {
         let current_state = self.get_switch_state(device_name, switch)?;
 
-        let Some(is_present) = *self.presence.lock().unwrap() else {
+        let Some(is_present) = *self.presence.lock() else {
             return Err(Error::NotInitialized);
         };
         let Some(is_active_bookings) = self.is_active_bookings() else {
@@ -550,7 +599,7 @@ impl Z2mController {
             return;
         };
 
-        let Some(presence) = *self.presence.lock().unwrap() else {
+        let Some(presence) = *self.presence.lock() else {
             return;
         };
 
@@ -582,12 +631,12 @@ impl Z2mController {
         }
     }
 
-    fn read_power_meter(&self, device: &z2m::Device) -> Result<PowerUsage, Error> {
+    pub fn read_power_meter(&self, device: &z2m::Device) -> Result<PowerUsage, Error> {
         let Some(_power_meter) = &device.classes.power_meter else {
             return Err(Error::ClassMismatch("power_meter", device.name.clone()));
         };
 
-        let device_states = self.device_states.lock().unwrap();
+        let device_states = self.device_states.lock();
         let Some(state) = device_states.get(&device.name) else {
             return Err(Error::StateNotFound(device.name.clone()));
         };
@@ -610,7 +659,7 @@ impl Z2mController {
     }
 
     async fn handle_alert_tasks(&self) {
-        let Some(presence) = *self.presence.lock().unwrap() else {
+        let Some(presence) = *self.presence.lock() else {
             return;
         };
 
@@ -619,7 +668,7 @@ impl Z2mController {
         };
 
         for alert in self.alerts.iter() {
-            if self.alert_flags.lock().unwrap().contains(&alert.name) {
+            if self.alert_flags.lock().contains(&alert.name) {
                 continue;
             }
 
@@ -643,20 +692,14 @@ impl Z2mController {
                 continue;
             };
 
-            let Some(state) = self
-                .device_states
-                .lock()
-                .unwrap()
-                .get(&device.name)
-                .cloned()
-            else {
+            let Some(state) = self.device_states.lock().get(&device.name).cloned() else {
                 log::warn!("Device state not found for {}", device.name);
                 continue;
             };
 
             match test_condition(&state, &alert.conditions) {
                 Ok(true) => {
-                    self.alert_flags.lock().unwrap().insert(alert.name.clone());
+                    self.alert_flags.lock().insert(alert.name.clone());
                     if let Err(e) = self
                         .notification_service
                         .notify(alert.priority, alert.name.clone())
@@ -676,6 +719,23 @@ impl Z2mController {
     async fn update(self: Arc<Self>) {
         self.handle_alert_tasks().await;
         self.sync_switch_states().await;
+    }
+
+    pub fn register_power_meter_telemetry_hook(
+        &mut self,
+        key: TableKey,
+        devices: HashSet<DeviceName>,
+        tx: mpsc::UnboundedSender<Z2mPowerMeterRow>,
+    ) {
+        self.power_meters.insert(
+            key,
+            Mutex::new(PowerMeterTelemetryContext {
+                devices,
+                usage: Default::default(),
+                tx: tx,
+                last_sent_at: Instant::now(),
+            }),
+        );
     }
 
     pub fn task(self) -> (Arc<Self>, JoinHandle<()>, Task) {
@@ -712,7 +772,7 @@ impl Z2mController {
 #[async_trait::async_trait]
 impl EventStateCallback<BookingWithUsers> for Z2mController {
     fn on_initialized(&self) {
-        *self.active_bookings.lock().unwrap() = Some(Default::default());
+        *self.active_bookings.lock() = Some(Default::default());
     }
 
     async fn on_event_start(
@@ -722,7 +782,7 @@ impl EventStateCallback<BookingWithUsers> for Z2mController {
     ) -> Result<(), Box<dyn StdError>> {
         if buffered {
             {
-                let mut guard = self.active_bookings.lock().unwrap();
+                let mut guard = self.active_bookings.lock();
                 if let Some(active_bookings) = guard.as_mut() {
                     active_bookings
                         .entry(event.booking.unit_id.clone())
@@ -744,7 +804,7 @@ impl EventStateCallback<BookingWithUsers> for Z2mController {
     ) -> Result<(), Box<dyn StdError>> {
         if buffered {
             {
-                let mut guard = self.active_bookings.lock().unwrap();
+                let mut guard = self.active_bookings.lock();
                 if let Some(active_bookings) = guard.as_mut() {
                     active_bookings
                         .entry(event.booking.unit_id.clone())
@@ -763,9 +823,9 @@ impl EventStateCallback<BookingWithUsers> for Z2mController {
 #[async_trait::async_trait]
 impl PresenceCallback for Z2mController {
     async fn on_enter(&self) -> Result<(), Box<dyn StdError>> {
-        *self.presence.lock().unwrap() = Some(true);
+        *self.presence.lock() = Some(true);
 
-        self.alert_flags.lock().unwrap().clear();
+        self.alert_flags.lock().clear();
 
         self.trigger_presence_switch_event(true).await;
 
@@ -773,7 +833,7 @@ impl PresenceCallback for Z2mController {
     }
 
     async fn on_leave(&self) -> Result<(), Box<dyn StdError>> {
-        *self.presence.lock().unwrap() = Some(false);
+        *self.presence.lock() = Some(false);
 
         self.trigger_presence_switch_event(false).await;
 

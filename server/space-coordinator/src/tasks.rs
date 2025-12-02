@@ -2,6 +2,7 @@ pub mod audio_recorder;
 pub mod booking_state_manager;
 pub mod carpark_exempter;
 pub mod presence_monitor;
+pub mod telemetry_manager;
 pub mod z2m_controller;
 
 use std::collections::HashMap;

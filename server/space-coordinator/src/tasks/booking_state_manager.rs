@@ -1,10 +1,11 @@
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use chrono::{DateTime, Local, Utc};
 use dxe_s2s_shared::entities::BookingWithUsers;
 use dxe_s2s_shared::handlers::{BookingType, GetBookingsResponse};
 use dxe_types::{BookingId, UnitId};
+use parking_lot::Mutex;
 use tokio_task_scheduler::{Scheduler, SchedulerError, Task, TaskBuilder};
 
 use crate::callback::EventStateCallback;
@@ -99,7 +100,7 @@ impl BookingStateManager {
         let mut bookings_to_delete = vec![];
 
         {
-            let mut states = self.states.lock().unwrap();
+            let mut states = self.states.lock();
 
             // Remove outdated events
             for bookings in states.bookings_1d.values_mut() {
@@ -165,7 +166,7 @@ impl BookingStateManager {
             let mut tasks_to_remove = vec![];
 
             {
-                let mut pending_tasks = self.pending_tasks.lock().unwrap();
+                let mut pending_tasks = self.pending_tasks.lock();
 
                 if let Some(id) = pending_tasks.remove(&booking_start_with_buffer) {
                     tasks_to_remove.push(id);
@@ -189,7 +190,7 @@ impl BookingStateManager {
         }
 
         // Schedule task under 24 hours time frame (if not scheduled)
-        let bookings_1d = self.states.lock().unwrap().bookings_1d.clone();
+        let bookings_1d = self.states.lock().bookings_1d.clone();
 
         for (_, bookings) in bookings_1d {
             for booking in bookings {
@@ -227,7 +228,6 @@ impl BookingStateManager {
                                     let task_id = Arc::clone(&arc_self)
                                         .pending_tasks
                                         .lock()
-                                        .unwrap()
                                         .remove(&task_name);
                                     if let Some(task_id) = task_id {
                                         let _ = arc_self.scheduler.remove(&task_id).await;
@@ -256,7 +256,6 @@ impl BookingStateManager {
                                 let task_id = Arc::clone(&arc_self)
                                     .pending_tasks
                                     .lock()
-                                    .unwrap()
                                     .remove(&task_name);
                                 if let Some(task_id) = task_id {
                                     let _ = arc_self.scheduler.remove(&task_id).await;
@@ -284,7 +283,6 @@ impl BookingStateManager {
                                 let task_id = Arc::clone(&arc_self)
                                     .pending_tasks
                                     .lock()
-                                    .unwrap()
                                     .remove(&task_name);
                                 if let Some(task_id) = task_id {
                                     let _ = arc_self.scheduler.remove(&task_id).await;
@@ -316,7 +314,6 @@ impl BookingStateManager {
                                     let task_id = Arc::clone(&arc_self)
                                         .pending_tasks
                                         .lock()
-                                        .unwrap()
                                         .remove(&task_name);
                                     if let Some(task_id) = task_id {
                                         let _ = arc_self.scheduler.remove(&task_id).await;
@@ -345,7 +342,7 @@ impl BookingStateManager {
         let delta = date - now;
         if delta.num_seconds() > 0
             && delta.num_days() == 0
-            && !self.pending_tasks.lock().unwrap().contains_key(task_name)
+            && !self.pending_tasks.lock().contains_key(task_name)
         {
             let task = TaskBuilder::new(task_name, f)
                 .daily()
@@ -359,10 +356,7 @@ impl BookingStateManager {
                         "Task {task_name} scheduled at {}",
                         date.with_timezone(&Local).format("%H:%M:%S")
                     );
-                    self.pending_tasks
-                        .lock()
-                        .unwrap()
-                        .insert(task_name.to_owned(), id);
+                    self.pending_tasks.lock().insert(task_name.to_owned(), id);
                     true
                 }
                 Err(e) => {

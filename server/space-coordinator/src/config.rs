@@ -1,3 +1,4 @@
+pub mod telemetry;
 pub mod z2m;
 
 use std::collections::HashMap;
@@ -152,6 +153,7 @@ pub struct Config {
     pub google_apis: GoogleApiConfig,
     pub audio_recorder: HashMap<UnitId, AudioRecorderConfig>,
     pub z2m: z2m::Config,
+    pub telemetry: telemetry::Config,
 }
 
 impl Config {

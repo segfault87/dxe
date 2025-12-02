@@ -6,6 +6,22 @@
 }
 
 .navigation {
+    margin-left: auto;
+
+    a {
+        padding: 2px 8px 2px 8px;
+        margin-left: 12px;
+        font-size: 20px;
+        font-weight: bold;
+        text-decoration: none;
+    }
+
+    .active {
+        text-decoration: underline;
+        text-decoration-thickness: 2px;
+        text-underline-offset: 8px;
+    }
+
     > ul {
         padding: 0;
         overflow-x: auto;

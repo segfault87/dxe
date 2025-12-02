@@ -1,10 +1,14 @@
+use std::time::Duration;
+
 use dxe_types::TelemetryType;
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt, select};
 use serde::Serialize;
 use tasi_sound_level_meter::TasiSoundLevelMeter;
 use tokio::sync::mpsc;
 
 use crate::config::telemetry::{SoundMeterConfig, SoundMeterDevice, TableKey};
+
+const POLL_INTERVAL: Duration = Duration::from_secs(10);
 
 pub struct State;
 
@@ -44,13 +48,32 @@ impl SoundMeter {
                             }
                         };
 
-                        while let Some(level) = meter.next().await {
-                            let _ = self.tx.send(SoundMeterRow {
-                                decibel_level_10: level,
-                            });
-                        }
+                        let mut current_level = 0;
 
-                        log::warn!("Sound meter disconnected. retrying...");
+                        let mut interval = tokio::time::interval(POLL_INTERVAL);
+
+                        loop {
+                            select! {
+                                _ = interval.tick().fuse() => {
+                                    if current_level > 0 {
+                                        let _ = self.tx.send(SoundMeterRow {
+                                            decibel_level_10: current_level,
+                                        });
+                                        current_level = 0;
+                                    }
+                                }
+                                meter = meter.next().fuse() => {
+                                    if let Some(level) = meter {
+                                        if level > current_level {
+                                            current_level = level;
+                                        }
+                                    } else {
+                                        log::warn!("Sound meter disconnected. retrying...");
+                                        break;
+                                    }
+                                }
+                            }
+                        }
                     }
                 };
             }

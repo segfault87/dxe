@@ -193,6 +193,7 @@ impl DxeClient {
         Ok(serde_json::from_value(response)?)
     }
 
+    #[allow(dead_code)]
     pub async fn delete<R: DeserializeOwned>(
         &self,
         path: &str,
@@ -234,6 +235,7 @@ impl DxeClient {
         Ok(serde_json::from_value(response)?)
     }
 
+    #[allow(dead_code)]
     pub async fn put<T: Serialize, R: DeserializeOwned>(
         &self,
         path: &str,

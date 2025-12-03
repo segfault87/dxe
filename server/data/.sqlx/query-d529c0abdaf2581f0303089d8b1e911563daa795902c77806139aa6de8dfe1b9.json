@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            b.time_from AS \"time_from: DateTime<Utc>\",\n            b.time_to AS \"time_to: DateTime<Utc>\",\n            cu.name OR cg.name AS \"name: String\",\n            b.confirmed_at AS \"confirmed_at: DateTime<Utc>\"\n        FROM booking \"b\"\n        JOIN identity \"ci\" ON b.customer_id = ci.id\n        LEFT OUTER JOIN user \"cu\" ON ci.discriminator = 'user' AND ci.id = cu.id\n        LEFT OUTER JOIN \"group\" \"cg\" ON ci.discriminator = 'group' AND ci.id = cg.id\n        WHERE\n            b.time_to >= ?1 AND b.time_from < ?2 AND\n            b.unit_id = ?3 AND\n            (b.canceled_at IS NULL OR b.canceled_at >= ?4)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "time_from: DateTime<Utc>",
+        "ordinal": 0,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "time_to: DateTime<Utc>",
+        "ordinal": 1,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "name: String",
+        "ordinal": 2,
+        "type_info": "Null"
+      },
+      {
+        "name": "confirmed_at: DateTime<Utc>",
+        "ordinal": 3,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      true
+    ]
+  },
+  "hash": "d529c0abdaf2581f0303089d8b1e911563daa795902c77806139aa6de8dfe1b9"
+}

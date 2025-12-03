@@ -102,20 +102,6 @@ CREATE TABLE booking_change_history(
 );
 CREATE INDEX idx_booking_change_history ON booking_change_history(booking_id);
 
-CREATE TABLE activity(
-    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    user_id BLOB NOT NULL,
-    booking_id BLOB,
-    event_name VARCHAR(30),
-    level VARCHAR(10) NOT NULL,
-    created_at DATETIME NOT NULL,
-    payload TEXT NOT NULL,
-    FOREIGN KEY(user_id) REFERENCES user(id),
-    FOREIGN KEY(booking_id) REFERENCES booking(id)
-);
-CREATE INDEX idx_activity_user_id ON activity(user_id);
-CREATE INDEX idx_activity_booking_id ON activity(booking_id);
-
 CREATE TABLE cash_payment_status(
     booking_id BLOB NOT NULL PRIMARY KEY,
     depositor_name VARCHAR(40) NOT NULL,

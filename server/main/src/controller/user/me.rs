@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use actix_web::web;
 use chrono::Utc;
 use dxe_data::queries::booking::get_bookings_by_user_id;
-use dxe_data::queries::user::{get_user_by_id, update_user};
+use dxe_data::queries::user::{get_user_by_id, get_user_cash_payment_information, update_user};
 use dxe_types::UnitId;
 use sqlx::SqlitePool;
 
@@ -21,11 +21,14 @@ pub async fn get(
 ) -> Result<web::Json<MeResponse>, Error> {
     let now = Utc::now();
 
-    let mut connection = database.acquire().await?;
+    let mut tx = database.begin().await?;
 
-    let user = get_user_by_id(&mut connection, &session.user_id, &now)
+    let user = get_user_by_id(&mut tx, &session.user_id, &now)
         .await?
         .ok_or(Error::UserNotFound)?;
+
+    let cash_payment_information =
+        get_user_cash_payment_information(&mut tx, &session.user_id).await?;
 
     let user = SelfUser {
         id: user.id,
@@ -33,10 +36,16 @@ pub async fn get(
         license_plate_number: user.license_plate_number,
         created_at: timezone_config.convert(user.created_at),
         is_administrator: session.is_administrator,
+        depositor_name: cash_payment_information
+            .as_ref()
+            .and_then(|v| v.depositor_name.clone()),
+        refund_account: cash_payment_information
+            .as_ref()
+            .and_then(|v| v.refund_account.clone()),
     };
 
     let mut bookings =
-        get_bookings_by_user_id(&mut connection, &now, &session.user_id, &now, false).await?;
+        get_bookings_by_user_id(&mut tx, &now, &session.user_id, &now, false).await?;
     bookings.sort_by(|a, b| a.time_from.cmp(&b.time_from));
 
     let mut active_bookings = HashMap::new();
@@ -74,10 +83,10 @@ pub async fn post(
 ) -> Result<web::Json<UpdateMeResponse>, Error> {
     let now = Utc::now();
 
-    let mut tr = database.begin().await?;
+    let mut tx = database.begin().await?;
 
     let result = update_user(
-        &mut tr,
+        &mut tx,
         &now,
         &session.user_id,
         &body.new_name,
@@ -85,7 +94,10 @@ pub async fn post(
     )
     .await?;
 
-    tr.commit().await?;
+    let cash_payment_information =
+        get_user_cash_payment_information(&mut tx, &session.user_id).await?;
+
+    tx.commit().await?;
 
     let user = SelfUser {
         id: result.id,
@@ -93,6 +105,12 @@ pub async fn post(
         license_plate_number: result.license_plate_number,
         created_at: timezone_config.convert(result.created_at),
         is_administrator: session.is_administrator,
+        depositor_name: cash_payment_information
+            .as_ref()
+            .and_then(|v| v.depositor_name.clone()),
+        refund_account: cash_payment_information
+            .as_ref()
+            .and_then(|v| v.refund_account.clone()),
     };
 
     Ok(web::Json(UpdateMeResponse { user }))

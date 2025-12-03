@@ -3,17 +3,20 @@ use std::error::Error;
 use std::sync::Arc;
 
 use dxe_s2s_shared::entities::BookingWithUsers;
+use dxe_s2s_shared::handlers::GetAdhocParkingsResponse;
 use dxe_types::BookingId;
 use parking_lot::Mutex;
 use tokio_task_scheduler::{Task, TaskBuilder};
 
 use crate::callback::EventStateCallback;
+use crate::client::DxeClient;
 use crate::config::AlertPriority;
 use crate::services::carpark_exemption::CarparkExemptionService;
 use crate::services::notification::NotificationService;
 use crate::tasks::booking_state_manager::BookingStates;
 
 pub struct CarparkExempter {
+    client: DxeClient,
     booking_states: Arc<Mutex<BookingStates>>,
     service: CarparkExemptionService,
     notification_service: NotificationService,
@@ -23,11 +26,13 @@ pub struct CarparkExempter {
 
 impl CarparkExempter {
     pub fn new(
+        client: DxeClient,
         booking_states: Arc<Mutex<BookingStates>>,
         service: CarparkExemptionService,
         notification_service: NotificationService,
     ) -> Self {
         Self {
+            client,
             booking_states,
             service,
             notification_service,
@@ -38,6 +43,25 @@ impl CarparkExempter {
 
     async fn update(self: Arc<Self>) {
         let mut license_plate_numbers = HashSet::new();
+
+        match self
+            .client
+            .get::<GetAdhocParkingsResponse>("/adhoc-parkings", None)
+            .await
+        {
+            Ok(parkings) => {
+                for parking in parkings.parkings {
+                    license_plate_numbers.insert((
+                        String::new(),
+                        String::new(),
+                        parking.license_plate_number,
+                    ));
+                }
+            }
+            Err(e) => {
+                log::warn!("Could not fetch adhoc parking information: {e}");
+            }
+        }
 
         {
             let active_bookings = self.active_bookings.lock();

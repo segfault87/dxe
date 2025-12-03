@@ -7,6 +7,7 @@ use dxe_data::queries::booking::{
 };
 use dxe_data::queries::identity::{get_group_members, get_identity, is_member_of};
 use dxe_data::queries::unit::is_unit_enabled;
+use dxe_data::queries::user::update_user_cash_payment_depositor_name;
 use sqlx::SqlitePool;
 
 use crate::config::{BookingConfig, TimeZoneConfig};
@@ -79,6 +80,13 @@ pub async fn post(
     let price = booking_config
         .calculate_price(&body.unit_id, time_from, time_to)
         .map_err(|_| Error::UnitNotFound)?;
+
+    update_user_cash_payment_depositor_name(
+        &mut tx,
+        &session.user_id,
+        Some(body.depositor_name.as_str()),
+    )
+    .await?;
 
     create_cash_payment_status(
         &mut tx,

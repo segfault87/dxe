@@ -61,7 +61,10 @@ function ShowReservationInner({
     let refundAccount: string | null = null;
 
     if (bookingStart.toDateString() !== new Date().toDateString()) {
-      refundAccount = prompt("환불받으실 계좌번호를 입력해 주세요.");
+      refundAccount = prompt(
+        "환불받으실 계좌번호를 입력해 주세요.",
+        auth?.user.refundAccount ?? undefined,
+      );
       if (refundAccount === null) {
         return;
       }

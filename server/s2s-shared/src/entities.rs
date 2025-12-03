@@ -1,4 +1,4 @@
-use dxe_types::{BookingId, IdentityId, SpaceId, UnitId, UserId};
+use dxe_types::{AdhocParkingId, BookingId, IdentityId, SpaceId, UnitId, UserId};
 use serde::{Deserialize, Serialize};
 
 use crate::Timestamp;
@@ -33,4 +33,12 @@ pub struct User {
 pub struct BookingWithUsers {
     pub booking: Booking,
     pub users: Vec<User>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct AdhocParking {
+    pub id: AdhocParkingId,
+    pub time_from: Timestamp,
+    pub time_to: Timestamp,
+    pub license_plate_number: String,
 }

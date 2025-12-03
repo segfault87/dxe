@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            user_id AS \"user_id: _\",\n            depositor_name,\n            refund_account\n        FROM user_cash_payment_information\n        WHERE user_id=?1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "user_id: _",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "depositor_name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "refund_account",
+        "ordinal": 2,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "f7c303b5d2b8b6516700e17aaab7f8c71717d5214e177fc791bbe9064620aba8"
+}

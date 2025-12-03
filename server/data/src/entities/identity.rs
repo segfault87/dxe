@@ -64,3 +64,10 @@ pub struct GroupAssociation {
     pub user_id: UserId,
     pub joined_at: DateTime<Utc>,
 }
+
+#[derive(Debug, FromRow)]
+pub struct UserCashPaymentInformation {
+    pub user_id: UserId,
+    pub depositor_name: Option<String>,
+    pub refund_account: Option<String>,
+}

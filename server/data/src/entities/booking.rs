@@ -1,5 +1,7 @@
 use chrono::{DateTime, Utc};
-use dxe_types::{AdhocReservationId, BookingId, IdentityId, TelemetryType, UnitId};
+use dxe_types::{
+    AdhocParkingId, AdhocReservationId, BookingId, IdentityId, SpaceId, TelemetryType, UnitId,
+};
 use sqlx::FromRow;
 
 use crate::entities::{Identity, User};
@@ -73,4 +75,14 @@ pub struct TelemetryFile {
     pub r#type: TelemetryType,
     pub file_name: String,
     pub uploaded_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct AdhocParking {
+    pub id: AdhocParkingId,
+    pub space_id: SpaceId,
+    pub time_from: DateTime<Utc>,
+    pub time_to: DateTime<Utc>,
+    pub license_plate_number: String,
+    pub created_at: DateTime<Utc>,
 }

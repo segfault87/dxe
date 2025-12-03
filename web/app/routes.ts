@@ -29,6 +29,7 @@ export default [
       route("groups/", "./pages/Admin/Groups.tsx"),
       route("users/", "./pages/Admin/Users.tsx"),
       route("adhoc-reservations/", "./pages/Admin/AdhocReservations.tsx"),
+      route("adhoc-parkings/", "./pages/Admin/AdhocParkings.tsx"),
     ]),
   ]),
 ] satisfies RouteConfig;

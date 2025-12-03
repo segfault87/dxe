@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO user_cash_payment_information(user_id, depositor_name)\n        VALUES(?1, ?2)\n        ON CONFLICT(user_id) DO UPDATE SET\n            depositor_name=?2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "a85716759a224362cc2a69a0dd6d7cb02d468bab099a726b0e8ebcd10904616e"
+}

@@ -82,6 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if let Some(carpark_exemption) = &config.carpark_exemption {
         let carpark_exempter = CarparkExempter::new(
+            client.clone(),
             booking_states.clone(),
             CarparkExemptionService::new(carpark_exemption),
             notification_service.clone(),

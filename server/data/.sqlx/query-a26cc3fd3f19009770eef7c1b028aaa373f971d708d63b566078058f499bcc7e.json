@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n        SELECT\n            remark,\n            time_from AS \"time_from: DateTime<Utc>\",\n            time_to AS \"time_to: DateTime<Utc>\"\n        FROM adhoc_reservation\n        WHERE\n            time_from >= ?1 AND time_from < ?2 AND\n            unit_id = ?3\n        ",
+  "query": "\n        SELECT\n            remark,\n            time_from AS \"time_from: DateTime<Utc>\",\n            time_to AS \"time_to: DateTime<Utc>\"\n        FROM adhoc_reservation\n        WHERE\n            time_to >= ?1 AND time_from < ?2 AND\n            unit_id = ?3\n        ",
   "describe": {
     "columns": [
       {
@@ -28,5 +28,5 @@
       false
     ]
   },
-  "hash": "34a582e82ff4b4ed4f67f6fa7fe5c56975a71b25e3ab7e285dd5c0cdb6f92924"
+  "hash": "a26cc3fd3f19009770eef7c1b028aaa373f971d708d63b566078058f499bcc7e"
 }

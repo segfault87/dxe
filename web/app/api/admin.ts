@@ -1,8 +1,10 @@
 import API from "../api";
 import { toUtcIso8601 } from "../lib/datetime";
 import type {
+  CreateAdhocParkingRequest,
   CreateAdhocReservationRequest,
   CreateAdhocReservationResponse,
+  GetAdhocParkingsResponse,
   GetAdhocReservationsResponse,
   GetBookingsResponse,
   ModifyBookingResponse,
@@ -11,8 +13,10 @@ import type {
   GetGroupsResponse,
 } from "../types/handlers/admin";
 import type {
-  BookingId,
+  AdhocParkingId,
   AdhocReservationId,
+  BookingId,
+  SpaceId,
   UnitId,
 } from "../types/models/base";
 
@@ -57,6 +61,20 @@ const deleteAdhocReservation = (id: AdhocReservationId) => {
   return API.delete(`/admin/adhoc-reservation/${id}`);
 };
 
+const getAdhocParkings = (spaceId: SpaceId) => {
+  return API.get<GetAdhocParkingsResponse>(
+    `/admin/adhoc-parkings?space_id=${spaceId}`,
+  );
+};
+
+const createAdhocParking = (data: CreateAdhocParkingRequest) => {
+  return API.post("/admin/adhoc-parkings", data);
+};
+
+const deleteAdhocParking = (id: AdhocParkingId) => {
+  return API.delete(`/admin/adhoc-parking/${id}`);
+};
+
 const AdminService = {
   getBookings,
   getUsers,
@@ -65,6 +83,9 @@ const AdminService = {
   getAdhocReservations,
   createAdhocReservation,
   deleteAdhocReservation,
+  getAdhocParkings,
+  createAdhocParking,
+  deleteAdhocParking,
 };
 
 export default AdminService;

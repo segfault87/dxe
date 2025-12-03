@@ -71,12 +71,15 @@ type Pages = {
   "/admin/adhoc-reservations": {
     params: {};
   };
+  "/admin/adhoc-parkings": {
+    params: {};
+  };
 };
 
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/guide" | "/inquiries" | "/reservation" | "/reservation/login" | "/reservation/:bookingId" | "/login" | "/register" | "/my" | "/terms-of-service" | "/booking/:bookingId/recording" | "/join/:groupId" | "/admin" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/adhoc-reservations";
+    page: "/" | "/guide" | "/inquiries" | "/reservation" | "/reservation/login" | "/reservation/:bookingId" | "/login" | "/register" | "/my" | "/terms-of-service" | "/booking/:bookingId/recording" | "/join/:groupId" | "/admin" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/adhoc-reservations" | "/admin/adhoc-parkings";
   };
   "./components/Scaffold.tsx": {
     id: "components/Scaffold";
@@ -132,7 +135,7 @@ type RouteFiles = {
   };
   "./components/AdminScaffold.tsx": {
     id: "components/AdminScaffold";
-    page: "/admin" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/adhoc-reservations";
+    page: "/admin" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/adhoc-reservations" | "/admin/adhoc-parkings";
   };
   "./pages/Admin/ConfirmedBookings.tsx": {
     id: "pages/Admin/ConfirmedBookings";
@@ -158,6 +161,10 @@ type RouteFiles = {
     id: "pages/Admin/AdhocReservations";
     page: "/admin/adhoc-reservations";
   };
+  "./pages/Admin/AdhocParkings.tsx": {
+    id: "pages/Admin/AdhocParkings";
+    page: "/admin/adhoc-parkings";
+  };
 };
 
 type RouteModules = {
@@ -182,4 +189,5 @@ type RouteModules = {
   "pages/Admin/Groups": typeof import("./app/./pages/Admin/Groups.tsx");
   "pages/Admin/Users": typeof import("./app/./pages/Admin/Users.tsx");
   "pages/Admin/AdhocReservations": typeof import("./app/./pages/Admin/AdhocReservations.tsx");
+  "pages/Admin/AdhocParkings": typeof import("./app/./pages/Admin/AdhocParkings.tsx");
 };

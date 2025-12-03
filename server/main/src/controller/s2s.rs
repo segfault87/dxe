@@ -1,3 +1,4 @@
+mod adhoc_parkings;
 mod audio_recording;
 mod bookings;
 mod telemetry;
@@ -16,4 +17,5 @@ pub fn scope() -> actix_web::Scope {
         .service(
             web::resource("/booking/{booking_id}/telemetry").route(web::post().to(telemetry::post)),
         )
+        .service(web::resource("/adhoc-parkings").route(web::get().to(adhoc_parkings::get)))
 }

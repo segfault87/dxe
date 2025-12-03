@@ -1,23 +1,25 @@
 use chrono::{DateTime, Utc};
 use dxe_types::{
-    AdhocReservationId, BookingId, GroupId, IdentityId, IdentityProvider, TelemetryType, UnitId,
-    UserId,
+    AdhocParkingId, AdhocReservationId, BookingId, GroupId, IdentityId, IdentityProvider, SpaceId,
+    TelemetryType, UnitId, UserId,
 };
 use sqlx::SqliteConnection;
 
 use crate::Error;
 use crate::entities::{
-    AdhocReservation, AudioRecording, Booking, CashPaymentStatus, Group, Identity,
+    AdhocParking, AdhocReservation, AudioRecording, Booking, CashPaymentStatus, Group, Identity,
     IdentityDiscriminator, OccupiedSlot, TelemetryFile, User,
 };
 use crate::queries::unit::is_unit_enabled;
+
+const MAX_ARBITRARY_DATETIME_RANGE: DateTime<Utc> = DateTime::from_timestamp_nanos(i64::MAX);
 
 pub async fn is_booking_available(
     connection: &mut SqliteConnection,
     now: &DateTime<Utc>,
     unit_id: &UnitId,
-    time_from: &DateTime<Utc>,
-    time_to: &DateTime<Utc>,
+    range_from: &DateTime<Utc>,
+    range_to: &DateTime<Utc>,
 ) -> Result<bool, Error> {
     Ok(sqlx::query!(
         r#"
@@ -37,8 +39,8 @@ pub async fn is_booking_available(
                     unit_id = ?3)
                 AS "count"
         "#,
-        time_from,
-        time_to,
+        range_from,
+        range_to,
         unit_id,
         now
     )
@@ -52,8 +54,8 @@ pub async fn get_occupied_slots(
     connection: &mut SqliteConnection,
     now: &DateTime<Utc>,
     unit_id: &UnitId,
-    time_from: &DateTime<Utc>,
-    time_to: &DateTime<Utc>,
+    range_from: &DateTime<Utc>,
+    range_to: &DateTime<Utc>,
 ) -> Result<Vec<OccupiedSlot>, Error> {
     let mut records = vec![];
 
@@ -69,12 +71,12 @@ pub async fn get_occupied_slots(
         LEFT OUTER JOIN user "cu" ON ci.discriminator = 'user' AND ci.id = cu.id
         LEFT OUTER JOIN "group" "cg" ON ci.discriminator = 'group' AND ci.id = cg.id
         WHERE
-            b.time_from >= ?1 AND b.time_from < ?2 AND
+            b.time_to >= ?1 AND b.time_from < ?2 AND
             b.unit_id = ?3 AND
             (b.canceled_at IS NULL OR b.canceled_at >= ?4)
         "#,
-        time_from,
-        time_to,
+        range_from,
+        range_to,
         unit_id,
         now
     )
@@ -98,11 +100,11 @@ pub async fn get_occupied_slots(
             time_to AS "time_to: DateTime<Utc>"
         FROM adhoc_reservation
         WHERE
-            time_from >= ?1 AND time_from < ?2 AND
+            time_to >= ?1 AND time_from < ?2 AND
             unit_id = ?3
         "#,
-        time_from,
-        time_to,
+        range_from,
+        range_to,
         unit_id
     )
     .fetch_all(&mut *connection)
@@ -444,7 +446,7 @@ pub async fn get_bookings_by_user_id(
     connection: &mut SqliteConnection,
     now: &DateTime<Utc>,
     user_id: &UserId,
-    time_from: &DateTime<Utc>,
+    range_from: &DateTime<Utc>,
     include_canceled: bool,
 ) -> Result<Vec<Booking>, Error> {
     sqlx::query!(
@@ -494,7 +496,7 @@ pub async fn get_bookings_by_user_id(
             )
         "#,
         user_id,
-        time_from,
+        range_from,
     )
     .fetch_all(&mut *connection)
     .await?
@@ -676,9 +678,9 @@ pub async fn get_bookings_refund_pending(
 pub async fn get_confirmed_bookings_with_payments(
     connection: &mut SqliteConnection,
     now: &DateTime<Utc>,
-    date_from: Option<DateTime<Utc>>,
+    range_from: Option<DateTime<Utc>>,
 ) -> Result<Vec<(Booking, Option<CashPaymentStatus>)>, Error> {
-    let date_from = date_from.unwrap_or_default();
+    let range_from = range_from.unwrap_or_default();
     sqlx::query!(
         r#"
         SELECT
@@ -726,11 +728,11 @@ pub async fn get_confirmed_bookings_with_payments(
         LEFT OUTER JOIN cash_payment_status "cps" ON b.id = cps.booking_id
         WHERE
             b.confirmed_at < ?1 AND
-            b.time_to > ?2
+            b.time_to >= ?2
         ORDER BY b.time_from DESC
         "#,
         now,
-        date_from
+        range_from,
     )
     .fetch_all(&mut *connection)
     .await?
@@ -1302,9 +1304,9 @@ pub async fn delete_adhoc_reservation(
 pub async fn get_adhoc_reservations_by_unit_id(
     connection: &mut SqliteConnection,
     unit_id: &UnitId,
-    date_from: Option<DateTime<Utc>>,
+    range_from: Option<DateTime<Utc>>,
 ) -> Result<Vec<AdhocReservation>, Error> {
-    let date_from = date_from.unwrap_or_default();
+    let range_from = range_from.unwrap_or_default();
 
     let result = sqlx::query!(
         r#"
@@ -1348,7 +1350,7 @@ pub async fn get_adhoc_reservations_by_unit_id(
         ORDER BY r.time_from ASC
         "#,
         unit_id,
-        date_from
+        range_from
     )
     .fetch_all(&mut *connection)
     .await?;
@@ -1514,4 +1516,79 @@ pub async fn create_telemetry_file(
     .await?;
 
     Ok(())
+}
+
+pub async fn create_adhoc_parking(
+    connection: &mut SqliteConnection,
+    now: &DateTime<Utc>,
+    space_id: &SpaceId,
+    time_from: &DateTime<Utc>,
+    time_to: &DateTime<Utc>,
+    license_plate_number: &str,
+) -> Result<AdhocParkingId, Error> {
+    let result = sqlx::query!(
+        r#"
+        INSERT INTO adhoc_parking(space_id, time_from, time_to, license_plate_number, created_at)
+        VALUES(?1, ?2, ?3, ?4, ?5)
+        RETURNING id AS "id: AdhocParkingId"
+        "#,
+        space_id,
+        time_from,
+        time_to,
+        license_plate_number,
+        now
+    )
+    .fetch_one(&mut *connection)
+    .await?;
+
+    Ok(result.id)
+}
+
+pub async fn get_adhoc_parkings(
+    connection: &mut SqliteConnection,
+    space_id: &SpaceId,
+    range_from: Option<DateTime<Utc>>,
+    range_to: Option<DateTime<Utc>>,
+) -> Result<Vec<AdhocParking>, Error> {
+    let range_from = range_from.unwrap_or_default();
+    let range_to = range_to.unwrap_or(MAX_ARBITRARY_DATETIME_RANGE);
+
+    Ok(sqlx::query_as!(
+        AdhocParking,
+        r#"
+        SELECT
+            id,
+            space_id AS "space_id: _",
+            time_from AS "time_from: _",
+            time_to AS "time_to: _",
+            license_plate_number,
+            created_at AS "created_at: _"
+        FROM adhoc_parking
+        WHERE
+            space_id = ?1 AND
+            time_to >= ?2 AND
+            time_from < ?3
+        "#,
+        space_id,
+        range_from,
+        range_to,
+    )
+    .fetch_all(&mut *connection)
+    .await?)
+}
+
+pub async fn delete_adhoc_parking(
+    connection: &mut SqliteConnection,
+    id: AdhocParkingId,
+) -> Result<bool, Error> {
+    let result = sqlx::query!(
+        r#"
+        DELETE FROM adhoc_parking WHERE id=?1
+        "#,
+        id
+    )
+    .execute(&mut *connection)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
 }

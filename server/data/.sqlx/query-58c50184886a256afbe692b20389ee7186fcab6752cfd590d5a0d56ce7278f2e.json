@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            id,\n            space_id AS \"space_id: _\",\n            time_from AS \"time_from: _\",\n            time_to AS \"time_to: _\",\n            license_plate_number,\n            created_at AS \"created_at: _\"\n        FROM adhoc_parking\n        WHERE\n            space_id = ?1 AND\n            time_to >= ?2 AND\n            time_from < ?3\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "space_id: _",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "time_from: _",
+        "ordinal": 2,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "time_to: _",
+        "ordinal": 3,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "license_plate_number",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at: _",
+        "ordinal": 5,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "58c50184886a256afbe692b20389ee7186fcab6752cfd590d5a0d56ce7278f2e"
+}

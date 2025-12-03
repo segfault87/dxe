@@ -1,7 +1,7 @@
 mod converters;
 
 use chrono::{DateTime, FixedOffset};
-use dxe_types::{AdhocReservationId, BookingId, GroupId, UnitId, UserId};
+use dxe_types::{AdhocParkingId, AdhocReservationId, BookingId, GroupId, SpaceId, UnitId, UserId};
 use serde::Serialize;
 
 pub use converters::IntoView;
@@ -21,7 +21,12 @@ pub struct SelfUser {
     pub name: String,
     pub license_plate_number: Option<String>,
     pub created_at: DateTime<FixedOffset>,
+
     pub is_administrator: bool,
+
+    // Cash payment information
+    pub depositor_name: Option<String>,
+    pub refund_account: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -131,4 +136,15 @@ pub struct AudioRecording {
     pub url: url::Url,
     pub created_at: DateTime<FixedOffset>,
     pub expires_in: Option<DateTime<FixedOffset>>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdhocParking {
+    pub id: AdhocParkingId,
+    pub space_id: SpaceId,
+    pub time_from: DateTime<FixedOffset>,
+    pub time_to: DateTime<FixedOffset>,
+    pub license_plate_number: String,
+    pub created_at: DateTime<FixedOffset>,
 }

@@ -1,16 +1,15 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, FixedOffset};
-use dxe_types::{IdentityId, UnitId, UserId};
+use dxe_types::{IdentityId, SpaceId, UnitId, UserId};
 use serde::{Deserialize, Serialize};
 
 use crate::models::entities::{
-    AdhocReservation, Booking, BookingCashPaymentStatus, BookingWithPayments, Group,
+    AdhocParking, AdhocReservation, Booking, BookingCashPaymentStatus, BookingWithPayments, Group,
     GroupWithUsers, OccupiedSlot, SelfUser,
 };
 
 pub mod admin {
-
     use super::*;
 
     #[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -94,6 +93,26 @@ pub mod admin {
     #[serde(rename_all = "camelCase")]
     pub struct GetUsersResponse {
         pub users: Vec<SelfUser>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct GetAdhocParkingsQuery {
+        pub space_id: SpaceId,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct GetAdhocParkingsResponse {
+        pub parkings: Vec<AdhocParking>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct CreateAdhocParkingRequest {
+        pub space_id: SpaceId,
+        pub time_from: DateTime<FixedOffset>,
+        pub desired_hours: i64,
+        pub license_plate_number: String,
     }
 }
 

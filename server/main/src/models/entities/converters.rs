@@ -2,8 +2,8 @@ use chrono::{DateTime, Utc};
 use dxe_data::entities;
 
 use super::{
-    AdhocReservation, AudioRecording, Booking, BookingCashPaymentStatus, BookingStatus, Group,
-    GroupWithUsers, Identity, OccupiedSlot, SelfUser, User,
+    AdhocParking, AdhocReservation, AudioRecording, Booking, BookingCashPaymentStatus,
+    BookingStatus, Group, GroupWithUsers, Identity, OccupiedSlot, SelfUser, User,
 };
 use crate::config::{BookingConfig, TimeZoneConfig};
 use crate::models::Error;
@@ -52,6 +52,8 @@ impl IntoView for SelfUser {
             license_plate_number: entity.license_plate_number,
             created_at: timezone.convert(entity.created_at),
             is_administrator: false,
+            depositor_name: None,
+            refund_account: None,
         })
     }
 }
@@ -262,6 +264,26 @@ impl IntoView for AudioRecording {
 
             created_at: timezone.convert(entity.created_at),
             expires_in: entity.expires_in.map(|v| timezone.convert(v)),
+        })
+    }
+}
+
+impl IntoView for AdhocParking {
+    type Entity = entities::AdhocParking;
+    type Error = Error;
+
+    fn convert(
+        entity: Self::Entity,
+        timezone: &TimeZoneConfig,
+        _now: &DateTime<Utc>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            id: entity.id,
+            space_id: entity.space_id,
+            time_from: timezone.convert(entity.time_from),
+            time_to: timezone.convert(entity.time_to),
+            license_plate_number: entity.license_plate_number,
+            created_at: timezone.convert(entity.created_at),
         })
     }
 }

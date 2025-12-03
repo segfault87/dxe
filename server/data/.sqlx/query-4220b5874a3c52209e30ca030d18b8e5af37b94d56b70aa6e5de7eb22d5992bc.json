@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO adhoc_parking(space_id, time_from, time_to, license_plate_number, created_at)\n        VALUES(?1, ?2, ?3, ?4, ?5)\n        RETURNING id AS \"id: AdhocParkingId\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: AdhocParkingId",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4220b5874a3c52209e30ca030d18b8e5af37b94d56b70aa6e5de7eb22d5992bc"
+}

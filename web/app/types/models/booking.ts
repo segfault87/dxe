@@ -1,4 +1,10 @@
-import type { BookingId, DateTime, AdhocReservationId, UnitId } from "./base";
+import type {
+  AdhocParkingId,
+  AdhocReservationId,
+  BookingId,
+  DateTime,
+  UnitId,
+} from "./base";
 import type { Identity } from "./identity";
 import type { User } from "./user";
 
@@ -65,4 +71,13 @@ export interface AudioRecording {
   url: string;
   createdAt: DateTime;
   expiresIn: DateTime | null;
+}
+
+export interface AdhocParking {
+  id: AdhocParkingId;
+  unitId: UnitId;
+  timeFrom: DateTime;
+  timeTo: DateTime;
+  licensePlateNumber: string;
+  createdAt: DateTime;
 }

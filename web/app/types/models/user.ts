@@ -7,7 +7,11 @@ export interface SelfUser {
   name: string;
   licensePlateNumber?: string;
   createdAt: DateTime;
+
   isAdministrator: boolean;
+
+  depositorName: string | null;
+  refundAccount: string | null;
 }
 
 export interface User {

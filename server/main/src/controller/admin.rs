@@ -1,3 +1,4 @@
+mod adhoc_parking;
 mod adhoc_reservations;
 mod booking;
 mod bookings;
@@ -21,4 +22,13 @@ pub fn scope() -> actix_web::Scope {
         )
         .service(web::resource("/users").route(web::get().to(users::get)))
         .service(web::resource("/groups").route(web::get().to(groups::get)))
+        .service(
+            web::resource("/adhoc-parkings")
+                .route(web::get().to(adhoc_parking::get))
+                .route(web::post().to(adhoc_parking::post)),
+        )
+        .service(
+            web::resource("/adhoc-parking/{adhoc_parking_id}")
+                .route(web::delete().to(adhoc_parking::delete)),
+        )
 }

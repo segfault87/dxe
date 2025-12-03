@@ -3,7 +3,7 @@ use dxe_types::{IdentityId, IdentityProvider, UserId};
 use sqlx::{Executor, QueryBuilder, SqliteConnection};
 
 use crate::Error;
-use crate::entities::{IdentityDiscriminator, User};
+use crate::entities::{IdentityDiscriminator, User, UserCashPaymentInformation};
 
 pub async fn create_user(
     connection: &mut SqliteConnection,
@@ -176,4 +176,66 @@ pub async fn is_administrator(
     .await?;
 
     Ok(result.is_some())
+}
+
+pub async fn get_user_cash_payment_information(
+    connection: &mut SqliteConnection,
+    user_id: &UserId,
+) -> Result<Option<UserCashPaymentInformation>, Error> {
+    Ok(sqlx::query_as!(
+        UserCashPaymentInformation,
+        r#"
+        SELECT
+            user_id AS "user_id: _",
+            depositor_name,
+            refund_account
+        FROM user_cash_payment_information
+        WHERE user_id=?1
+        "#,
+        user_id
+    )
+    .fetch_optional(&mut *connection)
+    .await?)
+}
+
+pub async fn update_user_cash_payment_depositor_name(
+    connection: &mut SqliteConnection,
+    user_id: &UserId,
+    depositor_name: Option<&str>,
+) -> Result<bool, Error> {
+    let result = sqlx::query!(
+        r#"
+        INSERT INTO user_cash_payment_information(user_id, depositor_name)
+        VALUES(?1, ?2)
+        ON CONFLICT(user_id) DO UPDATE SET
+            depositor_name=?2
+        "#,
+        user_id,
+        depositor_name
+    )
+    .execute(&mut *connection)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
+}
+
+pub async fn update_user_cash_payment_refund_account(
+    connection: &mut SqliteConnection,
+    user_id: &UserId,
+    refund_account: Option<&str>,
+) -> Result<bool, Error> {
+    let result = sqlx::query!(
+        r#"
+        INSERT INTO user_cash_payment_information(user_id, refund_account)
+        VALUES(?1, ?2)
+        ON CONFLICT(user_id) DO UPDATE SET
+            refund_account=?2
+        "#,
+        user_id,
+        refund_account
+    )
+    .execute(&mut *connection)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
 }

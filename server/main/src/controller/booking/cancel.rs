@@ -5,6 +5,7 @@ use chrono::Utc;
 use dxe_data::queries::booking::{
     cancel_booking, get_booking_with_user_id, get_cash_payment_status, update_refund_information,
 };
+use dxe_data::queries::user::update_user_cash_payment_refund_account;
 use dxe_types::BookingId;
 use sqlx::SqlitePool;
 
@@ -64,6 +65,15 @@ pub async fn delete(
         {
             cash_payment_status.refund_price = Some(refund_price);
             cash_payment_status.refund_account = query.refund_account.clone();
+        }
+
+        if let Some(refund_account) = &query.refund_account {
+            let _ = update_user_cash_payment_refund_account(
+                &mut tx,
+                &session.user_id,
+                Some(refund_account.as_str()),
+            )
+            .await?;
         }
 
         let refund_rate = (refund_price * 100 / cash_payment_status.price) as i32;

@@ -41,6 +41,11 @@ export default function AdminScaffold() {
               </NavLink>
             </li>
             <li>
+              <NavLink to="/admin/adhoc-parkings/" end>
+                임의 주차
+              </NavLink>
+            </li>
+            <li>
               <NavLink to="/admin/users/" end>
                 고객 목록
               </NavLink>

@@ -1,5 +1,6 @@
-import type { DateTime, IdentityId, UnitId } from "../models/base";
+import type { DateTime, IdentityId, SpaceId, UnitId } from "../models/base";
 import type {
+  AdhocParking,
   AdhocReservation,
   Booking,
   BookingWithPayments,
@@ -46,4 +47,15 @@ export interface GetGroupsResponse {
 
 export interface GetUsersResponse {
   users: SelfUser[];
+}
+
+export interface GetAdhocParkingsResponse {
+  parkings: AdhocParking[];
+}
+
+export interface CreateAdhocParkingRequest {
+  spaceId: SpaceId;
+  timeFrom: DateTime;
+  desiredHours: number;
+  licensePlateNumber: string;
 }

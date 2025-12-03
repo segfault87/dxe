@@ -5,7 +5,7 @@ use dxe_types::{TelemetryType, UnitId};
 use serde::{Deserialize, Serialize};
 
 use crate::Timestamp;
-use crate::entities::{BookingWithUsers, Unit};
+use crate::entities::{AdhocParking, BookingWithUsers, Unit};
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -51,4 +51,9 @@ pub struct UpdateAudioRequest {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct UploadTelemetryFileRequest {
     pub r#type: TelemetryType,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GetAdhocParkingsResponse {
+    pub parkings: Vec<AdhocParking>,
 }

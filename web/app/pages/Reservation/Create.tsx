@@ -257,6 +257,8 @@ function CustomerSelection({
 }
 
 function Reservation() {
+  const auth = useAuth();
+
   const [start, setStart] = useState(new Date());
   const [end, setEnd] = useState(new Date());
   const [maxBookingHours, setMaxBookingHours] = useState(1);
@@ -269,6 +271,12 @@ function Reservation() {
   const [selectedHours, setSelectedHours] = useState<number | null>(null);
   const [price, setPrice] = useState<number | null>(null);
   const [depositor, setDepositor] = useState("");
+
+  useEffect(() => {
+    if (auth) {
+      setDepositor(auth.user.depositorName ?? "");
+    }
+  }, [auth]);
 
   const [isRequestInProgress, setRequestInProgress] = useState(false);
 

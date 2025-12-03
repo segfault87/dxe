@@ -8,7 +8,6 @@ import type { Route } from "./+types/Index";
 import Image1 from "../assets/interior1.jpg";
 import Image2 from "../assets/interior2.jpg";
 import Image3 from "../assets/interior3.jpg";
-import OpenGraphThumbnail from "../assets/og.png";
 import Section from "../components/Section";
 import { useAuth } from "../context/AuthContext";
 
@@ -23,7 +22,7 @@ export function meta({}: Route.MetaArgs) {
       content: "드림하우스 합주실",
     },
     { property: "og:type", content: "website" },
-    { property: "og:image", content: OpenGraphThumbnail },
+    { property: "og:image", content: "/og.png" },
     { property: "og:url", content: "https://dream-house.kr" },
     { property: "og:description", content: "직장인 음악인들을 위한 합주 공간" },
     { property: "og:locale", content: "ko_KR" },

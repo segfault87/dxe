@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO adhoc_reservation(unit_id, holder_id, customer_id, time_from, time_to, remark, deleted_at)\n        VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "cb26f134ad38280b29cc87981750eb4681030a9910f3382cee84f12f17b55505"
+}

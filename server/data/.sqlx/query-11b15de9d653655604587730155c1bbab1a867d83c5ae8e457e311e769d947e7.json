@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n        SELECT\n            r.id AS \"id: AdhocReservationId\",\n            r.unit_id AS \"unit_id: UnitId\",\n            r.time_from AS \"time_from: DateTime<Utc>\",\n            r.time_to AS \"time_to: DateTime<Utc>\",\n            r.temporary,\n            r.remark,\n            hu.id AS \"hu_id: UserId\",\n            hu.provider AS \"hu_provider: IdentityProvider\",\n            hu.foreign_id AS \"hu_foreign_id: String\",\n            hu.name AS \"hu_name: String\",\n            hu.created_at AS \"hu_created_at: DateTime<Utc>\",\n            hu.deactivated_at AS \"hu_deactivated_at: DateTime<Utc>\",\n            hu.license_plate_number AS \"hu_license_plate_number\",\n            ci.id AS \"ci_id: IdentityId\",\n            ci.discriminator AS \"ci_discriminator: IdentityDiscriminator\",\n            cu.id AS \"cu_id: Option<UserId>\",\n            cu.provider AS \"cu_provider: Option<IdentityProvider>\",\n            cu.foreign_id AS \"cu_foreign_id: Option<String>\",\n            cu.name AS \"cu_name: Option<String>\",\n            cu.created_at AS \"cu_created_at: Option<DateTime<Utc>>\",\n            cu.deactivated_at AS \"cu_deactivated_at: DateTime<Utc>\",\n            cu.license_plate_number AS \"cu_license_plate_number\",\n            cg.id AS \"cg_id: Option<GroupId>\",\n            cg.name AS \"cg_name: Option<String>\",\n            cg.owner_id AS \"cg_owner_id: Option<UserId>\",\n            cg.is_open AS \"cg_is_open: Option<bool>\",\n            cg.created_at AS \"cg_created_at: Option<DateTime<Utc>>\",\n            cg.deleted_at AS \"cg_deleted_at: DateTime<Utc>\"\n        FROM adhoc_reservation \"r\"\n        JOIN user \"hu\" ON r.holder_id=hu.id\n        JOIN identity \"ci\" ON r.customer_id = ci.id\n        LEFT OUTER JOIN user \"cu\" ON ci.discriminator = 'user' AND ci.id = cu.id\n        LEFT OUTER JOIN \"group\" \"cg\" ON ci.discriminator = 'group' AND ci.id = cg.id\n        WHERE\n            unit_id = ?1 AND\n            time_to > ?2\n        ORDER BY r.time_from ASC\n        ",
+  "query": "\n        SELECT\n            r.id AS \"id: AdhocReservationId\",\n            r.unit_id AS \"unit_id: UnitId\",\n            r.time_from AS \"time_from: DateTime<Utc>\",\n            r.time_to AS \"time_to: DateTime<Utc>\",\n            r.deleted_at AS \"deleted_at: DateTime<Utc>\",\n            r.remark,\n            hu.id AS \"hu_id: UserId\",\n            hu.provider AS \"hu_provider: IdentityProvider\",\n            hu.foreign_id AS \"hu_foreign_id: String\",\n            hu.name AS \"hu_name: String\",\n            hu.created_at AS \"hu_created_at: DateTime<Utc>\",\n            hu.deactivated_at AS \"hu_deactivated_at: DateTime<Utc>\",\n            hu.license_plate_number AS \"hu_license_plate_number\",\n            hu.use_pg_payment AS \"hu_use_pg_payment\",\n            ci.id AS \"ci_id: IdentityId\",\n            ci.discriminator AS \"ci_discriminator: IdentityDiscriminator\",\n            cu.id AS \"cu_id: Option<UserId>\",\n            cu.provider AS \"cu_provider: Option<IdentityProvider>\",\n            cu.foreign_id AS \"cu_foreign_id: Option<String>\",\n            cu.name AS \"cu_name: Option<String>\",\n            cu.created_at AS \"cu_created_at: Option<DateTime<Utc>>\",\n            cu.deactivated_at AS \"cu_deactivated_at: DateTime<Utc>\",\n            cu.license_plate_number AS \"cu_license_plate_number\",\n            cu.use_pg_payment AS \"cu_use_pg_payment: Option<bool>\",\n            cg.id AS \"cg_id: Option<GroupId>\",\n            cg.name AS \"cg_name: Option<String>\",\n            cg.owner_id AS \"cg_owner_id: Option<UserId>\",\n            cg.is_open AS \"cg_is_open: Option<bool>\",\n            cg.created_at AS \"cg_created_at: Option<DateTime<Utc>>\",\n            cg.deleted_at AS \"cg_deleted_at: DateTime<Utc>\"\n        FROM adhoc_reservation \"r\"\n        JOIN user \"hu\" ON r.holder_id=hu.id\n        JOIN identity \"ci\" ON r.customer_id = ci.id\n        LEFT OUTER JOIN user \"cu\" ON ci.discriminator = 'user' AND ci.id = cu.id\n        LEFT OUTER JOIN \"group\" \"cg\" ON ci.discriminator = 'group' AND ci.id = cg.id\n        WHERE\n            unit_id = ?1 AND\n            time_to > ?2 AND\n            (r.deleted_at IS NULL OR r.deleted_at > ?3)\n        ORDER BY r.time_from ASC\n        ",
   "describe": {
     "columns": [
       {
@@ -24,9 +24,9 @@
         "type_info": "Datetime"
       },
       {
-        "name": "temporary",
+        "name": "deleted_at: DateTime<Utc>",
         "ordinal": 4,
-        "type_info": "Bool"
+        "type_info": "Datetime"
       },
       {
         "name": "remark",
@@ -69,96 +69,99 @@
         "type_info": "Text"
       },
       {
-        "name": "ci_id: IdentityId",
+        "name": "hu_use_pg_payment",
         "ordinal": 13,
+        "type_info": "Bool"
+      },
+      {
+        "name": "ci_id: IdentityId",
+        "ordinal": 14,
         "type_info": "Blob"
       },
       {
         "name": "ci_discriminator: IdentityDiscriminator",
-        "ordinal": 14,
+        "ordinal": 15,
         "type_info": "Text"
       },
       {
         "name": "cu_id: Option<UserId>",
-        "ordinal": 15,
+        "ordinal": 16,
         "type_info": "Blob"
       },
       {
         "name": "cu_provider: Option<IdentityProvider>",
-        "ordinal": 16,
-        "type_info": "Text"
-      },
-      {
-        "name": "cu_foreign_id: Option<String>",
         "ordinal": 17,
         "type_info": "Text"
       },
       {
-        "name": "cu_name: Option<String>",
+        "name": "cu_foreign_id: Option<String>",
         "ordinal": 18,
         "type_info": "Text"
       },
       {
-        "name": "cu_created_at: Option<DateTime<Utc>>",
+        "name": "cu_name: Option<String>",
         "ordinal": 19,
-        "type_info": "Datetime"
+        "type_info": "Text"
       },
       {
-        "name": "cu_deactivated_at: DateTime<Utc>",
+        "name": "cu_created_at: Option<DateTime<Utc>>",
         "ordinal": 20,
         "type_info": "Datetime"
       },
       {
-        "name": "cu_license_plate_number",
+        "name": "cu_deactivated_at: DateTime<Utc>",
         "ordinal": 21,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "cu_license_plate_number",
+        "ordinal": 22,
         "type_info": "Text"
+      },
+      {
+        "name": "cu_use_pg_payment: Option<bool>",
+        "ordinal": 23,
+        "type_info": "Bool"
       },
       {
         "name": "cg_id: Option<GroupId>",
-        "ordinal": 22,
-        "type_info": "Blob"
-      },
-      {
-        "name": "cg_name: Option<String>",
-        "ordinal": 23,
-        "type_info": "Text"
-      },
-      {
-        "name": "cg_owner_id: Option<UserId>",
         "ordinal": 24,
         "type_info": "Blob"
       },
       {
-        "name": "cg_is_open: Option<bool>",
+        "name": "cg_name: Option<String>",
         "ordinal": 25,
+        "type_info": "Text"
+      },
+      {
+        "name": "cg_owner_id: Option<UserId>",
+        "ordinal": 26,
+        "type_info": "Blob"
+      },
+      {
+        "name": "cg_is_open: Option<bool>",
+        "ordinal": 27,
         "type_info": "Bool"
       },
       {
         "name": "cg_created_at: Option<DateTime<Utc>>",
-        "ordinal": 26,
+        "ordinal": 28,
         "type_info": "Datetime"
       },
       {
         "name": "cg_deleted_at: DateTime<Utc>",
-        "ordinal": 27,
+        "ordinal": 29,
         "type_info": "Datetime"
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 3
     },
     "nullable": [
       false,
       false,
       false,
       false,
-      false,
-      true,
-      false,
-      false,
-      false,
-      false,
-      false,
       true,
       true,
       false,
@@ -166,10 +169,19 @@
       false,
       false,
       false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
       false,
       false,
       true,
       true,
+      false,
       false,
       false,
       false,
@@ -178,5 +190,5 @@
       true
     ]
   },
-  "hash": "31f97f6d329785c16ba8629ff017a2721ab5e99228e5b65b4f6068cb85458842"
+  "hash": "11b15de9d653655604587730155c1bbab1a867d83c5ae8e457e311e769d947e7"
 }

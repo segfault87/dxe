@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n        SELECT\n            b.id AS \"b_id: BookingId\",\n            b.unit_id AS \"b_unit_id: UnitId\",\n            hu.id AS \"hu_id: UserId\",\n            hu.provider AS \"hu_provider: IdentityProvider\",\n            hu.foreign_id AS \"hu_foreign_id\",\n            hu.name AS \"hu_name\",\n            hu.created_at AS \"hu_created_at: DateTime<Utc>\",\n            hu.deactivated_at AS \"hu_deactivated_at: DateTime<Utc>\",\n            hu.license_plate_number AS \"hu_license_plate_number\",\n            ci.id AS \"ci_id: IdentityId\",\n            ci.discriminator AS \"ci_discriminator: IdentityDiscriminator\",\n            cu.id AS \"cu_id: UserId\",\n            cu.provider AS \"cu_provider: IdentityProvider\",\n            cu.foreign_id AS \"cu_foreign_id: String\",\n            cu.name AS \"cu_name: String\",\n            cu.created_at AS \"cu_created_at: DateTime<Utc>\",\n            cu.deactivated_at AS \"cu_deactivated_at: DateTime<Utc>\",\n            cu.license_plate_number AS \"cu_license_plate_number\",\n            cg.id AS \"cg_id: GroupId\",\n            cg.name AS \"cg_name: String\",\n            cg.owner_id AS \"cg_owner_id: UserId\",\n            cg.is_open AS \"cg_is_open: bool\",\n            cg.created_at AS \"cg_created_at: DateTime<Utc>\",\n            cg.deleted_at AS \"cg_deleted_at: DateTime<Utc>\",\n            b.time_from AS \"b_time_from: DateTime<Utc>\",\n            b.time_to AS \"b_time_to: DateTime<Utc>\",\n            b.created_at AS \"b_created_at: DateTime<Utc>\",\n            b.confirmed_at AS \"b_confirmed_at: DateTime<Utc>\",\n            b.canceled_at AS \"b_canceled_at: DateTime<Utc>\",\n            cps.depositor_name AS \"cps_depsitor_name: String\",\n            cps.price AS \"cps_price: i64\",\n            cps.created_at AS \"cps_created_at: DateTime<Utc>\",\n            cps.confirmed_at AS \"cps_confirmed_at: DateTime<Utc>\",\n            cps.refund_account AS \"cps_refund_account: String\",\n            cps.refund_price AS \"cps_refund_price: i64\",\n            cps.refunded_at AS \"cps_refunded_at: DateTime<Utc>\"\n        FROM booking \"b\"\n        JOIN user \"hu\" ON b.holder_id = hu.id\n        JOIN identity \"ci\" ON b.customer_id = ci.id\n        LEFT OUTER JOIN user \"cu\" ON ci.discriminator = 'user' AND ci.id = cu.id\n        LEFT OUTER JOIN \"group\" \"cg\" ON ci.discriminator = 'group' AND ci.id = cg.id\n        LEFT OUTER JOIN cash_payment_status \"cps\" ON b.id = cps.booking_id\n        WHERE\n            b.confirmed_at < ?1 AND\n            b.time_to >= ?2\n        ORDER BY b.time_from DESC\n        ",
+  "query": "\n        SELECT\n            b.id AS \"b_id: BookingId\",\n            b.unit_id AS \"b_unit_id: UnitId\",\n            hu.id AS \"hu_id: UserId\",\n            hu.provider AS \"hu_provider: IdentityProvider\",\n            hu.foreign_id AS \"hu_foreign_id\",\n            hu.name AS \"hu_name\",\n            hu.created_at AS \"hu_created_at: DateTime<Utc>\",\n            hu.deactivated_at AS \"hu_deactivated_at: DateTime<Utc>\",\n            hu.license_plate_number AS \"hu_license_plate_number\",\n            hu.use_pg_payment AS \"hu_use_pg_payment\",\n            ci.id AS \"ci_id: IdentityId\",\n            ci.discriminator AS \"ci_discriminator: IdentityDiscriminator\",\n            cu.id AS \"cu_id: UserId\",\n            cu.provider AS \"cu_provider: IdentityProvider\",\n            cu.foreign_id AS \"cu_foreign_id: String\",\n            cu.name AS \"cu_name: String\",\n            cu.created_at AS \"cu_created_at: DateTime<Utc>\",\n            cu.deactivated_at AS \"cu_deactivated_at: DateTime<Utc>\",\n            cu.license_plate_number AS \"cu_license_plate_number\",\n            cu.use_pg_payment AS \"cu_use_pg_payment\",\n            cg.id AS \"cg_id: GroupId\",\n            cg.name AS \"cg_name: String\",\n            cg.owner_id AS \"cg_owner_id: UserId\",\n            cg.is_open AS \"cg_is_open: bool\",\n            cg.created_at AS \"cg_created_at: DateTime<Utc>\",\n            cg.deleted_at AS \"cg_deleted_at: DateTime<Utc>\",\n            b.time_from AS \"b_time_from: DateTime<Utc>\",\n            b.time_to AS \"b_time_to: DateTime<Utc>\",\n            b.created_at AS \"b_created_at: DateTime<Utc>\",\n            b.confirmed_at AS \"b_confirmed_at: DateTime<Utc>\",\n            b.canceled_at AS \"b_canceled_at: DateTime<Utc>\",\n            cps.depositor_name AS \"cps_depsitor_name: String\",\n            cps.price AS \"cps_price: i64\",\n            cps.created_at AS \"cps_created_at: DateTime<Utc>\",\n            cps.confirmed_at AS \"cps_confirmed_at: DateTime<Utc>\",\n            cps.refund_account AS \"cps_refund_account: String\",\n            cps.refund_price AS \"cps_refund_price: i64\",\n            cps.refunded_at AS \"cps_refunded_at: DateTime<Utc>\"\n        FROM booking \"b\"\n        JOIN user \"hu\" ON b.holder_id = hu.id\n        JOIN identity \"ci\" ON b.customer_id = ci.id\n        LEFT OUTER JOIN user \"cu\" ON ci.discriminator = 'user' AND ci.id = cu.id\n        LEFT OUTER JOIN \"group\" \"cg\" ON ci.discriminator = 'group' AND ci.id = cg.id\n        LEFT OUTER JOIN cash_payment_status \"cps\" ON b.id = cps.booking_id\n        WHERE\n            b.confirmed_at < ?1 AND\n            b.time_to >= ?2\n        ORDER BY b.time_from DESC\n        ",
   "describe": {
     "columns": [
       {
@@ -49,138 +49,148 @@
         "type_info": "Text"
       },
       {
-        "name": "ci_id: IdentityId",
+        "name": "hu_use_pg_payment",
         "ordinal": 9,
+        "type_info": "Bool"
+      },
+      {
+        "name": "ci_id: IdentityId",
+        "ordinal": 10,
         "type_info": "Blob"
       },
       {
         "name": "ci_discriminator: IdentityDiscriminator",
-        "ordinal": 10,
+        "ordinal": 11,
         "type_info": "Text"
       },
       {
         "name": "cu_id: UserId",
-        "ordinal": 11,
+        "ordinal": 12,
         "type_info": "Blob"
       },
       {
         "name": "cu_provider: IdentityProvider",
-        "ordinal": 12,
-        "type_info": "Text"
-      },
-      {
-        "name": "cu_foreign_id: String",
         "ordinal": 13,
         "type_info": "Text"
       },
       {
-        "name": "cu_name: String",
+        "name": "cu_foreign_id: String",
         "ordinal": 14,
         "type_info": "Text"
       },
       {
-        "name": "cu_created_at: DateTime<Utc>",
+        "name": "cu_name: String",
         "ordinal": 15,
-        "type_info": "Datetime"
+        "type_info": "Text"
       },
       {
-        "name": "cu_deactivated_at: DateTime<Utc>",
+        "name": "cu_created_at: DateTime<Utc>",
         "ordinal": 16,
         "type_info": "Datetime"
       },
       {
-        "name": "cu_license_plate_number",
+        "name": "cu_deactivated_at: DateTime<Utc>",
         "ordinal": 17,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "cu_license_plate_number",
+        "ordinal": 18,
         "type_info": "Text"
+      },
+      {
+        "name": "cu_use_pg_payment",
+        "ordinal": 19,
+        "type_info": "Bool"
       },
       {
         "name": "cg_id: GroupId",
-        "ordinal": 18,
-        "type_info": "Blob"
-      },
-      {
-        "name": "cg_name: String",
-        "ordinal": 19,
-        "type_info": "Text"
-      },
-      {
-        "name": "cg_owner_id: UserId",
         "ordinal": 20,
         "type_info": "Blob"
       },
       {
-        "name": "cg_is_open: bool",
+        "name": "cg_name: String",
         "ordinal": 21,
+        "type_info": "Text"
+      },
+      {
+        "name": "cg_owner_id: UserId",
+        "ordinal": 22,
+        "type_info": "Blob"
+      },
+      {
+        "name": "cg_is_open: bool",
+        "ordinal": 23,
         "type_info": "Bool"
       },
       {
         "name": "cg_created_at: DateTime<Utc>",
-        "ordinal": 22,
-        "type_info": "Datetime"
-      },
-      {
-        "name": "cg_deleted_at: DateTime<Utc>",
-        "ordinal": 23,
-        "type_info": "Datetime"
-      },
-      {
-        "name": "b_time_from: DateTime<Utc>",
         "ordinal": 24,
         "type_info": "Datetime"
       },
       {
-        "name": "b_time_to: DateTime<Utc>",
+        "name": "cg_deleted_at: DateTime<Utc>",
         "ordinal": 25,
         "type_info": "Datetime"
       },
       {
-        "name": "b_created_at: DateTime<Utc>",
+        "name": "b_time_from: DateTime<Utc>",
         "ordinal": 26,
         "type_info": "Datetime"
       },
       {
-        "name": "b_confirmed_at: DateTime<Utc>",
+        "name": "b_time_to: DateTime<Utc>",
         "ordinal": 27,
         "type_info": "Datetime"
       },
       {
-        "name": "b_canceled_at: DateTime<Utc>",
+        "name": "b_created_at: DateTime<Utc>",
         "ordinal": 28,
         "type_info": "Datetime"
       },
       {
-        "name": "cps_depsitor_name: String",
+        "name": "b_confirmed_at: DateTime<Utc>",
         "ordinal": 29,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "b_canceled_at: DateTime<Utc>",
+        "ordinal": 30,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "cps_depsitor_name: String",
+        "ordinal": 31,
         "type_info": "Text"
       },
       {
         "name": "cps_price: i64",
-        "ordinal": 30,
+        "ordinal": 32,
         "type_info": "Integer"
       },
       {
         "name": "cps_created_at: DateTime<Utc>",
-        "ordinal": 31,
+        "ordinal": 33,
         "type_info": "Datetime"
       },
       {
         "name": "cps_confirmed_at: DateTime<Utc>",
-        "ordinal": 32,
+        "ordinal": 34,
         "type_info": "Datetime"
       },
       {
         "name": "cps_refund_account: String",
-        "ordinal": 33,
+        "ordinal": 35,
         "type_info": "Text"
       },
       {
         "name": "cps_refund_price: i64",
-        "ordinal": 34,
+        "ordinal": 36,
         "type_info": "Integer"
       },
       {
         "name": "cps_refunded_at: DateTime<Utc>",
-        "ordinal": 35,
+        "ordinal": 37,
         "type_info": "Datetime"
       }
     ],
@@ -199,6 +209,8 @@
       true,
       false,
       false,
+      false,
+      true,
       true,
       true,
       true,
@@ -226,5 +238,5 @@
       true
     ]
   },
-  "hash": "d522d7e8fb8968e28682551d377a92b9bd1425f09764c914a16a6c919c156066"
+  "hash": "75a0eabcf0e358d50af846350e0b00fcb2849e31ddcc02638736b3c00761edb3"
 }

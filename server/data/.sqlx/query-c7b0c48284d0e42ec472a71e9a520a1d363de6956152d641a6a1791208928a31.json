@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n        SELECT\n            id as \"id: _\",\n            provider as \"provider: _\",\n            foreign_id,\n            name,\n            created_at as \"created_at: _\",\n            deactivated_at as \"deactivated_at: _\",\n            license_plate_number\n        FROM user\n        ORDER BY created_at DESC\n        ",
+  "query": "\n        SELECT\n            id AS \"id: _\",\n            provider AS \"provider: _\",\n            foreign_id,\n            name,\n            created_at AS \"created_at: _\",\n            deactivated_at AS \"deactivated_at: _\",\n            license_plate_number,\n            use_pg_payment\n        FROM user\n        WHERE provider = ?1 AND foreign_id = ?2 AND\n            (deactivated_at IS NULL OR deactivated_at < ?3)\n        ",
   "describe": {
     "columns": [
       {
@@ -37,10 +37,15 @@
         "name": "license_plate_number",
         "ordinal": 6,
         "type_info": "Text"
+      },
+      {
+        "name": "use_pg_payment",
+        "ordinal": 7,
+        "type_info": "Bool"
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 3
     },
     "nullable": [
       false,
@@ -49,8 +54,9 @@
       false,
       false,
       true,
-      true
+      true,
+      false
     ]
   },
-  "hash": "9dbe17f127224183081707c603cbe991bb4f233b319bfe47fabae030eb38dd85"
+  "hash": "c7b0c48284d0e42ec472a71e9a520a1d363de6956152d641a6a1791208928a31"
 }

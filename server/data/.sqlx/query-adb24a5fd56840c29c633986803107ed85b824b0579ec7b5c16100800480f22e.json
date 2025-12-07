@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n        SELECT\n            u.id AS \"u_id: UserId\",\n            u.provider AS \"u_provider: IdentityProvider\",\n            u.foreign_id AS \"u_foreign_id: String\",\n            u.name AS \"u_name: String\",\n            u.created_at AS \"u_created_at: DateTime<Utc>\",\n            u.deactivated_at AS \"u_deactivated_at: DateTime<Utc>\",\n            u.license_plate_number AS \"u_license_plate_number: String\"\n        FROM\n            group_association \"ga\"\n        JOIN\n            user \"u\" ON ga.user_id = u.id\n        WHERE\n            ga.group_id = ?1\n        ",
+  "query": "\n        SELECT\n            u.id AS \"u_id: UserId\",\n            u.provider AS \"u_provider: IdentityProvider\",\n            u.foreign_id AS \"u_foreign_id: String\",\n            u.name AS \"u_name: String\",\n            u.created_at AS \"u_created_at: DateTime<Utc>\",\n            u.deactivated_at AS \"u_deactivated_at: DateTime<Utc>\",\n            u.license_plate_number AS \"u_license_plate_number\",\n            u.use_pg_payment AS \"u_use_pg_payment\"\n        FROM\n            group_association \"ga\"\n        JOIN\n            user \"u\" ON ga.user_id = u.id\n        WHERE\n            ga.group_id = ?1\n        ",
   "describe": {
     "columns": [
       {
@@ -34,9 +34,14 @@
         "type_info": "Datetime"
       },
       {
-        "name": "u_license_plate_number: String",
+        "name": "u_license_plate_number",
         "ordinal": 6,
         "type_info": "Text"
+      },
+      {
+        "name": "u_use_pg_payment",
+        "ordinal": 7,
+        "type_info": "Bool"
       }
     ],
     "parameters": {
@@ -49,8 +54,9 @@
       false,
       false,
       true,
-      true
+      true,
+      false
     ]
   },
-  "hash": "b8263077ee9b755184bc21162f286981a6fcb8c9f06e5e82708a18035250cda7"
+  "hash": "adb24a5fd56840c29c633986803107ed85b824b0579ec7b5c16100800480f22e"
 }

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n        SELECT\n            g.id AS \"g_id: GroupId\",\n            g.name AS \"g_name\",\n            g.owner_id AS \"g_owner_id: UserId\",\n            g.is_open AS \"g_is_open: bool\",\n            g.created_at AS \"g_created_at: DateTime<Utc>\",\n            g.deleted_at AS \"g_deleted_at: DateTime<Utc>\",\n            u.id as \"u_id: UserId\",\n            u.provider as \"u_provider: IdentityProvider\",\n            u.foreign_id as \"u_foreign_id\",\n            u.name as \"u_name\",\n            u.created_at as \"u_created_at: DateTime<Utc>\",\n            u.deactivated_at as \"u_deactivated_at: DateTime<Utc>\",\n            u.license_plate_number as \"u_license_plate_number\"\n        FROM \"group\" \"g\"\n        JOIN group_association \"ga\" ON g.id = ga.group_id\n        JOIN user \"u\" ON ga.user_id = u.id\n        WHERE\n            g.id = ?1 AND\n            (g.deleted_at IS NULL OR g.deleted_at < ?2)\n        ",
+  "query": "\n        SELECT\n            g.id AS \"g_id: GroupId\",\n            g.name AS \"g_name\",\n            g.owner_id AS \"g_owner_id: UserId\",\n            g.is_open AS \"g_is_open: bool\",\n            g.created_at AS \"g_created_at: DateTime<Utc>\",\n            g.deleted_at AS \"g_deleted_at: DateTime<Utc>\",\n            u.id AS \"u_id: UserId\",\n            u.provider AS \"u_provider: IdentityProvider\",\n            u.foreign_id AS \"u_foreign_id\",\n            u.name AS \"u_name\",\n            u.created_at AS \"u_created_at: DateTime<Utc>\",\n            u.deactivated_at AS \"u_deactivated_at: DateTime<Utc>\",\n            u.license_plate_number AS \"u_license_plate_number\",\n            u.use_pg_payment AS \"u_use_pg_payment\"\n        FROM \"group\" \"g\"\n        JOIN group_association \"ga\" ON g.id = ga.group_id\n        JOIN user \"u\" ON ga.user_id = u.id\n        WHERE\n            (g.deleted_at IS NULL OR g.deleted_at < ?2) AND\n            (u.deactivated_at IS NULL OR u.deactivated_at < ?2) AND\n            EXISTS (\n                SELECT\n                    user_id\n                FROM\n                    group_association\n                WHERE\n                    group_association.group_id = g.id AND\n                    group_association.user_id = ?1\n            )\n        ORDER BY g.created_at DESC\n        ",
   "describe": {
     "columns": [
       {
@@ -67,6 +67,11 @@
         "name": "u_license_plate_number",
         "ordinal": 12,
         "type_info": "Text"
+      },
+      {
+        "name": "u_use_pg_payment",
+        "ordinal": 13,
+        "type_info": "Bool"
       }
     ],
     "parameters": {
@@ -85,8 +90,9 @@
       false,
       false,
       true,
-      true
+      true,
+      false
     ]
   },
-  "hash": "da3e70edc09270102987b79220113202d6de68132f69bb1676ab324dd25fd71b"
+  "hash": "6f06ce8491a13d73ff4da2e7596396b2bb3e440049afcaef024af0a723fcfdf3"
 }

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE adhoc_reservation SET deleted_at=?1 WHERE id=?2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "060c2479bc415e56ea89c8eeeab2a1aa66d8c51adbcc209d9b37ba7664e5d135"
+}

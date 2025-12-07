@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n        SELECT\n            i.discriminator as \"i_discriminator: IdentityDiscriminator\",\n            u.id as \"u_id: Option<UserId>\",\n            u.provider as \"u_provider: Option<IdentityProvider>\",\n            u.foreign_id as \"u_foreign_id: Option<String>\",\n            u.name as \"u_name: Option<String>\",\n            u.created_at as \"u_created_at: Option<DateTime<Utc>>\",\n            u.deactivated_at as \"u_deactivated_at: DateTime<Utc>\",\n            u.license_plate_number as \"u_license_plate_number\",\n            g.id as \"g_id: Option<GroupId>\",\n            g.name as \"g_name: Option<String>\",\n            g.owner_id AS \"g_owner_id: Option<UserId>\",\n            g.is_open AS \"g_is_open: Option<bool>\",\n            g.created_at AS \"g_created_at: Option<DateTime<Utc>>\",\n            g.deleted_at AS \"g_deleted_at: DateTime<Utc>\"\n        FROM identity \"i\"\n        LEFT OUTER JOIN user \"u\" ON i.discriminator = 'user' AND i.id = u.id\n        LEFT OUTER JOIN \"group\" \"g\" ON i.discriminator = 'group' AND i.id = g.id\n        WHERE\n            i.id = ?1 AND\n            (g.deleted_at IS NULL OR g.deleted_at < ?2) AND\n            (u.deactivated_at IS NULL OR u.deactivated_at < ?2)\n        ",
+  "query": "\n        SELECT\n            i.discriminator AS \"i_discriminator: IdentityDiscriminator\",\n            u.id AS \"u_id: Option<UserId>\",\n            u.provider AS \"u_provider: Option<IdentityProvider>\",\n            u.foreign_id AS \"u_foreign_id: Option<String>\",\n            u.name AS \"u_name: Option<String>\",\n            u.created_at AS \"u_created_at: Option<DateTime<Utc>>\",\n            u.deactivated_at AS \"u_deactivated_at: DateTime<Utc>\",\n            u.license_plate_number AS \"u_license_plate_number\",\n            u.use_pg_payment AS \"u_use_pg_payment\",\n            g.id AS \"g_id: Option<GroupId>\",\n            g.name AS \"g_name: Option<String>\",\n            g.owner_id AS \"g_owner_id: Option<UserId>\",\n            g.is_open AS \"g_is_open: Option<bool>\",\n            g.created_at AS \"g_created_at: Option<DateTime<Utc>>\",\n            g.deleted_at AS \"g_deleted_at: DateTime<Utc>\"\n        FROM identity \"i\"\n        LEFT OUTER JOIN user \"u\" ON i.discriminator = 'user' AND i.id = u.id\n        LEFT OUTER JOIN \"group\" \"g\" ON i.discriminator = 'group' AND i.id = g.id\n        WHERE\n            i.id = ?1 AND\n            (g.deleted_at IS NULL OR g.deleted_at < ?2) AND\n            (u.deactivated_at IS NULL OR u.deactivated_at < ?2)\n        ",
   "describe": {
     "columns": [
       {
@@ -44,33 +44,38 @@
         "type_info": "Text"
       },
       {
-        "name": "g_id: Option<GroupId>",
+        "name": "u_use_pg_payment",
         "ordinal": 8,
+        "type_info": "Bool"
+      },
+      {
+        "name": "g_id: Option<GroupId>",
+        "ordinal": 9,
         "type_info": "Blob"
       },
       {
         "name": "g_name: Option<String>",
-        "ordinal": 9,
+        "ordinal": 10,
         "type_info": "Text"
       },
       {
         "name": "g_owner_id: Option<UserId>",
-        "ordinal": 10,
+        "ordinal": 11,
         "type_info": "Blob"
       },
       {
         "name": "g_is_open: Option<bool>",
-        "ordinal": 11,
+        "ordinal": 12,
         "type_info": "Bool"
       },
       {
         "name": "g_created_at: Option<DateTime<Utc>>",
-        "ordinal": 12,
+        "ordinal": 13,
         "type_info": "Datetime"
       },
       {
         "name": "g_deleted_at: DateTime<Utc>",
-        "ordinal": 13,
+        "ordinal": 14,
         "type_info": "Datetime"
       }
     ],
@@ -91,8 +96,9 @@
       false,
       false,
       false,
+      false,
       true
     ]
   },
-  "hash": "a455c650de7d06c6bedd5daccc983e0d166035c617328cdae9f27c5df28426c9"
+  "hash": "93fd7484535e51df6f2a51bc315324df7b2fad67cec060371db3dd01a4952814"
 }

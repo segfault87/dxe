@@ -1,6 +1,6 @@
 import { isAxiosError } from "axios";
-import React, { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router";
 
 import "./TossPayment.css";
 import type { Route } from "./+types/TossPaymentSuccess";
@@ -53,20 +53,8 @@ export async function clientLoader({
   };
 }
 
-function Error({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="contents">
-      <p>{children}</p>
-      <Link to="/" className="cta">
-        돌아가기
-      </Link>
-    </div>
-  );
-}
-
 function TossPaymentSuccess({ loaderData }: { loaderData: LoaderData }) {
-  const { paymentType, orderId, paymentKey, amount, timeFrom, timeTo } =
-    loaderData;
+  const { orderId, paymentKey, amount, timeFrom, timeTo } = loaderData;
 
   const navigate = useNavigate();
 

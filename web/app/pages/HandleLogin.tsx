@@ -5,15 +5,12 @@ import "./HandleLogin.css";
 import type { Route } from "./+types/HandleLogin";
 import AuthService from "../api/auth";
 import { defaultErrorHandler } from "../lib/error";
-import { useNavigate } from "react-router";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "로그인 | 드림하우스 합주실" }];
 }
 
 export default function Login() {
-  const navigate = useNavigate();
-
   const [handle, setHandle] = useState("");
   const [password, setPassword] = useState("");
   const [isRequestInProgress, setRequestInProgress] = useState(false);
@@ -34,7 +31,7 @@ export default function Login() {
         password: password,
       });
 
-      navigate(result.data.redirectTo);
+      document.location.href = result.data.redirectTo;
     } catch (error) {
       defaultErrorHandler(error);
     } finally {

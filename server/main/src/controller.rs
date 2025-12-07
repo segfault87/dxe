@@ -10,18 +10,29 @@ use std::sync::Arc;
 
 use actix_jwt_auth_middleware::{AuthenticationService, Authority};
 use actix_state_guards::UseStateGuardOnScope;
+use actix_web::body::BoxBody;
+use actix_web::dev::{ServiceFactory, ServiceRequest, ServiceResponse};
 use actix_web::{FromRequest, Handler, web};
 use jwt_compact::Algorithm;
 use serde::{Serialize, de::DeserializeOwned};
 
 use crate::middleware::coordinator_verifier::{CoordinatorVerifier, PublicKeyBundle};
+use crate::middleware::datetime_injector::DateTimeInjector;
 use crate::models::Error;
 use crate::session::UserSession;
 
 pub fn api<Claims, Algo, ReAuth, Args>(
     jwt: Authority<Claims, Algo, ReAuth, Args>,
     s2s_public_keys: Arc<PublicKeyBundle>,
-) -> actix_web::Scope
+) -> actix_web::Scope<
+    impl ServiceFactory<
+        ServiceRequest,
+        Config = (),
+        Error = actix_web::Error,
+        InitError = (),
+        Response = ServiceResponse<BoxBody>,
+    >,
+>
 where
     Algo: Algorithm + Clone + 'static,
     Algo::SigningKey: Clone,
@@ -32,6 +43,7 @@ where
     let scope_with_auth = web::scope("")
         .service(booking::bookings_scope())
         .service(booking::booking_scope())
+        .service(booking::payments_scope())
         .service(user::scope())
         .use_state_guard(
             |session: UserSession| async move {
@@ -51,4 +63,5 @@ where
         .service(join_group::resource())
         .service(s2s::scope().wrap(CoordinatorVerifier::new(s2s_public_keys)))
         .service(scope_with_auth)
+        .wrap(DateTimeInjector)
 }

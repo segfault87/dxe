@@ -7,5 +7,6 @@ export type UnitId = string;
 export type SpaceId = string;
 export type AdhocReservationId = number;
 export type AdhocParkingId = number;
+export type ForeignPaymentId = string;
 
 export type IdentityId = UserId | GroupId;

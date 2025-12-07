@@ -23,6 +23,16 @@
     }
 }
 
+.footer {
+    padding-top: 64px;
+    padding-bottom: 64px;
+    text-align: center;
+    span {
+        display: inline-block;
+        margin-right: 24px;
+    }
+}
+
 @media only screen and (max-width: 400px) {
     .navigation {
         a {

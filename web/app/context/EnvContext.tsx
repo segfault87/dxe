@@ -5,6 +5,7 @@ export interface Environment {
   kakaoSdkKey: string;
   gtmId: string;
   gaMeasurementId: string;
+  tossPaymentClientKey: string;
 }
 
 const EnvContext = createContext<Environment>({
@@ -12,6 +13,7 @@ const EnvContext = createContext<Environment>({
   kakaoSdkKey: import.meta.env.VITE_KAKAO_SDK_KEY,
   gtmId: import.meta.env.VITE_GTM_ID,
   gaMeasurementId: import.meta.env.VITE_GA_MEASUREMENT_ID,
+  tossPaymentClientKey: import.meta.env.VITE_TOSS_PAYMENT_CLIENT_KEY,
 });
 
 export function EnvProvider({ children }: { children: React.ReactNode }) {
@@ -20,6 +22,7 @@ export function EnvProvider({ children }: { children: React.ReactNode }) {
     kakaoSdkKey: import.meta.env.VITE_KAKAO_SDK_KEY,
     gtmId: import.meta.env.VITE_GTM_ID,
     gaMeasurementId: import.meta.env.VITE_GA_MEASUREMENT_ID,
+    tossPaymentClientKey: import.meta.env.VITE_TOSS_PAYMENT_CLIENT_KEY,
   };
 
   return <EnvContext.Provider value={value}>{children}</EnvContext.Provider>;

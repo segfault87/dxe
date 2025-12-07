@@ -1,10 +1,11 @@
 use actix_web::web;
-use chrono::{TimeDelta, Utc};
+use chrono::TimeDelta;
 use dxe_data::queries::booking::{create_adhoc_parking, delete_adhoc_parking, get_adhoc_parkings};
 use dxe_types::AdhocParkingId;
 use sqlx::SqlitePool;
 
 use crate::config::TimeZoneConfig;
+use crate::middleware::datetime_injector::Now;
 use crate::models::entities::AdhocParking;
 use crate::models::handlers::admin::{
     CreateAdhocParkingRequest, GetAdhocParkingsQuery, GetAdhocParkingsResponse,
@@ -14,15 +15,14 @@ use crate::session::UserSession;
 use crate::utils::datetime::truncate_time;
 
 pub async fn get(
+    now: Now,
     query: web::Query<GetAdhocParkingsQuery>,
     database: web::Data<SqlitePool>,
     timezone_config: web::Data<TimeZoneConfig>,
 ) -> Result<web::Json<GetAdhocParkingsResponse>, Error> {
-    let now = Utc::now();
-
     let mut connection = database.acquire().await?;
 
-    let parkings = get_adhoc_parkings(&mut connection, &query.space_id, Some(now), None).await?;
+    let parkings = get_adhoc_parkings(&mut connection, &query.space_id, Some(*now), None).await?;
 
     Ok(web::Json(GetAdhocParkingsResponse {
         parkings: parkings
@@ -33,12 +33,11 @@ pub async fn get(
 }
 
 pub async fn post(
+    now: Now,
     _session: UserSession,
     body: web::Json<CreateAdhocParkingRequest>,
     database: web::Data<SqlitePool>,
 ) -> Result<web::Json<serde_json::Value>, Error> {
-    let now = Utc::now();
-
     let mut tx = database.begin().await?;
 
     let time_from = truncate_time(body.time_from).to_utc();

@@ -4,6 +4,7 @@ mod cancel;
 mod check;
 mod doorlock;
 mod get;
+mod payment_toss;
 mod recording;
 mod submit;
 
@@ -26,4 +27,17 @@ pub fn booking_scope() -> actix_web::Scope {
         )
         .service(web::resource("/{booking_id}/open").route(web::post().to(doorlock::post)))
         .service(web::resource("/{booking_id}/recording").route(web::get().to(recording::get)))
+}
+
+pub fn payments_scope() -> actix_web::Scope {
+    web::scope("/payments")
+        .service(web::resource("/toss").route(web::post().to(payment_toss::post)))
+        .service(
+            web::resource("/toss/confirm").route(web::post().to(payment_toss::confirm_payment)),
+        )
+        .service(
+            web::resource("/toss/order/{foreign_payment_id}")
+                .route(web::get().to(payment_toss::get))
+                .route(web::delete().to(payment_toss::delete)),
+        )
 }

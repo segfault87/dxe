@@ -250,7 +250,7 @@ pub struct MessagingConfig {
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct UrlConfig {
-    pub base_url: String,
+    pub base_url: url::Url,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -294,6 +294,17 @@ pub struct TelemetryConfig {
     pub path: PathBuf,
 }
 
+#[derive(Clone, Deserialize, Debug)]
+pub struct TossPaymentsConfig {
+    pub toss_payments_secret_key: String,
+}
+
+impl dxe_extern::toss_payments::TossPaymentsConfig for TossPaymentsConfig {
+    fn server_secret_key(&self) -> &str {
+        &self.toss_payments_secret_key
+    }
+}
+
 #[derive(Deserialize, Debug)]
 pub struct Config {
     #[serde(flatten)]
@@ -311,4 +322,6 @@ pub struct Config {
     pub google_apis: Option<GoogleApiConfig>,
     #[serde(flatten)]
     pub telemetry: TelemetryConfig,
+    #[serde(flatten)]
+    pub toss_payments: TossPaymentsConfig,
 }

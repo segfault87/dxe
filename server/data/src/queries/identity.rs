@@ -5,7 +5,7 @@ use dxe_types::{GroupId, IdentityId, IdentityProvider, UserId};
 use sqlx::SqliteConnection;
 
 use crate::Error;
-use crate::entities::{Group, Identity, IdentityDiscriminator, User};
+use crate::entities::{Group, Identity, IdentityDiscriminator, User, UserPlainCredential};
 
 pub async fn get_identity(
     connection: &mut SqliteConnection,
@@ -15,16 +15,17 @@ pub async fn get_identity(
     let result = sqlx::query!(
         r#"
         SELECT
-            i.discriminator as "i_discriminator: IdentityDiscriminator",
-            u.id as "u_id: Option<UserId>",
-            u.provider as "u_provider: Option<IdentityProvider>",
-            u.foreign_id as "u_foreign_id: Option<String>",
-            u.name as "u_name: Option<String>",
-            u.created_at as "u_created_at: Option<DateTime<Utc>>",
-            u.deactivated_at as "u_deactivated_at: DateTime<Utc>",
-            u.license_plate_number as "u_license_plate_number",
-            g.id as "g_id: Option<GroupId>",
-            g.name as "g_name: Option<String>",
+            i.discriminator AS "i_discriminator: IdentityDiscriminator",
+            u.id AS "u_id: Option<UserId>",
+            u.provider AS "u_provider: Option<IdentityProvider>",
+            u.foreign_id AS "u_foreign_id: Option<String>",
+            u.name AS "u_name: Option<String>",
+            u.created_at AS "u_created_at: Option<DateTime<Utc>>",
+            u.deactivated_at AS "u_deactivated_at: DateTime<Utc>",
+            u.license_plate_number AS "u_license_plate_number",
+            u.use_pg_payment AS "u_use_pg_payment",
+            g.id AS "g_id: Option<GroupId>",
+            g.name AS "g_name: Option<String>",
             g.owner_id AS "g_owner_id: Option<UserId>",
             g.is_open AS "g_is_open: Option<bool>",
             g.created_at AS "g_created_at: Option<DateTime<Utc>>",
@@ -57,6 +58,7 @@ pub async fn get_identity(
                     .ok_or(Error::MissingField("u.created_at"))?,
                 deactivated_at: result.u_deactivated_at,
                 license_plate_number: result.u_license_plate_number,
+                use_pg_payment: result.u_use_pg_payment,
             }))),
             IdentityDiscriminator::Group => Ok(Some(Identity::Group(Group {
                 id: result.g_id.ok_or(Error::MissingField("g.id"))?,
@@ -115,19 +117,21 @@ pub async fn get_group_with_members(
             g.is_open AS "g_is_open: bool",
             g.created_at AS "g_created_at: DateTime<Utc>",
             g.deleted_at AS "g_deleted_at: DateTime<Utc>",
-            u.id as "u_id: UserId",
-            u.provider as "u_provider: IdentityProvider",
-            u.foreign_id as "u_foreign_id",
-            u.name as "u_name",
-            u.created_at as "u_created_at: DateTime<Utc>",
-            u.deactivated_at as "u_deactivated_at: DateTime<Utc>",
-            u.license_plate_number as "u_license_plate_number"
+            u.id AS "u_id: UserId",
+            u.provider AS "u_provider: IdentityProvider",
+            u.foreign_id AS "u_foreign_id",
+            u.name AS "u_name",
+            u.created_at AS "u_created_at: DateTime<Utc>",
+            u.deactivated_at AS "u_deactivated_at: DateTime<Utc>",
+            u.license_plate_number AS "u_license_plate_number",
+            u.use_pg_payment AS "u_use_pg_payment"
         FROM "group" "g"
         JOIN group_association "ga" ON g.id = ga.group_id
         JOIN user "u" ON ga.user_id = u.id
         WHERE
             g.id = ?1 AND
-            (g.deleted_at IS NULL OR g.deleted_at < ?2)
+            (g.deleted_at IS NULL OR g.deleted_at < ?2) AND
+            (u.deactivated_at IS NULL OR u.deactivated_at < ?2)
         "#,
         group_id,
         now
@@ -157,6 +161,7 @@ pub async fn get_group_with_members(
             created_at: i.u_created_at,
             deactivated_at: i.u_deactivated_at,
             license_plate_number: i.u_license_plate_number,
+            use_pg_payment: i.u_use_pg_payment,
         });
     }
 
@@ -213,12 +218,14 @@ pub async fn get_all_groups_associated_with_members(
             u.name AS "u_name",
             u.created_at AS "u_created_at: DateTime<Utc>",
             u.deactivated_at AS "u_deactivated_at: DateTime<Utc>",
-            u.license_plate_number AS "u_license_plate_number"
+            u.license_plate_number AS "u_license_plate_number",
+            u.use_pg_payment AS "u_use_pg_payment"
         FROM "group" "g"
         JOIN group_association "ga" ON g.id = ga.group_id
         JOIN user "u" ON ga.user_id = u.id
         WHERE
-            (g.deleted_at IS NULL OR g.deleted_at < ?1)
+            (g.deleted_at IS NULL OR g.deleted_at < ?1) AND
+            (u.deactivated_at IS NULL OR u.deactivated_at < ?1)
         "#,
         now,
     )
@@ -249,6 +256,7 @@ pub async fn get_all_groups_associated_with_members(
             created_at: row.u_created_at,
             deactivated_at: row.u_deactivated_at,
             license_plate_number: row.u_license_plate_number,
+            use_pg_payment: row.u_use_pg_payment,
         });
     }
 
@@ -275,12 +283,14 @@ pub async fn get_groups_associated_with_members(
             u.name AS "u_name",
             u.created_at AS "u_created_at: DateTime<Utc>",
             u.deactivated_at AS "u_deactivated_at: DateTime<Utc>",
-            u.license_plate_number AS "u_license_plate_number"
+            u.license_plate_number AS "u_license_plate_number",
+            u.use_pg_payment AS "u_use_pg_payment"
         FROM "group" "g"
         JOIN group_association "ga" ON g.id = ga.group_id
         JOIN user "u" ON ga.user_id = u.id
         WHERE
             (g.deleted_at IS NULL OR g.deleted_at < ?2) AND
+            (u.deactivated_at IS NULL OR u.deactivated_at < ?2) AND
             EXISTS (
                 SELECT
                     user_id
@@ -322,6 +332,7 @@ pub async fn get_groups_associated_with_members(
             created_at: row.u_created_at,
             deactivated_at: row.u_deactivated_at,
             license_plate_number: row.u_license_plate_number,
+            use_pg_payment: row.u_use_pg_payment,
         });
     }
 
@@ -481,7 +492,8 @@ pub async fn get_group_members(
             u.name AS "u_name: String",
             u.created_at AS "u_created_at: DateTime<Utc>",
             u.deactivated_at AS "u_deactivated_at: DateTime<Utc>",
-            u.license_plate_number AS "u_license_plate_number: String"
+            u.license_plate_number AS "u_license_plate_number",
+            u.use_pg_payment AS "u_use_pg_payment"
         FROM
             group_association "ga"
         JOIN
@@ -504,6 +516,7 @@ pub async fn get_group_members(
             created_at: v.u_created_at,
             deactivated_at: v.u_deactivated_at,
             license_plate_number: v.u_license_plate_number,
+            use_pg_payment: v.u_use_pg_payment,
         })
         .collect())
 }
@@ -566,4 +579,108 @@ pub async fn leave_group(
     .await?;
 
     Ok(result.rows_affected() > 0)
+}
+
+pub async fn get_user_plain_credential_with_user_id(
+    connection: &mut SqliteConnection,
+    now: &DateTime<Utc>,
+    user_id: &UserId,
+) -> Result<Option<(User, UserPlainCredential)>, Error> {
+    Ok(sqlx::query!(
+        r#"
+        SELECT
+            u.id AS "u_id: UserId",
+            u.provider AS "u_provider: IdentityProvider",
+            u.foreign_id AS "u_foreign_id",
+            u.name AS "u_name",
+            u.created_at AS "u_created_at: DateTime<Utc>",
+            u.deactivated_at AS "u_deactivated_at: DateTime<Utc>",
+            u.license_plate_number AS "u_license_plate_number",
+            u.use_pg_payment AS "u_use_pg_payment",
+            upc.handle AS "upc_handle",
+            upc.argon2_password AS "upc_argon2_password"
+        FROM
+            user "u"
+        JOIN
+            user_plain_credential "upc" ON u.id = upc.user_id
+        WHERE
+            u.id = ?1 AND
+            (u.deactivated_at IS NULL OR u.deactivated_at < ?2)
+        "#,
+        user_id,
+        now
+    )
+    .fetch_optional(&mut *connection)
+    .await?
+    .map(|r| {
+        (
+            User {
+                id: r.u_id,
+                provider: r.u_provider,
+                foreign_id: r.u_foreign_id,
+                name: r.u_name,
+                created_at: r.u_created_at,
+                deactivated_at: r.u_deactivated_at,
+                license_plate_number: r.u_license_plate_number,
+                use_pg_payment: r.u_use_pg_payment,
+            },
+            UserPlainCredential {
+                user_id: r.u_id,
+                handle: r.upc_handle,
+                argon2_password: r.upc_argon2_password,
+            },
+        )
+    }))
+}
+
+pub async fn get_user_plain_credential_with_handle(
+    connection: &mut SqliteConnection,
+    now: &DateTime<Utc>,
+    handle: &str,
+) -> Result<Option<(User, UserPlainCredential)>, Error> {
+    Ok(sqlx::query!(
+        r#"
+        SELECT
+            u.id AS "u_id: UserId",
+            u.provider AS "u_provider: IdentityProvider",
+            u.foreign_id AS "u_foreign_id",
+            u.name AS "u_name",
+            u.created_at AS "u_created_at: DateTime<Utc>",
+            u.deactivated_at AS "u_deactivated_at: DateTime<Utc>",
+            u.license_plate_number AS "u_license_plate_number",
+            u.use_pg_payment AS "u_use_pg_payment",
+            upc.handle AS "upc_handle",
+            upc.argon2_password AS "upc_argon2_password"
+        FROM
+            user "u"
+        JOIN
+            user_plain_credential "upc" ON u.id = upc.user_id
+        WHERE
+            upc.handle = ?1 AND
+            (u.deactivated_at IS NULL OR u.deactivated_at < ?2)
+        "#,
+        handle,
+        now
+    )
+    .fetch_optional(&mut *connection)
+    .await?
+    .map(|r| {
+        (
+            User {
+                id: r.u_id,
+                provider: r.u_provider,
+                foreign_id: r.u_foreign_id,
+                name: r.u_name,
+                created_at: r.u_created_at,
+                deactivated_at: r.u_deactivated_at,
+                license_plate_number: r.u_license_plate_number,
+                use_pg_payment: r.u_use_pg_payment,
+            },
+            UserPlainCredential {
+                user_id: r.u_id,
+                handle: r.upc_handle,
+                argon2_password: r.upc_argon2_password,
+            },
+        )
+    }))
 }

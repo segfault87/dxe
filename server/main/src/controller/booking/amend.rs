@@ -1,5 +1,4 @@
 use actix_web::web;
-use chrono::Utc;
 use dxe_data::entities::Identity;
 use dxe_data::queries::booking::{get_booking_with_user_id, update_booking_customer};
 use dxe_data::queries::identity::is_member_of;
@@ -7,20 +6,20 @@ use dxe_types::{BookingId, GroupId};
 use sqlx::SqlitePool;
 
 use crate::config::TimeZoneConfig;
+use crate::middleware::datetime_injector::Now;
 use crate::models::entities::Booking;
 use crate::models::handlers::booking::{AmendBookingRequest, AmendBookingResponse};
 use crate::models::{Error, IntoView};
 use crate::session::UserSession;
 
 pub async fn put(
+    now: Now,
     session: UserSession,
     booking_id: web::Path<BookingId>,
     body: web::Json<AmendBookingRequest>,
     database: web::Data<SqlitePool>,
     timezone_config: web::Data<TimeZoneConfig>,
 ) -> Result<web::Json<AmendBookingResponse>, Error> {
-    let now = Utc::now();
-
     let mut tx = database.begin().await?;
 
     let booking = get_booking_with_user_id(&mut tx, booking_id.as_ref(), &session.user_id)

@@ -41,6 +41,14 @@ export default function Scaffold() {
       <div className="content">
         <Outlet />
       </div>
+      <div className="footer">
+        <span>상호명 : 디엑스이 스튜디오</span>
+        <span>대표자명 : 박준규</span>
+        <span>사업자등록번호 : 701-07-03619</span>
+        <span>
+          전화번호 : <a href="tel:+8250219445150">+82 0502-1944-5150</a>
+        </span>
+      </div>
     </main>
   );
 }

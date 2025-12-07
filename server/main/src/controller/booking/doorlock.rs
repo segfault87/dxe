@@ -1,5 +1,4 @@
 use actix_web::web;
-use chrono::Utc;
 use dxe_data::queries::booking::get_booking_with_user_id;
 use dxe_data::queries::unit::get_space_by_unit_id;
 use dxe_data::queries::user::get_user_by_id;
@@ -8,12 +7,14 @@ use dxe_types::BookingId;
 use sqlx::SqlitePool;
 
 use crate::config::BookingConfig;
+use crate::middleware::datetime_injector::Now;
 use crate::models::Error;
 use crate::services::doorlock::{DoorLockService, Error as DoorLockError};
 use crate::services::telemetry::{NotificationSender, Priority};
 use crate::session::UserSession;
 
 pub async fn post(
+    now: Now,
     session: UserSession,
     booking_id: web::Path<BookingId>,
     database: web::Data<SqlitePool>,
@@ -21,8 +22,6 @@ pub async fn post(
     booking_config: web::Data<BookingConfig>,
     notification_sender: web::Data<NotificationSender>,
 ) -> Result<web::Json<serde_json::Value>, Error> {
-    let now = Utc::now();
-
     let mut tx = database.begin().await?;
 
     let booking = get_booking_with_user_id(&mut tx, booking_id.as_ref(), &session.user_id)

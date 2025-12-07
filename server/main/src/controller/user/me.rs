@@ -1,31 +1,31 @@
 use std::collections::HashMap;
 
 use actix_web::web;
-use chrono::Utc;
 use dxe_data::queries::booking::get_bookings_by_user_id;
 use dxe_data::queries::user::{get_user_by_id, get_user_cash_payment_information, update_user};
 use dxe_types::UnitId;
 use sqlx::SqlitePool;
 
-use crate::config::{BookingConfig, TimeZoneConfig};
+use crate::config::{BookingConfig, TimeZoneConfig, UrlConfig};
+use crate::middleware::datetime_injector::Now;
 use crate::models::entities::{Booking, BookingStatus, SelfUser};
 use crate::models::handlers::user::{MeResponse, UpdateMeRequest, UpdateMeResponse};
 use crate::models::{Error, IntoView};
 use crate::session::UserSession;
 
 pub async fn get(
+    now: Now,
     session: UserSession,
     database: web::Data<SqlitePool>,
     timezone_config: web::Data<TimeZoneConfig>,
     booking_config: web::Data<BookingConfig>,
+    url_config: web::Data<UrlConfig>,
 ) -> Result<web::Json<MeResponse>, Error> {
-    let now = Utc::now();
-
     let mut tx = database.begin().await?;
 
     let user = get_user_by_id(&mut tx, &session.user_id, &now)
         .await?
-        .ok_or(Error::UserNotFound)?;
+        .ok_or(Error::LoggedOut(url_config.clone()))?;
 
     let cash_payment_information =
         get_user_cash_payment_information(&mut tx, &session.user_id).await?;
@@ -42,6 +42,7 @@ pub async fn get(
         refund_account: cash_payment_information
             .as_ref()
             .and_then(|v| v.refund_account.clone()),
+        use_pg_payment: user.use_pg_payment,
     };
 
     let mut bookings =
@@ -76,13 +77,12 @@ pub async fn get(
 }
 
 pub async fn post(
+    now: Now,
     session: UserSession,
     body: web::Json<UpdateMeRequest>,
     database: web::Data<SqlitePool>,
     timezone_config: web::Data<TimeZoneConfig>,
 ) -> Result<web::Json<UpdateMeResponse>, Error> {
-    let now = Utc::now();
-
     let mut tx = database.begin().await?;
 
     let result = update_user(
@@ -111,6 +111,7 @@ pub async fn post(
         refund_account: cash_payment_information
             .as_ref()
             .and_then(|v| v.refund_account.clone()),
+        use_pg_payment: result.use_pg_payment,
     };
 
     Ok(web::Json(UpdateMeResponse { user }))

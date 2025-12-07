@@ -5,10 +5,8 @@ use actix_jwt_auth_middleware::TokenSigner;
 use actix_web::body::BoxBody;
 use actix_web::cookie::Cookie;
 use actix_web::cookie::time::OffsetDateTime;
-use actix_web::http::Uri;
 use actix_web::http::header::LOCATION;
 use actix_web::{HttpResponse, ResponseError, web};
-use chrono::Utc;
 use dxe_data::queries::user::{get_user_by_foreign_id, is_administrator};
 use dxe_extern::kakao::client as kakao_client;
 use dxe_extern::kakao::models::AccountPropertyKey;
@@ -18,6 +16,7 @@ use serde::Deserialize;
 use sqlx::SqlitePool;
 
 use crate::config::{KakaoAuthConfig, UrlConfig};
+use crate::middleware::datetime_injector::Now;
 use crate::models::handlers::auth;
 use crate::session::UserSession;
 use crate::utils::aes::{AesCrypto, Error as AesError};
@@ -29,6 +28,7 @@ pub struct KakaoAuthState {
 }
 
 pub async fn redirect(
+    now: Now,
     query: web::Query<auth::KakaoAuthRedirectQuery>,
     kakao_auth: web::Data<KakaoAuthConfig>,
     database: web::Data<SqlitePool>,
@@ -46,14 +46,12 @@ pub async fn redirect(
         }
         .unwrap_or("/".to_owned());
 
-        let token = kakao_client::get_oauth_token(
-            kakao_auth.get_ref(),
-            code,
-            &format!("{}/api/auth/kakao/redirect", url_config.base_url),
-        )
-        .await?;
+        let mut redirect_url = url_config.base_url.clone();
+        redirect_url.set_path("/api/auth/kakao/redirect");
 
-        let now = Utc::now();
+        let token =
+            kakao_client::get_oauth_token(kakao_auth.get_ref(), code, redirect_url.as_str())
+                .await?;
 
         let me = kakao_client::get_me(
             &token,
@@ -72,7 +70,7 @@ pub async fn redirect(
 
         let mut tx = database.begin().await.map_err(dxe_data::Error::Sqlx)?;
         let user =
-            get_user_by_foreign_id(&mut tx, IdentityProvider::Kakao, foreign_id.as_str(), now)
+            get_user_by_foreign_id(&mut tx, IdentityProvider::Kakao, foreign_id.as_str(), *now)
                 .await?;
 
         if let Some(user) = user {
@@ -93,10 +91,9 @@ pub async fn redirect(
             refresh_cookie.set_http_only(true);
             refresh_cookie.set_path("/");
 
-            let base_url = Uri::try_from(&url_config.base_url).unwrap();
-            if let Some(host) = base_url.host() {
-                access_cookie.set_domain(host);
-                refresh_cookie.set_domain(host);
+            if let Some(domain) = url_config.base_url.domain() {
+                access_cookie.set_domain(domain);
+                refresh_cookie.set_domain(domain);
             }
 
             Ok(HttpResponse::TemporaryRedirect()
@@ -112,9 +109,8 @@ pub async fn redirect(
                 .http_only(true)
                 .secure(true);
 
-            let base_url = Uri::try_from(&url_config.base_url).unwrap();
-            if let Some(host) = base_url.host() {
-                cookie_bearer = cookie_bearer.domain(host);
+            if let Some(domain) = url_config.base_url.domain() {
+                cookie_bearer = cookie_bearer.domain(domain);
             }
 
             Ok(HttpResponse::TemporaryRedirect()

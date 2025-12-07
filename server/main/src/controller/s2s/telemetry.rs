@@ -2,13 +2,12 @@ use actix_multipart::form::MultipartForm;
 use actix_multipart::form::json::Json as MultipartJson;
 use actix_multipart::form::tempfile::TempFile;
 use actix_web::web;
-use chrono::Utc;
 use dxe_data::queries::booking::create_telemetry_file;
 use dxe_s2s_shared::handlers::UploadTelemetryFileRequest;
 use dxe_types::BookingId;
 use sqlx::SqlitePool;
 
-use crate::{config::TelemetryConfig, models::Error};
+use crate::{config::TelemetryConfig, middleware::datetime_injector::Now, models::Error};
 
 #[derive(Debug, MultipartForm)]
 pub struct UploadForm {
@@ -18,13 +17,12 @@ pub struct UploadForm {
 }
 
 pub async fn post(
+    now: Now,
     booking_id: web::Path<BookingId>,
     database: web::Data<SqlitePool>,
     telemetry_config: web::Data<TelemetryConfig>,
     MultipartForm(form): MultipartForm<UploadForm>,
 ) -> Result<web::Json<serde_json::Value>, Error> {
-    let now = Utc::now();
-
     let Some(file_name) = form.file.file_name.clone() else {
         return Err(Error::BadFileUpload);
     };

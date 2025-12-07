@@ -1,6 +1,14 @@
+#[cfg(feature = "amano")]
 pub mod amano;
+#[cfg(feature = "biztalk")]
 pub mod biztalk;
+#[cfg(feature = "google-cloud")]
 pub mod google_cloud;
+#[cfg(feature = "itsokey")]
 pub mod itsokey;
+#[cfg(feature = "kakao")]
 pub mod kakao;
+#[cfg(feature = "ntfy")]
 pub mod ntfy;
+#[cfg(feature = "toss-payments")]
+pub mod toss_payments;

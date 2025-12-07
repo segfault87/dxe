@@ -10,6 +10,7 @@ actix-multipart = "0.7"
 actix-state-guards = "0.1.0"
 actix-web = { version = "4.11", features = ["cookies"] }
 aes-gcm = "0.10"
+argon2 = "0.5"
 async-trait = { workspace = true }
 base64 = { workspace = true }
 chrono = { workspace = true }
@@ -31,6 +32,6 @@ url = { workspace = true }
 urlencoding = "2"
 
 dxe-data = { path = "../data" }
-dxe-extern = { path = "../extern" }
+dxe-extern = { path = "../extern", features = ["biztalk", "google-cloud", "itsokey", "kakao", "ntfy", "toss-payments"] }
 dxe-s2s-shared = { path = "../s2s-shared" }
 dxe-types = { path = "../types"}

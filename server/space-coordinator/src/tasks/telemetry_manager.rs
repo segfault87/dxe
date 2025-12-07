@@ -123,7 +123,7 @@ impl TelemetryManager {
 
     async fn table_handler_loop<S: TableSpec + Send + Sync + 'static>(
         self: Arc<Self>,
-        spec: &S,
+        spec: Arc<S>,
         mut rx: mpsc::UnboundedReceiver<S::Value>,
         mut event_state_rx: broadcast::Receiver<(BookingId, bool)>,
     ) {
@@ -174,7 +174,7 @@ impl TelemetryManager {
                 }
                 value_result = rx.recv().fuse() => {
                     if let Some(value) = value_result {
-                        Arc::clone(&self).handle_incoming_message::<S>(spec, value, &mut states).await;
+                        Arc::clone(&self).handle_incoming_message::<S>(&spec, value, &mut states).await;
                     } else {
                         break;
                     }
@@ -185,17 +185,17 @@ impl TelemetryManager {
 
     pub fn register_spec<S: TableSpec + Send + Sync + 'static>(
         self: Arc<Self>,
-        spec: S,
+        spec: Arc<S>,
     ) -> mpsc::UnboundedSender<S::Value> {
         let (tx, rx) = mpsc::unbounded_channel();
 
-        let table_key = spec.table_key();
+        let table_key = spec.clone().table_key();
 
         let event_state_rx = Arc::clone(&self).event_state_handler.subscribe();
 
         let arc_self = Arc::clone(&self);
         let task = tokio::task::spawn(async move {
-            arc_self.table_handler_loop(&spec, rx, event_state_rx).await;
+            arc_self.table_handler_loop(spec, rx, event_state_rx).await;
         });
 
         self.table_update_handlers.lock().insert(table_key, task);
@@ -221,8 +221,10 @@ impl TelemetryManager {
         for table in config {
             match &table.class {
                 TableClass::Z2mPowerMeter(power_meter) => {
-                    let z2m_power_meter_table =
-                        Z2mPowerMeterTable::new(table.name.clone(), table.remote_type);
+                    let z2m_power_meter_table = Arc::new(Z2mPowerMeterTable::new(
+                        table.name.clone(),
+                        table.remote_type,
+                    ));
                     for device_name in power_meter.devices.iter() {
                         if let Some(device) = z2m_controller.get_device(device_name) {
                             z2m_power_meter_table.update_power_usage(
@@ -231,17 +233,18 @@ impl TelemetryManager {
                             );
                         }
                     }
-                    let tx = Arc::clone(&self).register_spec(z2m_power_meter_table);
+                    let tx = Arc::clone(&self).register_spec(z2m_power_meter_table.clone());
 
                     z2m_controller.register_power_meter_telemetry_hook(
                         table.name.clone(),
                         HashSet::from_iter(power_meter.devices.clone().into_iter()),
                         tx,
+                        z2m_power_meter_table,
                     );
                 }
                 TableClass::SoundMeter(sound_meter) => {
                     let sound_meter_table =
-                        SoundMeterTable::new(table.name.clone(), table.remote_type);
+                        Arc::new(SoundMeterTable::new(table.name.clone(), table.remote_type));
                     let tx = Arc::clone(&self).register_spec(sound_meter_table);
 
                     let sound_meter = SoundMeter::new(sound_meter.clone(), tx);

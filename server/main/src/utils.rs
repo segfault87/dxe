@@ -1,6 +1,7 @@
 pub mod aes;
 pub mod datetime;
 pub mod messaging;
+pub mod session;
 
 pub fn mask_identity(identity: String) -> String {
     identity

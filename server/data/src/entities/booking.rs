@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use dxe_types::{
-    AdhocParkingId, AdhocReservationId, BookingId, IdentityId, SpaceId, TelemetryType, UnitId,
+    AdhocParkingId, AdhocReservationId, BookingId, ForeignPaymentId, IdentityId, SpaceId,
+    TelemetryType, UnitId, UserId,
 };
 use sqlx::FromRow;
 
@@ -40,6 +41,20 @@ pub struct CashPaymentStatus {
 }
 
 #[derive(Debug, Clone, FromRow)]
+pub struct TossPaymentStatus {
+    pub id: ForeignPaymentId,
+    pub user_id: UserId,
+    pub temporary_reservation_id: AdhocReservationId,
+    pub booking_id: Option<BookingId>,
+    pub price: i64,
+    pub payment_key: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub confirmed_at: Option<DateTime<Utc>>,
+    pub refund_price: Option<i64>,
+    pub refunded_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, FromRow)]
 pub struct AdhocReservation {
     pub id: AdhocReservationId,
     pub unit_id: UnitId,
@@ -47,7 +62,7 @@ pub struct AdhocReservation {
     pub customer: Identity,
     pub time_from: DateTime<Utc>,
     pub time_to: DateTime<Utc>,
-    pub temporary: bool,
+    pub deleted_at: Option<DateTime<Utc>>,
     pub remark: Option<String>,
 }
 

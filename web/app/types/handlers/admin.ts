@@ -33,7 +33,7 @@ export interface CreateAdhocReservationRequest {
   customerId: IdentityId;
   timeFrom: DateTime;
   desiredHours: number;
-  temporary: boolean;
+  expiresAt: DateTime | null;
   remark: string | null;
 }
 

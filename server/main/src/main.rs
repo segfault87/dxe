@@ -14,6 +14,7 @@ use std::time::Duration;
 use actix_jwt_auth_middleware::{Authority, TokenSigner};
 use actix_web::web::Data;
 use clap::Parser;
+use dxe_extern::toss_payments::TossPaymentsClient;
 use jwt_compact::alg::Ed25519;
 
 use crate::config::Config;
@@ -61,13 +62,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let booking_config = Data::new(config.booking.clone());
     let timezone_config = Data::new(config.timezone.clone());
-    let doorlock_service = DoorLockService::new(&config.spaces);
+    let doorlock_service = Data::new(DoorLockService::new(&config.spaces));
     let s2s_public_keys = Arc::new(PublicKeyBundle::new(&config.spaces));
     let calendar_service = if let Some(config) = &config.google_apis {
         Some(CalendarService::new(config)?)
     } else {
         None
     };
+    let toss_payments_client = Data::new(TossPaymentsClient::new(&config.toss_payments));
 
     let (biztalk_task, biztalk_sender) = if let Some(config) = &config.messaging.biztalk {
         let backend = BiztalkClient::new(config);
@@ -104,8 +106,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .app_data(aes.clone())
             .app_data(timezone_config.clone())
             .app_data(booking_config.clone())
+            .app_data(doorlock_service.clone())
+            .app_data(toss_payments_client.clone())
             .app_data(Data::new(notification_sender.clone()))
-            .app_data(Data::new(doorlock_service.clone()))
             .app_data(Data::new(biztalk_sender.clone()))
             .app_data(Data::new(config.url.clone()))
             .app_data(Data::new(calendar_service.clone()))

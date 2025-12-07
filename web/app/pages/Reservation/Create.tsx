@@ -1,6 +1,8 @@
 import { isAxiosError } from "axios";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+import { loadTossPayments } from "@tosspayments/tosspayments-sdk";
+import type { TossPaymentsWidgets } from "@tosspayments/tosspayments-sdk";
 
 import "./Create.css";
 import type { Route } from "./+types/Create";
@@ -14,9 +16,14 @@ import RequiresAuth from "../../lib/RequiresAuth";
 import Calendar from "../../components/Calendar";
 import GroupInvitationModal from "../../components/GroupInvitation";
 import Section from "../../components/Section";
-import type { IdentityId } from "../../types/models/base";
+import type {
+  AdhocReservationId,
+  IdentityId,
+  UserId,
+} from "../../types/models/base";
 import type { OccupiedSlot } from "../../types/models/booking";
 import type { GroupWithUsers } from "../../types/models/group";
+import { useEnv } from "../../context/EnvContext";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "예약 | 드림하우스 합주실" }];
@@ -256,6 +263,109 @@ function CustomerSelection({
   );
 }
 
+function CashPayment({
+  depositor,
+  setDepositor,
+  isRequestInProgress,
+  price,
+}: {
+  depositor: string;
+  setDepositor: (name: string) => void;
+  isRequestInProgress: boolean;
+  price: number | null;
+}) {
+  return (
+    <>
+      현재는 계좌입금을 통한 결제만 지원합니다. 아래 계좌로 입금해주시면 확인 후
+      예약이 확정됩니다.
+      <p>
+        입금 금액: {price !== null ? <em>₩{price.toLocaleString()}</em> : "-"}
+        <br />
+        입금 계좌: 신한은행 110-609-686081 (박준규, 디엑스이 스튜디오)
+      </p>
+      <p>
+        <input
+          type="text"
+          value={depositor}
+          placeholder="입금자명 입력"
+          disabled={isRequestInProgress}
+          maxLength={40}
+          onChange={(e) => setDepositor(e.target.value)}
+        />
+      </p>
+    </>
+  );
+}
+
+function TossPayment({
+  userId,
+  price,
+  tossPaymentsWidgets,
+  setTossPaymentsWidgets,
+  setAgreedRequiredTerms,
+}: {
+  userId: UserId;
+  price: number | null;
+  tossPaymentsWidgets: TossPaymentsWidgets | null;
+  setTossPaymentsWidgets: (widgets: TossPaymentsWidgets) => void;
+  setAgreedRequiredTerms: (agreed: boolean) => void;
+}) {
+  const { tossPaymentClientKey } = useEnv();
+
+  useEffect(() => {
+    const initializeTossPayments = async () => {
+      const tossPaymentsSdk = await loadTossPayments(tossPaymentClientKey);
+
+      const customerKey = userId;
+      const widgets = tossPaymentsSdk.widgets({
+        customerKey,
+      });
+
+      await widgets.setAmount({
+        currency: "KRW",
+        value: 0,
+      });
+
+      try {
+        const [_, agreementWidget] = await Promise.all([
+          widgets.renderPaymentMethods({
+            selector: "#toss-payment-method",
+            variantKey: "DEFAULT",
+          }),
+          widgets.renderAgreement({
+            selector: "#toss-payment-agreement",
+            variantKey: "AGREEMENT",
+          }),
+        ]);
+
+        agreementWidget.on("agreementStatusChange", (agreementStatus) => {
+          setAgreedRequiredTerms(agreementStatus.agreedRequiredTerms);
+        });
+
+        setTossPaymentsWidgets(widgets);
+      } catch {
+        // supress error
+      }
+    };
+
+    initializeTossPayments();
+  }, [tossPaymentClientKey]);
+
+  useEffect(() => {
+    if (tossPaymentsWidgets !== null && price !== null) {
+      tossPaymentsWidgets.setAmount({ currency: "KRW", value: price });
+    }
+  }, [tossPaymentsWidgets, price]);
+
+  return (
+    <>
+      결제 금액: {price !== null ? <em>₩{price.toLocaleString()}</em> : "-"}
+      <div id="toss-payment-method" />
+      <div id="toss-payment-agreement" />
+    </>
+  );
+}
+
 function Reservation() {
   const auth = useAuth();
 
@@ -265,12 +375,18 @@ function Reservation() {
   const [slots, setSlots] = useState<OccupiedSlot[]>([]);
   const [now, setNow] = useState(new Date());
   const [errorMessage, setErrorMessage] = useState("");
+  const [temporaryReservationId, setTemporaryReservationId] =
+    useState<AdhocReservationId | null>(null);
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<Date | null>(null);
   const [selectedHours, setSelectedHours] = useState<number | null>(null);
   const [price, setPrice] = useState<number | null>(null);
   const [depositor, setDepositor] = useState("");
+
+  const [tossPaymentsWidgets, setTossPaymentsWidgets] =
+    useState<TossPaymentsWidgets | null>(null);
+  const [hasAgreedRequiredTerms, setAgreedRequiredTerms] = useState(true);
 
   useEffect(() => {
     if (auth) {
@@ -282,12 +398,17 @@ function Reservation() {
 
   const navigate = useNavigate();
 
-  const isAvailable =
+  let isAvailable =
     selectedDate !== null &&
     selectedTime !== null &&
     selectedHours !== null &&
-    !isRequestInProgress &&
-    depositor.trim().length > 0;
+    !isRequestInProgress;
+
+  if (auth?.user.usePgPayment === true) {
+    isAvailable &&= hasAgreedRequiredTerms;
+  } else if (auth?.user.usePgPayment === false) {
+    isAvailable &&= depositor.trim().length > 0;
+  }
 
   const [selectedIdentityId, setSelectedIdentityId] =
     useState<IdentityId | null>(null);
@@ -330,6 +451,49 @@ function Reservation() {
       defaultErrorHandler(error);
     } finally {
       setRequestInProgress(false);
+    }
+  };
+
+  const proceedTossPayment = async (widgets: TossPaymentsWidgets) => {
+    if (
+      selectedTime === null ||
+      selectedHours === null ||
+      selectedIdentityId === null
+    ) {
+      return;
+    }
+
+    setRequestInProgress(true);
+    try {
+      const initiateResult = await BookingService.initiateTossPayment({
+        unitId: DEFAULT_UNIT_ID,
+        timeFrom: toUtcIso8601(selectedTime),
+        desiredHours: selectedHours,
+        identityId: selectedIdentityId,
+        temporaryReservationId: temporaryReservationId,
+      });
+      const data = initiateResult.data;
+      setTemporaryReservationId(data.temporaryReservationId);
+
+      await widgets.requestPayment({
+        orderId: data.orderId,
+        orderName: `공간이용료 (${selectedHours} 시간)`,
+        successUrl:
+          window.location.origin + "/reservation/payment/toss/success/",
+        failUrl: window.location.origin + "/reservation/payment/toss/fail/",
+      });
+    } catch (error) {
+      defaultErrorHandler(error);
+    } finally {
+      setRequestInProgress(false);
+    }
+  };
+
+  const proceedPayment = async () => {
+    if (auth?.user.usePgPayment === true && tossPaymentsWidgets !== null) {
+      await proceedTossPayment(tossPaymentsWidgets);
+    } else if (auth?.user.usePgPayment === false) {
+      await makeReservation();
     }
   };
 
@@ -416,30 +580,31 @@ function Reservation() {
           onSelectIdentityId={setSelectedIdentityId}
         />
       </Section>
-      <Section id="payment" title="결제 수단">
-        현재는 계좌입금을 통한 결제만 지원합니다. 아래 계좌로 입금해주시면 확인
-        후 예약이 확정됩니다.
-        <p>
-          입금 금액: {price !== null ? <em>₩{price.toLocaleString()}</em> : "-"}
-          <br />
-          입금 계좌: 신한은행 110-609-686081 (박준규, 디엑스이 스튜디오)
-        </p>
-        <p>
-          <input
-            type="text"
-            value={depositor}
-            placeholder="입금자명 입력"
-            disabled={isRequestInProgress}
-            maxLength={40}
-            onChange={(e) => setDepositor(e.target.value)}
-          />
-        </p>
+      <Section id="payment" title="결제 정보">
+        {auth ? (
+          auth.user.usePgPayment ? (
+            <TossPayment
+              userId={auth.user.id}
+              price={price}
+              tossPaymentsWidgets={tossPaymentsWidgets}
+              setTossPaymentsWidgets={setTossPaymentsWidgets}
+              setAgreedRequiredTerms={setAgreedRequiredTerms}
+            />
+          ) : (
+            <CashPayment
+              depositor={depositor}
+              setDepositor={setDepositor}
+              isRequestInProgress={isRequestInProgress}
+              price={price}
+            />
+          )
+        ) : null}
       </Section>
       <div className="create-actions">
         <button
           className="cta"
           disabled={!isAvailable}
-          onClick={makeReservation}
+          onClick={proceedPayment}
         >
           예약하기
         </button>

@@ -1,5 +1,5 @@
 use actix_web::web;
-use chrono::{TimeDelta, Utc};
+use chrono::TimeDelta;
 use dxe_data::entities::Identity;
 use dxe_data::queries::booking::{
     create_booking, create_cash_payment_status, get_booking_with_user_id, get_cash_payment_status,
@@ -11,6 +11,7 @@ use dxe_data::queries::user::update_user_cash_payment_depositor_name;
 use sqlx::SqlitePool;
 
 use crate::config::{BookingConfig, TimeZoneConfig};
+use crate::middleware::datetime_injector::Now;
 use crate::models::entities::{Booking, BookingCashPaymentStatus};
 use crate::models::handlers::booking::{SubmitBookingRequest, SubmitBookingResponse};
 use crate::models::{Error, IntoView};
@@ -20,6 +21,7 @@ use crate::session::UserSession;
 use crate::utils::datetime::truncate_time;
 
 pub async fn post(
+    now: Now,
     session: UserSession,
     body: web::Json<SubmitBookingRequest>,
     database: web::Data<SqlitePool>,
@@ -28,8 +30,6 @@ pub async fn post(
     notification_sender: web::Data<NotificationSender>,
     calendar_service: web::Data<Option<CalendarService>>,
 ) -> Result<web::Json<SubmitBookingResponse>, Error> {
-    let now = Utc::now();
-
     let mut tx = database.begin().await?;
 
     if is_unit_enabled(&mut tx, &body.unit_id).await? != Some(true) {
@@ -74,6 +74,7 @@ pub async fn post(
         &body.identity_id,
         &time_from,
         &time_to,
+        false,
     )
     .await?;
 

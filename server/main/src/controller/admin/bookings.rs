@@ -1,11 +1,11 @@
 use actix_web::web;
-use chrono::Utc;
 use dxe_data::queries::booking::{
     get_bookings_pending, get_bookings_refund_pending, get_confirmed_bookings_with_payments,
 };
 use sqlx::SqlitePool;
 
 use crate::config::{BookingConfig, TimeZoneConfig};
+use crate::middleware::datetime_injector::Now;
 use crate::models::entities::{Booking, BookingCashPaymentStatus, BookingWithPayments};
 use crate::models::handlers::admin::{GetBookingsQuery, GetBookingsResponse, GetBookingsType};
 use crate::models::{Error, IntoView};
@@ -13,14 +13,13 @@ use crate::session::UserSession;
 use crate::utils::datetime::is_in_effect;
 
 pub async fn get(
+    now: Now,
     _session: UserSession,
     query: web::Query<GetBookingsQuery>,
     database: web::Data<SqlitePool>,
     booking_config: web::Data<BookingConfig>,
     timezone_config: web::Data<TimeZoneConfig>,
 ) -> Result<web::Json<GetBookingsResponse>, Error> {
-    let now = Utc::now();
-
     let date_from = query.date_from.map(|v| v.to_utc());
 
     let mut connection = database.acquire().await?;

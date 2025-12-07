@@ -4,10 +4,10 @@ mod unit;
 
 pub use booking::{
     AdhocParking, AdhocReservation, AudioRecording, Booking, BookingChangeHistory,
-    CashPaymentStatus, OccupiedSlot, TelemetryFile,
+    CashPaymentStatus, OccupiedSlot, TelemetryFile, TossPaymentStatus,
 };
 pub use identity::{
     Group, GroupAssociation, Identity, IdentityDiscriminator, IdentityRow, User,
-    UserCashPaymentInformation,
+    UserCashPaymentInformation, UserPlainCredential,
 };
 pub use unit::{Space, Unit};

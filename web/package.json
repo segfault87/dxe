@@ -12,6 +12,7 @@
   "dependencies": {
     "@react-router/node": "^7.9.4",
     "@react-router/serve": "^7.9.4",
+    "@tosspayments/tosspayments-sdk": "^2.5.0",
     "axios": "^1.13.2",
     "isbot": "^5",
     "react": "^19.1.1",

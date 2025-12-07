@@ -1,0 +1,29 @@
+.login-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 400px;
+    justify-content: center;
+    align-items: center;
+
+    p {
+        text-align: center;
+        font-size: 18px;
+        margin-bottom: 32px;
+    }
+
+    .cred-login {
+        text-align: center;
+
+        label {
+            margin-right: 8px;
+        }
+
+        .row {
+            margin-bottom: 8px;
+        }
+
+        .cta {
+            margin-top: 16px;
+        }
+    }
+}

@@ -49,7 +49,7 @@ export default function AdhocReservations({
   const [startTime, setStartTime] = useState(toUtcIso8601(new Date()));
   const [identityId, setIdentityId] = useState("");
   const [desiredHours, setDesiredHours] = useState("2");
-  const [isTemporary, setTemporary] = useState(false);
+  const [expiresAt, setExpiresAt] = useState("");
   const [remark, setRemark] = useState("");
 
   const createReservation = async () => {
@@ -59,7 +59,7 @@ export default function AdhocReservations({
         customerId: identityId,
         timeFrom: startTime,
         desiredHours: parseInt(desiredHours),
-        temporary: isTemporary,
+        expiresAt: expiresAt ? expiresAt : null,
         remark: remark.length === 0 ? null : remark,
       });
 
@@ -86,7 +86,9 @@ export default function AdhocReservations({
             <td>{v.holder.name}</td>
             <td>{new Date(v.reservationStart).toLocaleString()}</td>
             <td>{new Date(v.reservationEnd).toLocaleString()}</td>
-            <td>{v.temporary ? "Y" : "N"}</td>
+            <td>
+              {v.deletedAt ? new Date(v.deletedAt).toLocaleString() : "-"}
+            </td>
             <td>{v.remark ?? ""}</td>
             <td>
               <button
@@ -135,13 +137,14 @@ export default function AdhocReservations({
         }}
       />
       <br />
+      만료시간:{" "}
       <input
-        type="checkbox"
-        checked={isTemporary}
-        onChange={(e) => setTemporary(e.target.checked)}
-        id="is-temporary"
-      />{" "}
-      <label htmlFor="is-temporary">임시</label>
+        type="text"
+        value={expiresAt}
+        onChange={(e) => {
+          setExpiresAt(e.target.value);
+        }}
+      />
       <br />
       <button onClick={createReservation}>생성</button>
     </>

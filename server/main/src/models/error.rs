@@ -1,10 +1,16 @@
 use actix_web::http::StatusCode;
+use actix_web::web::Data;
 use actix_web::{HttpResponse, HttpResponseBuilder, ResponseError};
 use dxe_data::Error as DataError;
 use dxe_extern::kakao::client::Error as KakaoClientError;
 
+use crate::config::UrlConfig;
+use crate::utils::session::log_out;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("다시 로그인해 주십시오.")]
+    LoggedOut(Data<UrlConfig>),
     #[error("권한이 없습니다.")]
     Forbidden,
     #[error("첫 화면으로 돌아가서 다시 로그인을 진행해 주십시오.")]
@@ -47,8 +53,16 @@ pub enum Error {
     DoorNotOpened(String),
     #[error("이미 확정된 예약입니다.")]
     BookingAlreadyConfirmed,
+    #[error("결제 정보를 찾을 수 없습니다.")]
+    ForeignPaymentNotFound,
     #[error("잘못된 파일 업로드입니다.")]
     BadFileUpload,
+    #[error("결제에 실패했습니다: {0}")]
+    PaymentFailed(String),
+    #[error("로그인에 실패했습니다.")]
+    AuthFailed,
+    #[error("{message}")]
+    TossPaymentsFailed { code: String, message: String },
     #[error("인증에 실패했습니다.")]
     Jwt(actix_jwt_auth_middleware::AuthError),
     #[error("카카오 API 에러가 발생했습니다: {0}")]
@@ -93,6 +107,7 @@ impl From<KakaoClientError> for Error {
 impl ResponseError for Error {
     fn status_code(&self) -> StatusCode {
         match self {
+            Self::LoggedOut(_) => StatusCode::UNAUTHORIZED,
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::InvalidKakaoAccessToken => StatusCode::BAD_REQUEST,
             Self::InvalidTimeRange => StatusCode::BAD_REQUEST,
@@ -114,7 +129,11 @@ impl ResponseError for Error {
             Self::BookingNotActive => StatusCode::BAD_REQUEST,
             Self::DoorNotOpened(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::BookingAlreadyConfirmed => StatusCode::BAD_REQUEST,
+            Self::ForeignPaymentNotFound => StatusCode::NOT_FOUND,
             Self::BadFileUpload => StatusCode::BAD_REQUEST,
+            Self::PaymentFailed(_) => StatusCode::BAD_REQUEST,
+            Self::AuthFailed => StatusCode::FORBIDDEN,
+            Self::TossPaymentsFailed { .. } => StatusCode::BAD_REQUEST,
             Self::Jwt(_) => StatusCode::UNAUTHORIZED,
             Self::Kakao(_) => StatusCode::UNAUTHORIZED,
             Self::Http(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -125,6 +144,7 @@ impl ResponseError for Error {
 
     fn error_response(&self) -> HttpResponse {
         let r#type = match self {
+            Self::LoggedOut(_) => "LoggedOut",
             Self::Forbidden => "Forbidden",
             Self::InvalidKakaoAccessToken => "InvalidKakaoAccessToken",
             Self::InvalidTimeRange => "InvalidTimeRange",
@@ -146,20 +166,36 @@ impl ResponseError for Error {
             Self::BookingNotActive => "BookingNotActive",
             Self::DoorNotOpened(_) => "DoorNotOpened",
             Self::BookingAlreadyConfirmed => "BookingAlreadyConfirmed",
+            Self::ForeignPaymentNotFound => "ForeignPaymentNotFound",
             Self::BadFileUpload => "BadFileUpload",
+            Self::PaymentFailed(_) => "PaymentFailed",
+            Self::AuthFailed => "AuthError",
+            Self::TossPaymentsFailed { .. } => "TossPaymentsFailed",
             Self::Jwt(_) => "AuthError",
             Self::Http(_) => "HttpError",
             Self::Kakao(_) => "KakaoApiError",
             Self::Sqlx(_) => "DatabaseError",
             Self::Internal(_) => "InternalError",
         };
-        let message = format!("{self}");
+        let extras = match self {
+            Self::TossPaymentsFailed { code, .. } => {
+                Some(serde_json::json!({ code: code.clone() }))
+            }
+            _ => None,
+        };
 
         let payload = serde_json::json!({
             "type": r#type,
-            "message": message
+            "message": format!("{self}"),
+            "extras": extras,
         });
 
-        HttpResponseBuilder::new(self.status_code()).json(payload)
+        let mut response = HttpResponseBuilder::new(self.status_code());
+
+        if let Self::LoggedOut(url_config) = self {
+            log_out(&mut response, url_config);
+        }
+
+        response.json(payload)
     }
 }

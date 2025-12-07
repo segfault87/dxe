@@ -1,13 +1,13 @@
 use actix_web::web;
-use chrono::Utc;
 use dxe_data::queries::booking::{
     cancel_booking, confirm_booking, confirm_cash_payment, get_booking, get_cash_payment_status,
-    refund_payment,
+    refund_cash_payment,
 };
 use dxe_types::BookingId;
 use sqlx::SqlitePool;
 
 use crate::config::{BookingConfig, TimeZoneConfig};
+use crate::middleware::datetime_injector::Now;
 use crate::models::entities::{Booking, BookingCashPaymentStatus};
 use crate::models::handlers::admin::{ModifyAction, ModifyBookingRequest, ModifyBookingResponse};
 use crate::models::{Error, IntoView};
@@ -18,6 +18,7 @@ use crate::utils::datetime::is_in_effect;
 use crate::utils::messaging::{send_confirmation, send_refund_confirmation};
 
 pub async fn put(
+    now: Now,
     _session: UserSession,
     booking_id: web::Path<BookingId>,
     body: web::Json<ModifyBookingRequest>,
@@ -27,8 +28,6 @@ pub async fn put(
     biztalk_sender: web::Data<Option<BiztalkSender>>,
     calendar_service: web::Data<Option<CalendarService>>,
 ) -> Result<web::Json<ModifyBookingResponse>, Error> {
-    let now = Utc::now();
-
     let mut tx = database.begin().await?;
 
     let booking = get_booking(&mut tx, booking_id.as_ref())
@@ -49,7 +48,7 @@ pub async fn put(
         }
         ModifyAction::Refund => {
             if is_in_effect(&booking.canceled_at, &now) {
-                refund_payment(&mut tx, &now, booking_id.as_ref()).await?;
+                refund_cash_payment(&mut tx, &now, booking_id.as_ref()).await?;
             }
         }
         ModifyAction::Cancel => {

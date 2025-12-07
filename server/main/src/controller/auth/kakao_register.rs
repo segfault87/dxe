@@ -1,12 +1,12 @@
 use actix_jwt_auth_middleware::TokenSigner;
 use actix_web::{HttpRequest, HttpResponse, Responder, web};
-use chrono::Utc;
 use dxe_data::queries::user::create_user;
 use dxe_extern::kakao::{BearerToken, client as kakao_client};
 use dxe_types::IdentityProvider;
 use jwt_compact::alg::Ed25519;
 use sqlx::SqlitePool;
 
+use crate::middleware::datetime_injector::Now;
 use crate::models::Error;
 use crate::models::handlers::auth;
 use crate::services::telemetry::{NotificationSender, Priority};
@@ -22,6 +22,7 @@ impl BearerToken for SimpleBearerToken {
 }
 
 pub async fn post(
+    now: Now,
     request: HttpRequest,
     body: web::Json<auth::KakaoAuthRegisterRequest>,
     database: web::Data<SqlitePool>,
@@ -40,13 +41,11 @@ pub async fn post(
 
     let me = kakao_client::get_me(&bearer_token, Default::default()).await?;
 
-    let now = Utc::now();
-
     let mut tx = database.begin().await?;
 
     let user_id = create_user(
         &mut tx,
-        now,
+        *now,
         IdentityProvider::Kakao,
         me.id.to_string().as_str(),
         body.name.as_str(),

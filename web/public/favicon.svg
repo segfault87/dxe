@@ -7,32 +7,43 @@
    viewBox="0 0 16.933332 16.933332"
    version="1.1"
    id="svg1"
+   sodipodi:docname="favicon.svg"
+   inkscape:version="1.4.2 (ebf0e940, 2025-05-08)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
    xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="13.000001"
+     inkscape:cx="31.999998"
+     inkscape:cy="31.961537"
+     inkscape:window-width="1712"
+     inkscape:window-height="1186"
+     inkscape:window-x="847"
+     inkscape:window-y="31"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg1" />
   <defs
      id="defs1" />
-  <g
-     id="layer2">
-    <rect
-       style="fill:#ffffff;stroke-width:0.281516"
-       id="rect1"
-       width="16.933001"
-       height="16.933332"
-       x="0"
-       y="1.110223e-16"
-       rx="2" />
-  </g>
-  <g
-     id="layer1">
-    <text
-       xml:space="preserve"
-       style="font-size:9.17222px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#000000;stroke-width:0.264583"
-       x="0.65192443"
-       y="11.676938"
-       id="text1"><tspan
-         id="tspan1"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:9.17222px;font-family:Sunbather;-inkscape-font-specification:Sunbather;fill:#000000;stroke-width:0.264583"
-         x="0.65192443"
-         y="11.676938">DXE</tspan></text>
-  </g>
+  <rect
+     style="fill:#ffffff;stroke-width:0.281516"
+     id="rect1"
+     width="16.933001"
+     height="16.933332"
+     x="0"
+     y="1.110223e-16"
+     rx="2" />
+  <path
+     style="font-size:9.17222px;font-family:Sunbather;-inkscape-font-specification:Sunbather;stroke-width:0.264583"
+     d="M 1.1013632,11.676938 H 2.1194797 V 5.2563839 H 1.1013632 c 0.1375833,0.2017888 0.2109611,0.4310943 0.2109611,0.917222 v 4.5861101 c 0,0.486128 -0.073378,0.715433 -0.2109611,0.917222 z m 2.7608383,0 C 5.2930679,11.35591 6.256151,10.044283 6.256151,8.4483165 c 0,-1.5684496 -0.7704665,-2.834216 -2.3939495,-3.1919326 1.1281831,0.5595054 1.4950719,1.8069274 1.4950719,3.2102771 0,1.4216941 -0.3852332,2.669116 -1.4950719,3.210277 z m 6.1178742,0 h 1.2107333 c -0.110067,-0.128411 -0.183445,-0.24765 -0.3302,-0.504472 L 7.8429484,6.0818837 C 7.5861263,5.6141005 7.5494374,5.4948616 7.6136429,5.2563839 H 6.4120821 C 6.5129765,5.384795 6.5863543,5.5040338 6.742282,5.760856 l 3.0084882,5.090582 c 0.2568218,0.467783 0.3026838,0.587022 0.2293055,0.8255 z m 1.8344513,0 h 1.018116 V 5.2563839 h -1.018116 c 0.137583,0.2017888 0.210961,0.4310943 0.210961,0.917222 v 4.5861101 c 0,0.486128 -0.07338,0.715433 -0.210961,0.917222 z m 2.825043,0 h 1.192389 v -1.192389 c -0.24765,0.531989 -0.706261,0.9906 -1.192389,1.192389 z m 0,-6.4205541 c 0.504473,0.1742722 0.953911,0.6053665 1.192389,1.1190109 V 5.2563839 Z"
+     id="text1"
+     aria-label="DXE" />
 </svg>

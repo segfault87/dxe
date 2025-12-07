@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use actix_web::web;
-use chrono::{TimeDelta, Utc};
+use chrono::TimeDelta;
 use dxe_data::entities::{Booking as RawBooking, Identity, User as RawUser};
 use dxe_data::queries::identity::get_group_members;
 use dxe_data::queries::{booking::get_bookings_by_unit_id, unit::get_units_by_space_id};
@@ -11,6 +11,7 @@ use sqlx::SqlitePool;
 
 use crate::config::BookingConfig;
 use crate::middleware::coordinator_verifier::CoordinatorContext;
+use crate::middleware::datetime_injector::Now;
 use crate::models::Error;
 
 fn convert_user(user: &RawUser) -> User {
@@ -35,17 +36,16 @@ fn convert_booking(booking: &RawBooking, booking_config: &BookingConfig) -> Book
 }
 
 pub async fn get(
+    now: Now,
     context: CoordinatorContext,
     query: web::Query<GetBookingsQuery>,
     database: web::Data<SqlitePool>,
     booking_config: web::Data<BookingConfig>,
 ) -> Result<web::Json<GetBookingsResponse>, Error> {
-    let now = Utc::now();
-
     let CoordinatorContext { space_id } = context;
 
-    let start = now - booking_config.buffer_time.1;
-    let end = now + TimeDelta::days(1);
+    let start = *now - booking_config.buffer_time.1;
+    let end = *now + TimeDelta::days(1);
 
     let mut tx = database.begin().await?;
 

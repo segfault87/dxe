@@ -1,5 +1,5 @@
 use actix_web::web;
-use chrono::{TimeDelta, Utc};
+use chrono::{DateTime, TimeDelta};
 use dxe_data::queries::booking::{
     create_adhoc_reservation, delete_adhoc_reservation, get_adhoc_reservation,
     get_adhoc_reservations_by_unit_id, is_booking_available,
@@ -8,6 +8,7 @@ use dxe_types::AdhocReservationId;
 use sqlx::SqlitePool;
 
 use crate::config::TimeZoneConfig;
+use crate::middleware::datetime_injector::Now;
 use crate::models::entities::AdhocReservation;
 use crate::models::handlers::admin::{
     CreateAdhocReservationRequest, CreateAdhocReservationResponse, GetAdhocReservationsQuery,
@@ -19,16 +20,16 @@ use crate::session::UserSession;
 use crate::utils::datetime::truncate_time;
 
 pub async fn get(
+    now: Now,
     query: web::Query<GetAdhocReservationsQuery>,
     database: web::Data<SqlitePool>,
     timezone_config: web::Data<TimeZoneConfig>,
 ) -> Result<web::Json<GetAdhocReservationsResponse>, Error> {
-    let now = Utc::now();
-
     let mut connection = database.acquire().await?;
 
     let reservations =
-        get_adhoc_reservations_by_unit_id(&mut connection, &query.unit_id, Some(now)).await?;
+        get_adhoc_reservations_by_unit_id(&mut connection, &now, &query.unit_id, Some(*now))
+            .await?;
 
     Ok(web::Json(GetAdhocReservationsResponse {
         reservations: reservations
@@ -39,18 +40,19 @@ pub async fn get(
 }
 
 pub async fn post(
+    now: Now,
     session: UserSession,
     body: web::Json<CreateAdhocReservationRequest>,
     database: web::Data<SqlitePool>,
     timezone_config: web::Data<TimeZoneConfig>,
     calendar_service: web::Data<Option<CalendarService>>,
 ) -> Result<web::Json<CreateAdhocReservationResponse>, Error> {
-    let now = Utc::now();
-
     let mut tx = database.begin().await?;
 
     let time_from = truncate_time(body.time_from).to_utc();
     let time_to = time_from + TimeDelta::hours(body.desired_hours);
+
+    let expires_at = body.expires_at.as_ref().map(DateTime::to_utc);
 
     if !is_booking_available(&mut tx, &now, &body.unit_id, &time_from, &time_to).await? {
         return Err(Error::TimeRangeOccupied);
@@ -65,7 +67,7 @@ pub async fn post(
         &time_from,
         &time_to,
         &body.remark,
-        body.temporary,
+        &expires_at,
     )
     .await?;
 

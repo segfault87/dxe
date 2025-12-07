@@ -3,9 +3,18 @@ name = "dxe-extern"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+amano = []
+biztalk = []
+google-cloud = ["dep:gcp_auth"]
+itsokey = []
+kakao = []
+ntfy = []
+toss-payments = []
+
 [dependencies]
 chrono = { workspace = true }
-gcp_auth = "0.12"
+gcp_auth = { version = "0.12", optional = true }
 parking_lot = { workspace = true }
 reqwest = { workspace = true, features = ["multipart", "stream"] }
 serde = { workspace = true }

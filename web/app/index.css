@@ -68,7 +68,8 @@ main {
 }
 
 input[type="text"],
-input[type="tel"] {
+input[type="tel"],
+input[type="password"] {
     font-family: Gowun Batang;
     padding: 8px;
     font-size: 18px;

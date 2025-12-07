@@ -1,5 +1,4 @@
 use actix_web::web;
-use chrono::Utc;
 use dxe_data::queries::identity::{
     delete_group, get_group, get_group_with_members, is_member_of, join_group, leave_group,
     update_group_name, update_group_open, update_group_owner,
@@ -8,19 +7,19 @@ use dxe_types::GroupId;
 use sqlx::SqlitePool;
 
 use crate::config::TimeZoneConfig;
+use crate::middleware::datetime_injector::Now;
 use crate::models::entities::{Group, GroupWithUsers};
 use crate::models::handlers::user::{AmendGroupRequest, AmendGroupResponse, GetGroupResponse};
 use crate::models::{Error, IntoView};
 use crate::session::UserSession;
 
 pub async fn get(
+    now: Now,
     session: UserSession,
     group_id: web::Path<GroupId>,
     database: web::Data<SqlitePool>,
     timezone_config: web::Data<TimeZoneConfig>,
 ) -> Result<web::Json<GetGroupResponse>, Error> {
-    let now = Utc::now();
-
     let mut connection = database.acquire().await?;
 
     let mut group = get_group_with_members(&mut connection, &now, group_id.as_ref())
@@ -38,14 +37,13 @@ pub async fn get(
 }
 
 pub async fn put(
+    now: Now,
     session: UserSession,
     body: web::Json<AmendGroupRequest>,
     group_id: web::Path<GroupId>,
     database: web::Data<SqlitePool>,
     timezone_config: web::Data<TimeZoneConfig>,
 ) -> Result<web::Json<AmendGroupResponse>, Error> {
-    let now = Utc::now();
-
     let mut tx = database.begin().await?;
 
     let group = get_group(&mut tx, &now, group_id.as_ref())
@@ -81,12 +79,11 @@ pub async fn put(
 }
 
 pub async fn delete(
+    now: Now,
     session: UserSession,
     group_id: web::Path<GroupId>,
     database: web::Data<SqlitePool>,
 ) -> Result<web::Json<serde_json::Value>, Error> {
-    let now = Utc::now();
-
     let mut tx = database.begin().await?;
 
     let (group, members) = get_group_with_members(&mut tx, &now, group_id.as_ref())
@@ -107,12 +104,11 @@ pub async fn delete(
 }
 
 pub async fn membership_put(
+    now: Now,
     session: UserSession,
     group_id: web::Path<GroupId>,
     database: web::Data<SqlitePool>,
 ) -> Result<web::Json<serde_json::Value>, Error> {
-    let now = Utc::now();
-
     let mut tx = database.begin().await?;
 
     let group = get_group(&mut tx, &now, group_id.as_ref())
@@ -129,12 +125,11 @@ pub async fn membership_put(
 }
 
 pub async fn membership_delete(
+    now: Now,
     session: UserSession,
     group_id: web::Path<GroupId>,
     database: web::Data<SqlitePool>,
 ) -> Result<web::Json<serde_json::Value>, Error> {
-    let now = Utc::now();
-
     let mut tx = database.begin().await?;
     let group = get_group(&mut tx, &now, &group_id)
         .await?

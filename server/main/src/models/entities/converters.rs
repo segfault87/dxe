@@ -7,6 +7,8 @@ use super::{
 };
 use crate::config::{BookingConfig, TimeZoneConfig};
 use crate::models::Error;
+use crate::models::entities::BookingTossPaymentStatus;
+use crate::utils::datetime::is_in_effect;
 use crate::utils::mask_identity;
 
 pub trait IntoView: Sized {
@@ -54,6 +56,7 @@ impl IntoView for SelfUser {
             is_administrator: false,
             depositor_name: None,
             refund_account: None,
+            use_pg_payment: false,
         })
     }
 }
@@ -219,7 +222,26 @@ impl IntoView for BookingCashPaymentStatus {
             refund_account: entity.refund_account,
             is_refund_requested: entity.refund_price.is_some(),
             refunded_at: entity.refunded_at.map(|v| timezone.convert(v)),
-            is_refunded: entity.refunded_at.map(|v| &v < now).unwrap_or(false),
+            is_refunded: is_in_effect(&entity.refunded_at, now),
+        })
+    }
+}
+
+impl IntoView for BookingTossPaymentStatus {
+    type Entity = entities::TossPaymentStatus;
+    type Error = Error;
+
+    fn convert(
+        entity: Self::Entity,
+        timezone: &TimeZoneConfig,
+        now: &DateTime<Utc>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            price: entity.price,
+            confirmed_at: entity.confirmed_at.map(|v| timezone.convert(v)),
+            refund_price: entity.refund_price,
+            refunded_at: entity.refunded_at.map(|v| timezone.convert(v)),
+            is_refunded: is_in_effect(&entity.refunded_at, now),
         })
     }
 }
@@ -240,7 +262,7 @@ impl IntoView for AdhocReservation {
             reservation_start: timezone.convert(entity.time_from),
             reservation_end: timezone.convert(entity.time_to),
             reserved_hours: (entity.time_to - entity.time_from).num_hours(),
-            temporary: entity.temporary,
+            deleted_at: entity.deleted_at.map(|v| timezone.convert(v)),
             remark: entity.remark,
         })
     }

@@ -24,9 +24,10 @@ pub struct SelfUser {
 
     pub is_administrator: bool,
 
-    // Cash payment information
+    // Payment information
     pub depositor_name: Option<String>,
     pub refund_account: Option<String>,
+    pub use_pg_payment: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -102,6 +103,16 @@ pub struct BookingCashPaymentStatus {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct BookingTossPaymentStatus {
+    pub price: i64,
+    pub confirmed_at: Option<DateTime<FixedOffset>>,
+    pub refund_price: Option<i64>,
+    pub refunded_at: Option<DateTime<FixedOffset>>,
+    pub is_refunded: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AdhocReservation {
     pub id: AdhocReservationId,
     pub holder: User,
@@ -109,7 +120,7 @@ pub struct AdhocReservation {
     pub reservation_start: DateTime<FixedOffset>,
     pub reservation_end: DateTime<FixedOffset>,
     pub reserved_hours: i64,
-    pub temporary: bool,
+    pub deleted_at: Option<DateTime<FixedOffset>>,
     pub remark: Option<String>,
 }
 

@@ -20,7 +20,9 @@ use crate::config::telemetry::TableKey;
 use crate::config::z2m::{self, SwitchPolicy};
 use crate::services::mqtt::{Error as MqttError, MqttService};
 use crate::services::notification::NotificationService;
-use crate::tasks::telemetry_manager::z2m_power_meter::{PUBLISH_DURATION, Z2mPowerMeterRow};
+use crate::tasks::telemetry_manager::z2m_power_meter::{
+    PUBLISH_DURATION, Z2mPowerMeterRow, Z2mPowerMeterTable,
+};
 
 #[derive(Debug)]
 pub enum Z2mPublishTopic {
@@ -75,10 +77,13 @@ struct PowerMeterTelemetryContext {
     usage: HashMap<DeviceName, PowerUsage>,
     tx: mpsc::UnboundedSender<Z2mPowerMeterRow>,
     last_sent_at: Instant,
+    table: Arc<Z2mPowerMeterTable>,
 }
 
 impl PowerMeterTelemetryContext {
     pub fn update(&mut self, device_name: DeviceName, power_usage: &PowerUsage) {
+        self.table
+            .update_power_usage(device_name.clone(), power_usage.sum_kwh);
         let current = self.usage.entry(device_name).or_default();
         if current.instant_wattage < power_usage.instant_wattage {
             current.instant_wattage = power_usage.instant_wattage;
@@ -742,6 +747,7 @@ impl Z2mController {
         key: TableKey,
         devices: HashSet<DeviceName>,
         tx: mpsc::UnboundedSender<Z2mPowerMeterRow>,
+        table: Arc<Z2mPowerMeterTable>,
     ) {
         self.power_meters.insert(
             key,
@@ -750,6 +756,7 @@ impl Z2mController {
                 usage: Default::default(),
                 tx,
                 last_sent_at: Instant::now(),
+                table,
             }),
         );
     }

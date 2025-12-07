@@ -1,10 +1,10 @@
 use actix_web::web;
-use chrono::Utc;
 use dxe_data::queries::booking::{get_audio_recording, get_booking_with_user_id};
 use dxe_types::BookingId;
 use sqlx::SqlitePool;
 
 use crate::config::TimeZoneConfig;
+use crate::middleware::datetime_injector::Now;
 use crate::models::entities::AudioRecording;
 use crate::models::handlers::booking::GetAudioRecordingResponse;
 use crate::models::{Error, IntoView};
@@ -12,13 +12,12 @@ use crate::session::UserSession;
 use crate::utils::datetime::is_in_effect;
 
 pub async fn get(
+    now: Now,
     session: UserSession,
     booking_id: web::Path<BookingId>,
     database: web::Data<SqlitePool>,
     timezone_config: web::Data<TimeZoneConfig>,
 ) -> Result<web::Json<GetAudioRecordingResponse>, Error> {
-    let now = Utc::now();
-
     let mut tx = database.begin().await?;
 
     let booking = get_booking_with_user_id(&mut tx, &booking_id, &session.user_id)

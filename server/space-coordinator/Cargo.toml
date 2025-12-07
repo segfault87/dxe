@@ -29,6 +29,6 @@ toml = "0.9"
 url = { workspace = true }
 rumqttc = "0.25"
 
-dxe-extern = { path = "../extern" }
+dxe-extern = { path = "../extern", features = ["amano", "google-cloud", "ntfy"] }
 dxe-s2s-shared = { path = "../s2s-shared" }
 dxe-types = { path = "../types" }

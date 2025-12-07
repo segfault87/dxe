@@ -7,7 +7,7 @@ use uuid::Uuid;
 #[cfg_attr(feature = "sqlx", derive(sqlx::Type), sqlx(rename_all = "lowercase"))]
 pub enum IdentityProvider {
     Kakao,
-    Administrator,
+    Handle,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Deserialize, Serialize)]
@@ -145,5 +145,27 @@ impl From<i64> for AdhocParkingId {
 impl std::fmt::Display for AdhocParkingId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Deserialize, Serialize)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::Type), sqlx(transparent))]
+pub struct ForeignPaymentId(Uuid);
+
+impl From<Uuid> for ForeignPaymentId {
+    fn from(value: Uuid) -> Self {
+        Self(value)
+    }
+}
+
+impl Display for ForeignPaymentId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl ForeignPaymentId {
+    pub fn generate() -> Self {
+        Self(Uuid::new_v4())
     }
 }

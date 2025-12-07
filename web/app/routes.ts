@@ -13,8 +13,17 @@ export default [
     route("inquiries/", "./pages/Inquiries.tsx"),
     route("reservation/", "./pages/Reservation/Create.tsx"),
     route("reservation/login/", "./pages/Reservation/Login.tsx"),
+    route(
+      "reservation/payment/toss/success/",
+      "./pages/Reservation/Payment/TossPaymentSuccess.tsx",
+    ),
+    route(
+      "reservation/payment/toss/fail/",
+      "./pages/Reservation/Payment/TossPaymentFail.tsx",
+    ),
     route("reservation/:bookingId", "./pages/Reservation/Show.tsx"),
     route("login/", "./pages/Login.tsx"),
+    route("temp-login/", "./pages/HandleLogin.tsx"),
     route("register/", "./pages/Register.tsx"),
     route("my/", "./pages/MyPage.tsx"),
     route("terms-of-service/", "./pages/legal/TermsOfService.tsx"),

@@ -44,6 +44,14 @@ export interface CashPaymentStatus {
   isRefunded: boolean;
 }
 
+export interface TossPaymentStatus {
+  price: number;
+  confirmedAt: DateTime | null;
+  refundPrice: number | null;
+  refundedAt: DateTime | null;
+  isRefunded: boolean;
+}
+
 export interface BookingWithPayments {
   booking: Booking;
   payment: CashPaymentStatus | null;
@@ -62,7 +70,7 @@ export interface AdhocReservation {
   reservationStart: DateTime;
   reservationEnd: DateTime;
   reservedHours: number;
-  temporary: boolean;
+  deletedAt: DateTime;
   remark: string | null;
 }
 

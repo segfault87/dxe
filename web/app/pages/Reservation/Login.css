@@ -5,10 +5,12 @@
     .calendar {
         flex: 1;
         height: 600px;
+        display: flex;
+        flex-direction: column;
 
         iframe {
             width: 100%;
-            height: 100%;
+            flex: 1;
             border: #ebc1ae 1px solid;
         }
     }

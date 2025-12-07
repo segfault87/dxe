@@ -1,19 +1,18 @@
 use actix_web::web;
-use chrono::Utc;
 use dxe_data::queries::user::get_users;
 use sqlx::SqlitePool;
 
 use crate::config::TimeZoneConfig;
+use crate::middleware::datetime_injector::Now;
 use crate::models::entities::SelfUser;
 use crate::models::handlers::admin::GetUsersResponse;
 use crate::models::{Error, IntoView};
 
 pub async fn get(
+    now: Now,
     database: web::Data<SqlitePool>,
     timezone_config: web::Data<TimeZoneConfig>,
 ) -> Result<web::Json<GetUsersResponse>, Error> {
-    let now = Utc::now();
-
     let mut connection = database.acquire().await?;
 
     let users = get_users(&mut connection).await?;

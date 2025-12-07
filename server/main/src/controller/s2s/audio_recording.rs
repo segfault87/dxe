@@ -1,24 +1,23 @@
 use actix_web::web;
-use chrono::Utc;
 use dxe_data::queries::booking::{create_audio_recording, get_audio_recording, get_booking};
 use dxe_s2s_shared::handlers::UpdateAudioRequest;
 use dxe_types::BookingId;
 use sqlx::SqlitePool;
 
 use crate::config::TimeZoneConfig;
+use crate::middleware::datetime_injector::Now;
 use crate::models::Error;
 use crate::services::messaging::biztalk::BiztalkSender;
 use crate::utils::messaging::send_audio_recording;
 
 pub async fn post(
+    now: Now,
     booking_id: web::Path<BookingId>,
     body: web::Json<UpdateAudioRequest>,
     database: web::Data<SqlitePool>,
     timezone_config: web::Data<TimeZoneConfig>,
     biztalk_sender: web::Data<Option<BiztalkSender>>,
 ) -> Result<web::Json<serde_json::Value>, Error> {
-    let now = Utc::now();
-
     let mut tx = database.begin().await?;
 
     let booking = get_booking(&mut tx, &booking_id)

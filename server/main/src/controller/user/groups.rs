@@ -1,23 +1,22 @@
 use actix_web::web;
-use chrono::Utc;
 use dxe_data::queries::identity::{
     create_group, get_group_with_members, get_groups_associated_with_members,
 };
 use sqlx::SqlitePool;
 
 use crate::config::TimeZoneConfig;
+use crate::middleware::datetime_injector::Now;
 use crate::models::entities::GroupWithUsers;
 use crate::models::handlers::user::{CreateGroupRequest, CreateGroupResponse, ListGroupsResponse};
 use crate::models::{Error, IntoView};
 use crate::session::UserSession;
 
 pub async fn get(
+    now: Now,
     session: UserSession,
     database: web::Data<SqlitePool>,
     timezone_config: web::Data<TimeZoneConfig>,
 ) -> Result<web::Json<ListGroupsResponse>, Error> {
-    let now = Utc::now();
-
     let mut connection = database.acquire().await?;
 
     let mut groups =
@@ -33,13 +32,12 @@ pub async fn get(
 }
 
 pub async fn post(
+    now: Now,
     session: UserSession,
     body: web::Json<CreateGroupRequest>,
     database: web::Data<SqlitePool>,
     timezone_config: web::Data<TimeZoneConfig>,
 ) -> Result<web::Json<CreateGroupResponse>, Error> {
-    let now = Utc::now();
-
     let mut tx = database.begin().await?;
 
     let group_id = create_group(&mut tx, &now, &session.user_id, &body.name, true).await?;

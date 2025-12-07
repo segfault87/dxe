@@ -24,6 +24,7 @@ pub struct User {
     pub created_at: DateTime<Utc>,
     pub deactivated_at: Option<DateTime<Utc>>,
     pub license_plate_number: Option<String>,
+    pub use_pg_payment: bool,
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -70,4 +71,11 @@ pub struct UserCashPaymentInformation {
     pub user_id: UserId,
     pub depositor_name: Option<String>,
     pub refund_account: Option<String>,
+}
+
+#[derive(Debug, FromRow)]
+pub struct UserPlainCredential {
+    pub user_id: UserId,
+    pub handle: String,
+    pub argon2_password: String,
 }

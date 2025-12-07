@@ -1,0 +1,16 @@
+.contents {
+    display: flex;
+    min-height: 400px;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+
+    p {
+        font-size: 18px;
+        text-align: center;
+    }
+
+    .cta {
+        margin-top: 16px;
+    }
+}

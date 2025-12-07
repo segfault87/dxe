@@ -1,23 +1,23 @@
 use actix_web::web;
-use chrono::{TimeDelta, Utc};
+use chrono::TimeDelta;
 use dxe_data::queries::booking::is_booking_available;
 use dxe_data::queries::unit::is_unit_enabled;
 use sqlx::SqlitePool;
 
 use crate::config::BookingConfig;
+use crate::middleware::datetime_injector::Now;
 use crate::models::Error;
 use crate::models::handlers::booking::{CheckRequest, CheckResponse};
 use crate::session::UserSession;
 use crate::utils::datetime::truncate_time;
 
 pub async fn post(
+    now: Now,
     _session: UserSession,
     body: web::Json<CheckRequest>,
     database: web::Data<SqlitePool>,
     booking_config: web::Data<BookingConfig>,
 ) -> Result<web::Json<CheckResponse>, Error> {
-    let now = Utc::now();
-
     let mut connection = database.acquire().await?;
 
     if is_unit_enabled(&mut connection, &body.unit_id).await? != Some(true) {

@@ -464,6 +464,7 @@ function Reservation() {
     }
 
     setRequestInProgress(true);
+    let activeAdhocReservationId: AdhocReservationId | null = null;
     try {
       const initiateResult = await BookingService.initiateTossPayment({
         unitId: DEFAULT_UNIT_ID,
@@ -473,6 +474,7 @@ function Reservation() {
         temporaryReservationId: temporaryReservationId,
       });
       const data = initiateResult.data;
+      activeAdhocReservationId = data.temporaryReservationId;
       setTemporaryReservationId(data.temporaryReservationId);
 
       await widgets.requestPayment({
@@ -483,6 +485,12 @@ function Reservation() {
         failUrl: window.location.origin + "/reservation/payment/toss/fail/",
       });
     } catch (error) {
+      if (activeAdhocReservationId) {
+        await BookingService.deleteTemporaryReservation(
+          activeAdhocReservationId,
+        );
+        setTemporaryReservationId(null);
+      }
       defaultErrorHandler(error);
     } finally {
       setRequestInProgress(false);

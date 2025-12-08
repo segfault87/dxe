@@ -16,7 +16,12 @@ import type {
   TossPaymentInitiateRequest,
   TossPaymentInitiateResponse,
 } from "../types/handlers/booking";
-import type { BookingId, ForeignPaymentId, UnitId } from "../types/models/base";
+import type {
+  AdhocReservationId,
+  BookingId,
+  ForeignPaymentId,
+  UnitId,
+} from "../types/models/base";
 
 const calendar = (unitId: UnitId) => {
   return API.get<CalendarResponse>(`/bookings/calendar?unit_id=${unitId}`);
@@ -80,6 +85,10 @@ const getTossPaymentState = (id: ForeignPaymentId) => {
   return API.get<GetTossPaymentStateResponse>(`/payments/toss/order/${id}`);
 };
 
+const deleteTemporaryReservation = (id: AdhocReservationId) => {
+  return API.delete(`/adhoc-reservation/${id}`);
+};
+
 const BookingService = {
   calendar,
   check,
@@ -93,6 +102,7 @@ const BookingService = {
   confirmTossPayment,
   cancelTossPayment,
   getTossPaymentState,
+  deleteTemporaryReservation,
 };
 
 export default BookingService;

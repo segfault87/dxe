@@ -2,6 +2,7 @@ mod admin;
 mod auth;
 mod booking;
 mod join_group;
+mod payment;
 mod s2s;
 mod timestamp;
 mod user;
@@ -43,7 +44,8 @@ where
     let scope_with_auth = web::scope("")
         .service(booking::bookings_scope())
         .service(booking::booking_scope())
-        .service(booking::payments_scope())
+        .service(booking::adhoc_reservation_scope())
+        .service(payment::scope())
         .service(user::scope())
         .use_state_guard(
             |session: UserSession| async move {

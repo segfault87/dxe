@@ -507,17 +507,23 @@ impl Z2mController {
             return Err(Error::NotInitialized);
         };
 
-        let switch_policy = if is_present {
-            switch.presence_policy
-        } else if is_active_bookings {
+        let switch_policy = if is_active_bookings {
             switch.booking_policy
         } else {
-            z2m::SwitchPolicy::Off
+            switch.presence_policy
         };
+
+        let is_in_use = is_present || is_active_bookings;
 
         let desired_state = match switch_policy {
             SwitchPolicy::Uncontrolled => return Ok(false),
-            SwitchPolicy::StayOn => z2m::SwitchState::On,
+            SwitchPolicy::StayOn => {
+                if is_in_use {
+                    z2m::SwitchState::On
+                } else {
+                    z2m::SwitchState::Off
+                }
+            }
             SwitchPolicy::Off => z2m::SwitchState::Off,
         };
 

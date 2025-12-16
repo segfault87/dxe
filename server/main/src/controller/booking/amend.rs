@@ -17,10 +17,9 @@ use crate::models::entities::Booking;
 use crate::models::handlers::booking::{AmendBookingRequest, AmendBookingResponse};
 use crate::models::{Error, IntoView};
 use crate::services::calendar::CalendarService;
-use crate::services::messaging::biztalk::BiztalkSender;
+use crate::services::messaging::MessagingService;
 use crate::services::telemetry::{NotificationSender, Priority};
 use crate::session::UserSession;
-use crate::utils::messaging::send_amend_notification;
 
 pub async fn put(
     now: Now,
@@ -32,7 +31,7 @@ pub async fn put(
     timezone_config: web::Data<TimeZoneConfig>,
     calendar_service: web::Data<Option<CalendarService>>,
     notification_sender: web::Data<NotificationSender>,
-    biztalk_sender: web::Data<Option<BiztalkSender>>,
+    messaging_service: web::Data<MessagingService>,
 ) -> Result<web::Json<AmendBookingResponse>, Error> {
     let mut tx = database.begin().await?;
 
@@ -141,15 +140,14 @@ pub async fn put(
         )
         .await?
         {
-            if let Err(e) = send_amend_notification(
-                &biztalk_sender,
-                &mut tx,
-                &timezone_config,
-                &booking,
-                &desired_time_from,
-                &desired_time_to,
-            )
-            .await
+            if let Err(e) = messaging_service
+                .send_amend_notification(
+                    &mut tx,
+                    booking.clone(),
+                    desired_time_from,
+                    desired_time_to,
+                )
+                .await
             {
                 log::warn!("Could not send amend notification to customers: {e}");
             }

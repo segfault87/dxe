@@ -27,11 +27,10 @@ use crate::models::handlers::booking::{
     InitiateTossPaymentRequest, InitiateTossPaymentResponse,
 };
 use crate::services::calendar::CalendarService;
-use crate::services::messaging::biztalk::BiztalkSender;
+use crate::services::messaging::MessagingService;
 use crate::services::telemetry::{NotificationSender, Priority};
 use crate::session::UserSession;
 use crate::utils::datetime::{is_in_effect, truncate_time};
-use crate::utils::messaging::{send_amend_notification, send_confirmation};
 
 const TEMPORARY_RESERVATION_LIFE: TimeDelta = TimeDelta::minutes(10);
 
@@ -187,7 +186,7 @@ async fn confirm_booking_payment<'tx>(
     calendar_service: &Option<CalendarService>,
     timezone_config: &TimeZoneConfig,
     notification_sender: &NotificationSender,
-    biztalk_sender: &Option<BiztalkSender>,
+    messaging_service: &MessagingService,
 ) -> Result<BookingId, Error> {
     if temporary_reservation.holder.id != session.user_id {
         return Err(Error::Forbidden);
@@ -290,7 +289,9 @@ async fn confirm_booking_payment<'tx>(
         ),
     );
 
-    send_confirmation(biztalk_sender, tx, timezone_config, &booking).await?;
+    messaging_service
+        .send_confirmation(tx, booking.clone())
+        .await?;
 
     Ok(booking_id)
 }
@@ -305,7 +306,7 @@ async fn confirm_amend_payment<'tx>(
     calendar_service: &Option<CalendarService>,
     timezone_config: &TimeZoneConfig,
     notification_sender: &NotificationSender,
-    biztalk_sender: &Option<BiztalkSender>,
+    messaging_service: &MessagingService,
 ) -> Result<BookingId, Error> {
     let booking = get_booking(tx, &booking_amendment.booking_id)
         .await?
@@ -363,15 +364,14 @@ async fn confirm_amend_payment<'tx>(
         confirm_toss_payments_transaction(tx, now, &toss_tx.id, &product_id, &payment.payment_key)
             .await?;
 
-    if let Err(e) = send_amend_notification(
-        biztalk_sender,
-        tx,
-        timezone_config,
-        &booking,
-        &booking_amendment.desired_time_from,
-        &booking_amendment.desired_time_to,
-    )
-    .await
+    if let Err(e) = messaging_service
+        .send_amend_notification(
+            tx,
+            booking.clone(),
+            booking_amendment.desired_time_from,
+            booking_amendment.desired_time_to,
+        )
+        .await
     {
         log::warn!("Could not send amend notification to customers: {e}");
     }
@@ -418,7 +418,7 @@ pub async fn confirm_payment(
     timezone_config: web::Data<TimeZoneConfig>,
     toss_payments_client: web::Data<TossPaymentsClient>,
     calendar_service: web::Data<Option<CalendarService>>,
-    biztalk_sender: web::Data<Option<BiztalkSender>>,
+    messaging_service: web::Data<MessagingService>,
     notification_sender: web::Data<NotificationSender>,
 ) -> Result<web::Json<ConfirmTossPaymentResponse>, Error> {
     let mut tx = database.begin().await?;
@@ -453,7 +453,7 @@ pub async fn confirm_payment(
             calendar_service.as_ref(),
             timezone_config.as_ref(),
             notification_sender.as_ref(),
-            biztalk_sender.as_ref(),
+            messaging_service.as_ref(),
         )
         .await?
     } else if let Some(product_id) = toss_tx.product_id {
@@ -474,7 +474,7 @@ pub async fn confirm_payment(
             calendar_service.as_ref(),
             timezone_config.as_ref(),
             notification_sender.as_ref(),
-            biztalk_sender.as_ref(),
+            messaging_service.as_ref(),
         )
         .await?
     } else {

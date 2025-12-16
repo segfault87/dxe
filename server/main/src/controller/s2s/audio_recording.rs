@@ -4,19 +4,16 @@ use dxe_s2s_shared::handlers::UpdateAudioRequest;
 use dxe_types::BookingId;
 use sqlx::SqlitePool;
 
-use crate::config::TimeZoneConfig;
 use crate::middleware::datetime_injector::Now;
 use crate::models::Error;
-use crate::services::messaging::biztalk::BiztalkSender;
-use crate::utils::messaging::send_audio_recording;
+use crate::services::messaging::MessagingService;
 
 pub async fn post(
     now: Now,
     booking_id: web::Path<BookingId>,
     body: web::Json<UpdateAudioRequest>,
     database: web::Data<SqlitePool>,
-    timezone_config: web::Data<TimeZoneConfig>,
-    biztalk_sender: web::Data<Option<BiztalkSender>>,
+    messaging_service: web::Data<MessagingService>,
 ) -> Result<web::Json<serde_json::Value>, Error> {
     let mut tx = database.begin().await?;
 
@@ -33,14 +30,9 @@ pub async fn post(
     )
     .await?
         && let Some(audio_recording) = get_audio_recording(&mut tx, &booking_id).await?
-        && let Err(e) = send_audio_recording(
-            &biztalk_sender,
-            &mut tx,
-            &timezone_config,
-            &booking,
-            &audio_recording,
-        )
-        .await
+        && let Err(e) = messaging_service
+            .send_audio_recording(&mut tx, booking.clone(), audio_recording.clone())
+            .await
     {
         log::warn!("Couldn't send audio recording notification: {e}");
     }

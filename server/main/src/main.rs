@@ -21,8 +21,7 @@ use crate::config::Config;
 use crate::middleware::coordinator_verifier::PublicKeyBundle;
 use crate::services::calendar::CalendarService;
 use crate::services::doorlock::DoorLockService;
-use crate::services::messaging::biztalk::BiztalkClient;
-use crate::services::messaging::spawn_messaging_backend;
+use crate::services::messaging::MessagingService;
 use crate::services::telemetry::spawn_notification_service_task;
 use crate::session::UserSession;
 use crate::utils::aes::AesCrypto;
@@ -71,13 +70,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let toss_payments_client = Data::new(TossPaymentsClient::new(&config.toss_payments));
 
-    let (biztalk_task, biztalk_sender) = if let Some(config) = &config.messaging.biztalk {
-        let backend = BiztalkClient::new(config);
-        let (task, sender) = spawn_messaging_backend(backend);
-        (Some(task), Some(sender))
-    } else {
-        (None, None)
-    };
+    let (messaging_service, messaging_consumers) = MessagingService::new(
+        &config.messaging,
+        config.timezone.clone(),
+        config.url.clone(),
+    );
+    let messaging_service = Data::new(messaging_service);
 
     let (notification_task, notification_sender) =
         spawn_notification_service_task(config.notifications.clone());
@@ -108,8 +106,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .app_data(booking_config.clone())
             .app_data(doorlock_service.clone())
             .app_data(toss_payments_client.clone())
+            .app_data(messaging_service.clone())
             .app_data(Data::new(notification_sender.clone()))
-            .app_data(Data::new(biztalk_sender.clone()))
             .app_data(Data::new(config.url.clone()))
             .app_data(Data::new(calendar_service.clone()))
             .app_data(Data::new(config.telemetry.clone()))
@@ -120,8 +118,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
 
     notification_task.abort();
-    if let Some(v) = biztalk_task {
-        v.abort()
+    for messaging_consumer in messaging_consumers {
+        messaging_consumer.abort();
     }
 
     Ok(())

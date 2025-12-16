@@ -1,5 +1,6 @@
 mod adhoc_parkings;
 mod audio_recording;
+mod booking_reminder;
 mod bookings;
 mod telemetry;
 mod units;
@@ -16,6 +17,10 @@ pub fn scope() -> actix_web::Scope {
         )
         .service(
             web::resource("/booking/{booking_id}/telemetry").route(web::post().to(telemetry::post)),
+        )
+        .service(
+            web::resource("/booking/{booking_id}/reminder")
+                .route(web::post().to(booking_reminder::post)),
         )
         .service(web::resource("/adhoc-parkings").route(web::get().to(adhoc_parkings::get)))
 }

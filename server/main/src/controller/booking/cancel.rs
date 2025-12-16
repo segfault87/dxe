@@ -18,10 +18,9 @@ use crate::models::entities::{CashTransaction, TossPaymentsTransaction, Transact
 use crate::models::handlers::booking::{CancelBookingRequest, CancelBookingResponse};
 use crate::models::{Error, IntoView};
 use crate::services::calendar::CalendarService;
-use crate::services::messaging::biztalk::BiztalkSender;
+use crate::services::messaging::MessagingService;
 use crate::services::telemetry::{NotificationSender, Priority};
 use crate::session::UserSession;
-use crate::utils::messaging::send_cancellation;
 
 pub async fn delete(
     now: Now,
@@ -32,7 +31,7 @@ pub async fn delete(
     booking_config: web::Data<BookingConfig>,
     timezone_config: web::Data<TimeZoneConfig>,
     notification_sender: web::Data<NotificationSender>,
-    biztalk_sender: web::Data<Option<BiztalkSender>>,
+    messaging_service: web::Data<MessagingService>,
     calendar_service: web::Data<Option<CalendarService>>,
     toss_payments_service: web::Data<TossPaymentsClient>,
 ) -> Result<web::Json<CancelBookingResponse>, Error> {
@@ -83,14 +82,9 @@ pub async fn delete(
 
         let refund_rate = (refund_price * 100 / cash_tx.price) as i32;
 
-        send_cancellation(
-            biztalk_sender.as_ref(),
-            &mut tx,
-            &timezone_config,
-            &booking,
-            refund_rate,
-        )
-        .await?;
+        messaging_service
+            .send_cancellation(&mut tx, booking.clone(), refund_rate)
+            .await?;
 
         Some(Transaction::Cash(CashTransaction::convert(
             cash_tx,
@@ -183,14 +177,9 @@ pub async fn delete(
         }
 
         let refund_rate = (refund_price * 100 / toss_tx.price) as i32;
-        send_cancellation(
-            biztalk_sender.as_ref(),
-            &mut tx,
-            &timezone_config,
-            &booking,
-            refund_rate,
-        )
-        .await?;
+        messaging_service
+            .send_cancellation(&mut tx, booking.clone(), refund_rate)
+            .await?;
 
         Some(Transaction::TossPayments(TossPaymentsTransaction::convert(
             toss_tx,

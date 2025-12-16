@@ -10,10 +10,9 @@ use crate::models::entities::{Booking, CashTransaction};
 use crate::models::handlers::admin::{ModifyAction, ModifyBookingRequest, ModifyBookingResponse};
 use crate::models::{Error, IntoView};
 use crate::services::calendar::CalendarService;
-use crate::services::messaging::biztalk::BiztalkSender;
+use crate::services::messaging::MessagingService;
 use crate::session::UserSession;
 use crate::utils::datetime::is_in_effect;
-use crate::utils::messaging::{send_confirmation, send_refund_confirmation};
 
 pub async fn put(
     now: Now,
@@ -23,7 +22,7 @@ pub async fn put(
     database: web::Data<SqlitePool>,
     booking_config: web::Data<BookingConfig>,
     timezone_config: web::Data<TimeZoneConfig>,
-    biztalk_sender: web::Data<Option<BiztalkSender>>,
+    messaging_service: web::Data<MessagingService>,
     calendar_service: web::Data<Option<CalendarService>>,
 ) -> Result<web::Json<ModifyBookingResponse>, Error> {
     let mut tx = database.begin().await?;
@@ -67,19 +66,16 @@ pub async fn put(
 
     match body.action {
         ModifyAction::Confirm => {
-            send_confirmation(biztalk_sender.as_ref(), &mut tx, &timezone_config, &booking).await?;
+            messaging_service
+                .send_confirmation(&mut tx, booking.clone())
+                .await?;
         }
         ModifyAction::Refund => {
             if let Some(cash_payment_status) = &cash_tx
                 && let Some(refund_price) = cash_payment_status.refund_price
                 && refund_price > 0
             {
-                send_refund_confirmation(
-                    biztalk_sender.as_ref(),
-                    &timezone_config,
-                    &booking,
-                    refund_price,
-                );
+                messaging_service.send_refund_confirmation(booking.clone(), refund_price);
             }
         }
         _ => {}

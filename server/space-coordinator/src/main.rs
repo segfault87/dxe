@@ -15,6 +15,7 @@ use crate::services::mqtt::MqttService;
 use crate::services::notification::NotificationService;
 use crate::tasks::TaskContext;
 use crate::tasks::audio_recorder::AudioRecorder;
+use crate::tasks::booking_reminder::BookingReminder;
 use crate::tasks::booking_state_manager::BookingStateManager;
 use crate::tasks::carpark_exempter::CarparkExempter;
 use crate::tasks::osd_controller::OsdController;
@@ -79,10 +80,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
     let (audio_recorder, audio_recorder_task) = audio_recorder.task();
 
+    let booking_reminder = BookingReminder::new(client.clone());
+
     booking_state_manager.add_callback(z2m_controller.clone());
     booking_state_manager.add_callback(audio_recorder);
     booking_state_manager.add_callback(telemetry_manager.clone());
     booking_state_manager.add_callback(osd_controller.clone());
+    booking_state_manager.add_callback(booking_reminder);
 
     presence_monitor.add_callback(z2m_controller);
 

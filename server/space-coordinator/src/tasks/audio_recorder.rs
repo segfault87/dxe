@@ -264,12 +264,11 @@ impl EventStateCallback<BookingWithUsers> for AudioRecorder {
         event: &BookingWithUsers,
         buffered: bool,
     ) -> Result<(), Box<dyn StdError>> {
-        if !buffered {
-            if let Some(config) = self.config.get(&event.booking.unit_id) {
-                if let Err(e) = self.start(config, event).await {
-                    log::warn!("Could not create audio recorder task: {e}");
-                }
-            }
+        if !buffered
+            && let Some(config) = self.config.get(&event.booking.unit_id)
+            && let Err(e) = self.start(config, event).await
+        {
+            log::warn!("Could not create audio recorder task: {e}");
         }
 
         Ok(())
@@ -280,10 +279,8 @@ impl EventStateCallback<BookingWithUsers> for AudioRecorder {
         event: &BookingWithUsers,
         buffered: bool,
     ) -> Result<(), Box<dyn StdError>> {
-        if !buffered {
-            if let Some(config) = self.config.get(&event.booking.unit_id) {
-                self.stop(config, event).await;
-            }
+        if !buffered && let Some(config) = self.config.get(&event.booking.unit_id) {
+            self.stop(config, event).await;
         }
 
         Ok(())

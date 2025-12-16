@@ -23,8 +23,20 @@ import type {
   UnitId,
 } from "../types/models/base";
 
-const calendar = (unitId: UnitId) => {
-  return API.get<CalendarResponse>(`/bookings/calendar?unit_id=${unitId}`);
+const calendar = (
+  unitId: UnitId,
+  excludeBookingId?: BookingId,
+  excludeAdhocReservationId?: AdhocReservationId,
+) => {
+  let url = `/bookings/calendar?unit_id=${unitId}`;
+  if (excludeBookingId) {
+    url += `&exclude_booking_id=${excludeBookingId}`;
+  }
+  if (excludeAdhocReservationId) {
+    url += `&exclude_adhoc_reservation_id=${excludeAdhocReservationId}`;
+  }
+
+  return API.get<CalendarResponse>(url);
 };
 
 const check = (data: CheckRequest) => {

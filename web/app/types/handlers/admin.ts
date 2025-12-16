@@ -4,9 +4,9 @@ import type {
   AdhocReservation,
   Booking,
   BookingWithPayments,
-  CashPaymentStatus,
 } from "../models/booking";
 import type { GroupWithUsers } from "../models/group";
+import type { CashTransaction } from "../models/payment";
 import type { SelfUser } from "../models/user";
 
 export interface GetBookingsResponse {
@@ -21,7 +21,7 @@ export interface ModifyBookingRequest {
 
 export interface ModifyBookingResponse {
   booking: Booking;
-  cashPaymentStatus: CashPaymentStatus;
+  cashTransaction: CashTransaction;
 }
 
 export interface GetAdhocReservationsResponse {

@@ -60,8 +60,7 @@ pub async fn get_user_by_id(
             name,
             created_at AS "created_at: _",
             deactivated_at AS "deactivated_at: _",
-            license_plate_number,
-            use_pg_payment
+            license_plate_number
         FROM user
         WHERE id = ?1 AND
             (deactivated_at IS NULL OR deactivated_at < ?2)
@@ -89,8 +88,7 @@ pub async fn get_user_by_foreign_id(
             name,
             created_at AS "created_at: _",
             deactivated_at AS "deactivated_at: _",
-            license_plate_number,
-            use_pg_payment
+            license_plate_number
         FROM user
         WHERE provider = ?1 AND foreign_id = ?2 AND
             (deactivated_at IS NULL OR deactivated_at < ?3)
@@ -114,8 +112,7 @@ pub async fn get_users(executor: &mut SqliteConnection) -> Result<Vec<User>, Err
             name,
             created_at AS "created_at: _",
             deactivated_at AS "deactivated_at: _",
-            license_plate_number,
-            use_pg_payment
+            license_plate_number
         FROM user
         ORDER BY created_at DESC
         "#,

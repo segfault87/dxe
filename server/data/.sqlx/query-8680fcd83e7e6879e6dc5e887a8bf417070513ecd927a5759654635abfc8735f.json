@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            remark,\n            time_from AS \"time_from: DateTime<Utc>\",\n            time_to AS \"time_to: DateTime<Utc>\"\n        FROM adhoc_reservation\n        WHERE\n            time_to >= ?1 AND time_from < ?2 AND\n            unit_id = ?3 AND\n            (deleted_at IS NULL OR deleted_at > ?4) AND\n            id != ?5\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "remark",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "time_from: DateTime<Utc>",
+        "ordinal": 1,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "time_to: DateTime<Utc>",
+        "ordinal": 2,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "8680fcd83e7e6879e6dc5e887a8bf417070513ecd927a5759654635abfc8735f"
+}

@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use dxe_data::entities::{AudioRecording, Booking, Identity};
 use dxe_data::queries::identity::get_group_members;
 use dxe_types::IdentityProvider;
@@ -46,6 +47,63 @@ pub async fn send_confirmation(
             booking_id: booking.id,
             customer_name: booking.customer.name().to_owned(),
             reservation_time: time_str,
+        });
+    }
+
+    Ok(())
+}
+
+pub async fn send_amend_notification(
+    biztalk_sender: &Option<BiztalkSender>,
+    database: &mut SqliteConnection,
+    timezone_config: &TimeZoneConfig,
+    booking: &Booking,
+    new_time_from: &DateTime<Utc>,
+    new_time_to: &DateTime<Utc>,
+) -> Result<(), Error> {
+    let prev_start = timezone_config.convert(booking.time_from);
+    let prev_end = timezone_config.convert(booking.time_to);
+
+    let prev_time_str = format!(
+        "{} - {} ({} 시간)",
+        prev_start.format("%Y-%m-%d %H:%M"),
+        prev_end.format("%Y-%m-%d %H:%M"),
+        (prev_end - prev_start).num_hours()
+    );
+
+    let new_start = timezone_config.convert(*new_time_from);
+    let new_end = timezone_config.convert(*new_time_to);
+
+    let new_time_str = format!(
+        "{} - {} ({} 시간)",
+        new_start.format("%Y-%m-%d %H:%M"),
+        new_end.format("%Y-%m-%d %H:%M"),
+        (new_end - new_start).num_hours()
+    );
+
+    let recipients = match &booking.customer {
+        Identity::Group(g) => get_group_members(&mut *database, &g.id).await?,
+        Identity::User(u) => vec![u.clone()],
+    };
+
+    if let Some(biztalk_sender) = biztalk_sender {
+        let biztalk_recipients: Vec<_> = recipients
+            .iter()
+            .filter_map(|v| {
+                if v.provider == IdentityProvider::Kakao {
+                    Some(v.foreign_id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        biztalk_sender.send(MessagingEvent::AmendNotification {
+            recipients: biztalk_recipients,
+            booking_id: booking.id,
+            customer_name: booking.customer.name().to_owned(),
+            old_reservation_time: prev_time_str,
+            new_reservation_time: new_time_str,
         });
     }
 

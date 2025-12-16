@@ -10,6 +10,22 @@ pub enum Priority {
     Low,
 }
 
+#[derive(Clone, Debug, Default)]
+struct NoopService;
+
+impl NoopService {
+    pub fn notify(&self, priority: Priority, message: String) -> Result<(), Error> {
+        let level = match priority {
+            Priority::High => "high",
+            Priority::Default => "default",
+            Priority::Low => "low",
+        };
+        log::info!("New notification ({level}): {message}");
+
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug)]
 struct NtfyService {
     client: NtfyClient,
@@ -37,6 +53,7 @@ impl NtfyService {
 
 #[derive(Clone, Debug)]
 enum Backend {
+    Noop(NoopService),
     Ntfy(NtfyService),
 }
 
@@ -47,6 +64,7 @@ pub struct NotificationService {
 impl NotificationService {
     async fn notify(&self, priority: Priority, message: String) -> Result<(), Error> {
         match &self.backend {
+            Backend::Noop(service) => service.notify(priority, message),
             Backend::Ntfy(service) => service.notify(priority, message).await,
         }
     }
@@ -66,6 +84,7 @@ impl NotificationSender {
 impl NotificationService {
     pub fn new(config: NotificationConfig) -> Self {
         let backend = match config.backend {
+            NotificationBackend::Noop => Backend::Noop(Default::default()),
             NotificationBackend::Ntfy => Backend::Ntfy(NtfyService::new(config.ntfy.unwrap())),
         };
 

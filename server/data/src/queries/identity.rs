@@ -23,7 +23,6 @@ pub async fn get_identity(
             u.created_at AS "u_created_at: Option<DateTime<Utc>>",
             u.deactivated_at AS "u_deactivated_at: DateTime<Utc>",
             u.license_plate_number AS "u_license_plate_number",
-            u.use_pg_payment AS "u_use_pg_payment",
             g.id AS "g_id: Option<GroupId>",
             g.name AS "g_name: Option<String>",
             g.owner_id AS "g_owner_id: Option<UserId>",
@@ -58,7 +57,6 @@ pub async fn get_identity(
                     .ok_or(Error::MissingField("u.created_at"))?,
                 deactivated_at: result.u_deactivated_at,
                 license_plate_number: result.u_license_plate_number,
-                use_pg_payment: result.u_use_pg_payment,
             }))),
             IdentityDiscriminator::Group => Ok(Some(Identity::Group(Group {
                 id: result.g_id.ok_or(Error::MissingField("g.id"))?,
@@ -123,8 +121,7 @@ pub async fn get_group_with_members(
             u.name AS "u_name",
             u.created_at AS "u_created_at: DateTime<Utc>",
             u.deactivated_at AS "u_deactivated_at: DateTime<Utc>",
-            u.license_plate_number AS "u_license_plate_number",
-            u.use_pg_payment AS "u_use_pg_payment"
+            u.license_plate_number AS "u_license_plate_number"
         FROM "group" "g"
         JOIN group_association "ga" ON g.id = ga.group_id
         JOIN user "u" ON ga.user_id = u.id
@@ -161,7 +158,6 @@ pub async fn get_group_with_members(
             created_at: i.u_created_at,
             deactivated_at: i.u_deactivated_at,
             license_plate_number: i.u_license_plate_number,
-            use_pg_payment: i.u_use_pg_payment,
         });
     }
 
@@ -218,8 +214,7 @@ pub async fn get_all_groups_associated_with_members(
             u.name AS "u_name",
             u.created_at AS "u_created_at: DateTime<Utc>",
             u.deactivated_at AS "u_deactivated_at: DateTime<Utc>",
-            u.license_plate_number AS "u_license_plate_number",
-            u.use_pg_payment AS "u_use_pg_payment"
+            u.license_plate_number AS "u_license_plate_number"
         FROM "group" "g"
         JOIN group_association "ga" ON g.id = ga.group_id
         JOIN user "u" ON ga.user_id = u.id
@@ -256,7 +251,6 @@ pub async fn get_all_groups_associated_with_members(
             created_at: row.u_created_at,
             deactivated_at: row.u_deactivated_at,
             license_plate_number: row.u_license_plate_number,
-            use_pg_payment: row.u_use_pg_payment,
         });
     }
 
@@ -283,8 +277,7 @@ pub async fn get_groups_associated_with_members(
             u.name AS "u_name",
             u.created_at AS "u_created_at: DateTime<Utc>",
             u.deactivated_at AS "u_deactivated_at: DateTime<Utc>",
-            u.license_plate_number AS "u_license_plate_number",
-            u.use_pg_payment AS "u_use_pg_payment"
+            u.license_plate_number AS "u_license_plate_number"
         FROM "group" "g"
         JOIN group_association "ga" ON g.id = ga.group_id
         JOIN user "u" ON ga.user_id = u.id
@@ -332,7 +325,6 @@ pub async fn get_groups_associated_with_members(
             created_at: row.u_created_at,
             deactivated_at: row.u_deactivated_at,
             license_plate_number: row.u_license_plate_number,
-            use_pg_payment: row.u_use_pg_payment,
         });
     }
 
@@ -492,8 +484,7 @@ pub async fn get_group_members(
             u.name AS "u_name: String",
             u.created_at AS "u_created_at: DateTime<Utc>",
             u.deactivated_at AS "u_deactivated_at: DateTime<Utc>",
-            u.license_plate_number AS "u_license_plate_number",
-            u.use_pg_payment AS "u_use_pg_payment"
+            u.license_plate_number AS "u_license_plate_number"
         FROM
             group_association "ga"
         JOIN
@@ -516,7 +507,6 @@ pub async fn get_group_members(
             created_at: v.u_created_at,
             deactivated_at: v.u_deactivated_at,
             license_plate_number: v.u_license_plate_number,
-            use_pg_payment: v.u_use_pg_payment,
         })
         .collect())
 }
@@ -596,7 +586,6 @@ pub async fn get_user_plain_credential_with_user_id(
             u.created_at AS "u_created_at: DateTime<Utc>",
             u.deactivated_at AS "u_deactivated_at: DateTime<Utc>",
             u.license_plate_number AS "u_license_plate_number",
-            u.use_pg_payment AS "u_use_pg_payment",
             upc.handle AS "upc_handle",
             upc.argon2_password AS "upc_argon2_password"
         FROM
@@ -622,7 +611,6 @@ pub async fn get_user_plain_credential_with_user_id(
                 created_at: r.u_created_at,
                 deactivated_at: r.u_deactivated_at,
                 license_plate_number: r.u_license_plate_number,
-                use_pg_payment: r.u_use_pg_payment,
             },
             UserPlainCredential {
                 user_id: r.u_id,
@@ -648,7 +636,6 @@ pub async fn get_user_plain_credential_with_handle(
             u.created_at AS "u_created_at: DateTime<Utc>",
             u.deactivated_at AS "u_deactivated_at: DateTime<Utc>",
             u.license_plate_number AS "u_license_plate_number",
-            u.use_pg_payment AS "u_use_pg_payment",
             upc.handle AS "upc_handle",
             upc.argon2_password AS "upc_argon2_password"
         FROM
@@ -674,7 +661,6 @@ pub async fn get_user_plain_credential_with_handle(
                 created_at: r.u_created_at,
                 deactivated_at: r.u_deactivated_at,
                 license_plate_number: r.u_license_plate_number,
-                use_pg_payment: r.u_use_pg_payment,
             },
             UserPlainCredential {
                 user_id: r.u_id,

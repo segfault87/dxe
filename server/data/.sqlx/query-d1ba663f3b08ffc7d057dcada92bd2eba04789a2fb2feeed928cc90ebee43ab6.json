@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO toss_payments_transaction(id, user_id, temporary_reservation_id, product_id, price, created_at)\n        VALUES(?1, ?2, ?3, ?4, ?5, ?6)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "d1ba663f3b08ffc7d057dcada92bd2eba04789a2fb2feeed928cc90ebee43ab6"
+}

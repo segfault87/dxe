@@ -22,6 +22,7 @@ export default [
       "./pages/Reservation/Payment/TossPaymentFail.tsx",
     ),
     route("reservation/:bookingId", "./pages/Reservation/Show.tsx"),
+    route("reservation/:bookingId/amend", "./pages/Reservation/Amend.tsx"),
     route("login/", "./pages/Login.tsx"),
     route("temp-login/", "./pages/HandleLogin.tsx"),
     route("register/", "./pages/Register.tsx"),

@@ -1,18 +1,17 @@
 use actix_web::web;
 use chrono::TimeDelta;
 use dxe_data::entities::Identity;
-use dxe_data::queries::booking::{
-    create_booking, create_cash_payment_status, get_booking_with_user_id, get_cash_payment_status,
-    is_booking_available,
-};
+use dxe_data::queries::booking::{create_booking, get_booking_with_user_id};
 use dxe_data::queries::identity::{get_group_members, get_identity, is_member_of};
+use dxe_data::queries::payment::{create_cash_transaction, get_cash_transaction};
 use dxe_data::queries::unit::is_unit_enabled;
 use dxe_data::queries::user::update_user_cash_payment_depositor_name;
+use dxe_types::ProductId;
 use sqlx::SqlitePool;
 
 use crate::config::{BookingConfig, TimeZoneConfig};
 use crate::middleware::datetime_injector::Now;
-use crate::models::entities::{Booking, BookingCashPaymentStatus};
+use crate::models::entities::{Booking, CashTransaction};
 use crate::models::handlers::booking::{SubmitBookingRequest, SubmitBookingResponse};
 use crate::models::{Error, IntoView};
 use crate::services::calendar::CalendarService;
@@ -42,10 +41,6 @@ pub async fn post(
 
     let time_from = truncate_time(body.time_from).to_utc();
     let time_to = time_from + TimeDelta::hours(body.desired_hours);
-
-    if !is_booking_available(&mut tx, &now, &body.unit_id, &time_from, &time_to).await? {
-        return Err(Error::TimeRangeOccupied);
-    }
 
     let identity = get_identity(&mut tx, &now, &body.identity_id)
         .await?
@@ -89,10 +84,12 @@ pub async fn post(
     )
     .await?;
 
-    create_cash_payment_status(
+    let product_id = ProductId::from(booking_id);
+
+    create_cash_transaction(
         &mut tx,
         &now,
-        &booking_id,
+        &product_id,
         body.depositor_name.as_str(),
         price,
     )
@@ -102,25 +99,24 @@ pub async fn post(
         .await?
         .ok_or(Error::BookingNotFound)?;
 
-    let cash_payment_status = get_cash_payment_status(&mut tx, &booking_id)
+    let cash_tx = get_cash_transaction(&mut tx, &product_id)
         .await?
         .ok_or(Error::BookingNotFound)?;
 
     tx.commit().await?;
 
-    if let Some(calendar_service) = calendar_service.as_ref() {
-        if let Err(e) = calendar_service
+    if let Some(calendar_service) = calendar_service.as_ref()
+        && let Err(e) = calendar_service
             .register_booking(&timezone_config, &booking, &customers)
             .await
-        {
-            log::error!("Failed to register event on calendar: {e}");
-        }
+    {
+        log::error!("Failed to register event on calendar: {e}");
     }
 
     notification_sender.enqueue(
         Priority::High,
         format!(
-            "New booking by {}: {} ({} hours)",
+            "New booking request by {}: {} ({} hours)",
             identity.name(),
             timezone_config.convert(time_from),
             body.desired_hours
@@ -130,10 +126,6 @@ pub async fn post(
     Ok(web::Json(SubmitBookingResponse {
         booking: Booking::convert(booking, &timezone_config, &now)?
             .finish(booking_config.as_ref(), &now),
-        cash_payment_status: BookingCashPaymentStatus::convert(
-            cash_payment_status,
-            &timezone_config,
-            &now,
-        )?,
+        cash_transaction: CashTransaction::convert(cash_tx, &timezone_config, &now)?,
     }))
 }

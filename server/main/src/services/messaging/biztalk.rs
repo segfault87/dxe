@@ -15,6 +15,8 @@ const MESSAGE_RESERVATION_CANCEL_RF_01: &str =
     include_str!("biztalk/RESERVATION_CANCEL_RF_01.txt").trim_ascii();
 const MESSAGE_RESERVATION_CONFIRMATION_02: &str =
     include_str!("biztalk/RESERVATION_CONFIRMATION_02.txt").trim_ascii();
+const MESSAGE_RESERVATION_AMEND_01: &str =
+    include_str!("biztalk/RESERVATION_AMEND_01.txt").trim_ascii();
 
 const TEMPLATE_AUDIO_READY: &str = "AUDIO_READY_01";
 const TEMPLATE_RESERVATION_CANCEL_CONFIRM: &str = "RESERVATION_CONFIRM_01";
@@ -22,6 +24,7 @@ const TEMPLATE_RESERVATION_CANCEL_NO_REFUND: &str = "RESERVATION_CANCEL_NRF_01";
 const TEMPLATE_RESERVATION_CANCEL_HALF_REFUND: &str = "RESERVATION_CANCEL_HRF_01";
 const TEMPLATE_RESERVATION_CANCEL_FULL_REFUND: &str = "RESERVATION_CANCEL_RF_01";
 const TEMPLATE_RESERVATION_CONFIRMATION: &str = "RESERVATION_CONFIRMATION_02";
+const TEMPLATE_RESERVATION_AMEND: &str = "RESERVATION_AMEND_01";
 
 pub type BiztalkRecipient = String;
 pub type BiztalkSender = super::MessagingSender<BiztalkRecipient>;
@@ -68,6 +71,50 @@ impl MessagingBackend for BiztalkClient {
                     message.clone(),
                     Some(vec![AlimTalkButtonAttachment {
                         name: "이용 안내".to_owned(),
+                        r#type: Default::default(),
+                        url_mobile: url.clone(),
+                        url_pc: Some(url.clone()),
+                    }]),
+                )
+                .await
+            {
+                error = Some(e);
+            }
+        }
+
+        if let Some(error) = error {
+            Err(error.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    async fn send_amend_notification(
+        &self,
+        recipients: Vec<Self::Recipient>,
+        booking_id: &BookingId,
+        customer_name: &str,
+        old_reservation_time: &str,
+        new_reservation_time: &str,
+    ) -> Result<(), Self::Error> {
+        let message = MESSAGE_RESERVATION_AMEND_01
+            .replace("#{customer}", customer_name)
+            .replace("#{old_reservation_dt}", old_reservation_time)
+            .replace("#{new_reservation_dt}", new_reservation_time);
+
+        let url = format!("https://dream-house.kr/reservation/{booking_id}");
+
+        let mut error = None;
+
+        for recipient in recipients {
+            if let Err(e) = self
+                .client
+                .send_alimtalk(
+                    &recipient,
+                    TEMPLATE_RESERVATION_AMEND,
+                    message.clone(),
+                    Some(vec![AlimTalkButtonAttachment {
+                        name: "예약 확인".to_owned(),
                         r#type: Default::default(),
                         url_mobile: url.clone(),
                         url_pc: Some(url.clone()),

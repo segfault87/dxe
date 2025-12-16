@@ -8,18 +8,15 @@ use std::path::PathBuf;
 use dxe_types::{SpaceId, UnitId};
 use serde::Deserialize;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Deserialize)]
+use crate::services::mqtt::MqttTopicPrefix;
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum AlertPriority {
     High,
+    #[default]
     Default,
     Low,
-}
-
-impl Default for AlertPriority {
-    fn default() -> Self {
-        Self::Default
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -140,6 +137,11 @@ pub struct AudioRecorderConfig {
     pub path_prefix: PathBuf,
 }
 
+#[derive(Deserialize, Clone, Debug)]
+pub struct OsdConfig {
+    pub topic_prefix: MqttTopicPrefix,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub space_id: SpaceId,
@@ -153,6 +155,7 @@ pub struct Config {
     pub google_apis: GoogleApiConfig,
     pub audio_recorder: HashMap<UnitId, AudioRecorderConfig>,
     pub z2m: z2m::Config,
+    pub osd: OsdConfig,
     pub telemetry: telemetry::Config,
 }
 

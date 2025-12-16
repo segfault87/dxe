@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            id AS \"id: _\",\n            user_id AS \"user_id: _\",\n            temporary_reservation_id AS \"temporary_reservation_id: _\",\n            product_id AS \"product_id: _\",\n            price,\n            payment_key,\n            created_at AS \"created_at: _\",\n            confirmed_at AS \"confirmed_at: _\",\n            refund_price,\n            refunded_at AS \"refunded_at: _\"\n        FROM\n            toss_payments_transaction\n        WHERE\n            id=?1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: _",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "user_id: _",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "temporary_reservation_id: _",
+        "ordinal": 2,
+        "type_info": "Blob"
+      },
+      {
+        "name": "product_id: _",
+        "ordinal": 3,
+        "type_info": "Blob"
+      },
+      {
+        "name": "price",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "payment_key",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at: _",
+        "ordinal": 6,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "confirmed_at: _",
+        "ordinal": 7,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "refund_price",
+        "ordinal": 8,
+        "type_info": "Integer"
+      },
+      {
+        "name": "refunded_at: _",
+        "ordinal": 9,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "e8f86d0bdf9ecdb68c3fb44f28a10064fd1774c8091364a2f5e4afda3b910bc7"
+}

@@ -10,12 +10,6 @@ pub enum IdentityDiscriminator {
 }
 
 #[derive(Debug, Clone, FromRow)]
-pub struct IdentityRow {
-    pub id: IdentityId,
-    pub discriminator: IdentityDiscriminator,
-}
-
-#[derive(Debug, Clone, FromRow)]
 pub struct User {
     pub id: UserId,
     pub provider: IdentityProvider,
@@ -24,7 +18,6 @@ pub struct User {
     pub created_at: DateTime<Utc>,
     pub deactivated_at: Option<DateTime<Utc>>,
     pub license_plate_number: Option<String>,
-    pub use_pg_payment: bool,
 }
 
 #[derive(Debug, Clone, FromRow)]

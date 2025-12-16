@@ -10,6 +10,7 @@ import BookingService from "../../api/booking";
 import UserService from "../../api/user";
 import { DEFAULT_UNIT_ID } from "../../constants";
 import { useAuth } from "../../context/AuthContext";
+import { useEnv } from "../../context/EnvContext";
 import { checkSlots, toUtcIso8601 } from "../../lib/datetime";
 import { defaultErrorHandler } from "../../lib/error";
 import RequiresAuth from "../../lib/RequiresAuth";
@@ -23,7 +24,6 @@ import type {
 } from "../../types/models/base";
 import type { OccupiedSlot } from "../../types/models/booking";
 import type { GroupWithUsers } from "../../types/models/group";
-import { useEnv } from "../../context/EnvContext";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "예약 | 드림하우스 합주실" }];
@@ -344,7 +344,7 @@ function TossPayment({
 
         setTossPaymentsWidgets(widgets);
       } catch {
-        // supress error
+        // suppress error
       }
     };
 
@@ -368,6 +368,7 @@ function TossPayment({
 
 function Reservation() {
   const auth = useAuth();
+  const env = useEnv();
 
   const [start, setStart] = useState(new Date());
   const [end, setEnd] = useState(new Date());
@@ -404,9 +405,9 @@ function Reservation() {
     selectedHours !== null &&
     !isRequestInProgress;
 
-  if (auth?.user.usePgPayment === true) {
+  if (env.enableTossPayments) {
     isAvailable &&= hasAgreedRequiredTerms;
-  } else if (auth?.user.usePgPayment === false) {
+  } else {
     isAvailable &&= depositor.trim().length > 0;
   }
 
@@ -498,9 +499,9 @@ function Reservation() {
   };
 
   const proceedPayment = async () => {
-    if (auth?.user.usePgPayment === true && tossPaymentsWidgets !== null) {
+    if (env.enableTossPayments && tossPaymentsWidgets !== null) {
       await proceedTossPayment(tossPaymentsWidgets);
-    } else if (auth?.user.usePgPayment === false) {
+    } else if (!env.enableTossPayments) {
       await makeReservation();
     }
   };
@@ -590,7 +591,7 @@ function Reservation() {
       </Section>
       <Section id="payment" title="결제 정보">
         {auth ? (
-          auth.user.usePgPayment ? (
+          env.enableTossPayments ? (
             <TossPayment
               userId={auth.user.id}
               price={price}

@@ -1,0 +1,68 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            id AS \"id: _\",\n            booking_id AS \"booking_id: _\",\n            original_time_from AS \"original_time_from: _\",\n            original_time_to AS \"original_time_to: _\",\n            desired_time_from AS \"desired_time_from: _\",\n            desired_time_to AS \"desired_time_to: _\",\n            created_at AS \"created_at: _\",\n            confirmed_at AS \"confirmed_at: _\",\n            canceled_at AS \"canceled_at: _\"\n        FROM\n            booking_amendment\n        WHERE\n            id = ?1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: _",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "booking_id: _",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "original_time_from: _",
+        "ordinal": 2,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "original_time_to: _",
+        "ordinal": 3,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "desired_time_from: _",
+        "ordinal": 4,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "desired_time_to: _",
+        "ordinal": 5,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "created_at: _",
+        "ordinal": 6,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "confirmed_at: _",
+        "ordinal": 7,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "canceled_at: _",
+        "ordinal": 8,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "ef9484b83ea600c16b7a365e07bff23b3cce5f0dbfbf003fb4f7c0199e1f9249"
+}

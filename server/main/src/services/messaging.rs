@@ -11,6 +11,13 @@ pub enum MessagingEvent<R> {
         customer_name: String,
         reservation_time: String,
     },
+    AmendNotification {
+        recipients: Vec<R>,
+        booking_id: BookingId,
+        customer_name: String,
+        old_reservation_time: String,
+        new_reservation_time: String,
+    },
     CancelNotification {
         recipients: Vec<R>,
         booking_id: BookingId,
@@ -56,6 +63,14 @@ pub trait MessagingBackend {
         booking_id: &BookingId,
         customer_name: &str,
         reservation_time: &str,
+    ) -> Result<(), Self::Error>;
+    async fn send_amend_notification(
+        &self,
+        recipients: Vec<Self::Recipient>,
+        booking_id: &BookingId,
+        customer_name: &str,
+        old_reservation_time: &str,
+        new_reservation_time: &str,
     ) -> Result<(), Self::Error>;
     async fn send_cancel_notification(
         &self,
@@ -105,8 +120,28 @@ where
                         .send_booking_confirmation(
                             recipients,
                             &booking_id,
-                            customer_name.as_str(),
-                            reservation_time.as_str(),
+                            &customer_name,
+                            &reservation_time,
+                        )
+                        .await
+                    {
+                        log::warn!("Could not send booking confirmation: {e}");
+                    }
+                }
+                MessagingEvent::AmendNotification {
+                    recipients,
+                    booking_id,
+                    customer_name,
+                    old_reservation_time,
+                    new_reservation_time,
+                } => {
+                    if let Err(e) = backend
+                        .send_amend_notification(
+                            recipients,
+                            &booking_id,
+                            &customer_name,
+                            &old_reservation_time,
+                            &new_reservation_time,
                         )
                         .await
                     {
@@ -124,8 +159,8 @@ where
                         .send_cancel_notification(
                             recipients,
                             &booking_id,
-                            customer_name.as_str(),
-                            reservation_time.as_str(),
+                            &customer_name,
+                            &reservation_time,
                             refund_rate,
                         )
                         .await

@@ -6,6 +6,10 @@ pub enum Error {
     UnitNotFound,
     #[error("User not found")]
     UserNotFound,
+    #[error("Booking not found")]
+    BookingNotFound,
+    #[error("Booking amendment not found")]
+    BookingAmendmentNotFound,
     #[error("Invalid desired time range")]
     InvalidTimeRange,
     #[error("Specified time range is already occupied")]

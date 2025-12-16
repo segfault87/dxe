@@ -22,7 +22,7 @@ impl From<String> for UnitId {
 
 impl Display for UnitId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        self.0.fmt(f)
     }
 }
 
@@ -42,6 +42,16 @@ impl Display for SpaceId {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Deserialize, Serialize)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::Type), sqlx(transparent))]
+pub struct ProductId(Uuid);
+
+impl Display for ProductId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Deserialize, Serialize, Hash)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::Type), sqlx(transparent))]
 pub struct BookingId(Uuid);
@@ -50,11 +60,43 @@ impl BookingId {
     pub fn generate() -> Self {
         Self(Uuid::new_v4())
     }
+
+    pub fn nil() -> Self {
+        Self(Uuid::nil())
+    }
 }
 
 impl Display for BookingId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        self.0.fmt(f)
+    }
+}
+
+impl From<BookingId> for ProductId {
+    fn from(value: BookingId) -> Self {
+        Self(value.0)
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Deserialize, Serialize, Hash)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::Type), sqlx(transparent))]
+pub struct BookingAmendmentId(Uuid);
+
+impl BookingAmendmentId {
+    pub fn generate() -> Self {
+        Self(Uuid::new_v4())
+    }
+}
+
+impl Display for BookingAmendmentId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl From<BookingAmendmentId> for ProductId {
+    fn from(value: BookingAmendmentId) -> Self {
+        Self(value.0)
     }
 }
 
@@ -110,6 +152,12 @@ impl std::fmt::Display for GroupId {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Deserialize, Serialize)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::Type), sqlx(transparent))]
 pub struct AdhocReservationId(i64);
+
+impl AdhocReservationId {
+    pub fn nil() -> Self {
+        Self(-1)
+    }
+}
 
 impl From<i64> for AdhocReservationId {
     fn from(value: i64) -> Self {

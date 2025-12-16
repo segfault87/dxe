@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use chrono::{Local, TimeDelta};
+use chrono::{DateTime, Local, LocalResult, TimeDelta, TimeZone, Utc};
 use reqwest::{
     StatusCode,
     header::{CONTENT_TYPE, HeaderValue},
@@ -22,11 +22,11 @@ pub struct AmanoClient {
     hashed_password: String,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum CarParkExemptionResult {
     NotFound,
-    AlreadyApplied,
-    Success,
+    AlreadyApplied { entry_date: DateTime<Utc> },
+    Success { entry_date: DateTime<Utc> },
 }
 
 impl AmanoClient {
@@ -76,7 +76,7 @@ impl AmanoClient {
         self.refresh_session_if_required().await?;
 
         let yesterday = Local::now() - TimeDelta::days(1);
-        let entry_date = yesterday.format("%Y%m%d").to_string();
+        let search_from = yesterday.format("%Y%m%d").to_string();
 
         let mut list_url = self.url_base.clone();
         list_url.set_path(PATH_LIST);
@@ -86,7 +86,7 @@ impl AmanoClient {
             .post(list_url.clone())
             .form(&HashMap::from([
                 ("iLotArea", self.lot_id.clone()),
-                ("entryDate", entry_date.clone()),
+                ("entryDate", search_from.clone()),
                 ("carNo", license_plate_number.to_owned()),
             ]))
             .build()?;
@@ -104,6 +104,15 @@ impl AmanoClient {
         };
         let entry_object = entry.as_object().ok_or(Error::InvalidJsonType("0"))?;
 
+        let entry_date = entry_object
+            .get("entryDate")
+            .ok_or(Error::MissingField("entryDate", list_url.clone()))?
+            .as_i64()
+            .ok_or(Error::InvalidJsonType("entryDate"))?;
+        let LocalResult::Single(entry_date) = Utc.timestamp_millis_opt(entry_date) else {
+            return Err(Error::InvalidEntryDate(entry_date));
+        };
+
         let discount_count = entry_object
             .get("dscnt_cnt")
             .ok_or(Error::MissingField("dscnt_cnt", list_url.clone()))?
@@ -113,7 +122,7 @@ impl AmanoClient {
             .map_err(|_| Error::InvalidJsonType("dscnt_cnt"))?;
 
         if discount_count > 0 {
-            return Ok(CarParkExemptionResult::AlreadyApplied);
+            return Ok(CarParkExemptionResult::AlreadyApplied { entry_date });
         }
 
         let pe_id = entry_object
@@ -139,7 +148,7 @@ impl AmanoClient {
                 ("id", pe_id.to_owned()),
                 ("iCardType", card_type.clone()),
                 ("member_id", self.user_id.clone()),
-                ("startDate", entry_date.clone()),
+                ("startDate", search_from.clone()),
             ]))
             .build()?;
         *request.headers_mut().get_mut(CONTENT_TYPE).unwrap() =
@@ -217,7 +226,7 @@ impl AmanoClient {
         if exemption_result.status() != StatusCode::OK {
             Err(Error::ExemptionFailed(exemption_result.status()))
         } else {
-            Ok(CarParkExemptionResult::Success)
+            Ok(CarParkExemptionResult::Success { entry_date })
         }
     }
 }
@@ -245,4 +254,6 @@ pub enum Error {
     NoFreeDiscountFound,
     #[error("Failed to apply exemption")]
     ExemptionFailed(StatusCode),
+    #[error("Invalid entry date: {0}")]
+    InvalidEntryDate(i64),
 }

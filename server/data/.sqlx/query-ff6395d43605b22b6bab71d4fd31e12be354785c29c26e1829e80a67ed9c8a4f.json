@@ -1,0 +1,68 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            u.id AS \"u_id: UserId\",\n            u.provider AS \"u_provider: IdentityProvider\",\n            u.foreign_id AS \"u_foreign_id\",\n            u.name AS \"u_name\",\n            u.created_at AS \"u_created_at: DateTime<Utc>\",\n            u.deactivated_at AS \"u_deactivated_at: DateTime<Utc>\",\n            u.license_plate_number AS \"u_license_plate_number\",\n            upc.handle AS \"upc_handle\",\n            upc.argon2_password AS \"upc_argon2_password\"\n        FROM\n            user \"u\"\n        JOIN\n            user_plain_credential \"upc\" ON u.id = upc.user_id\n        WHERE\n            u.id = ?1 AND\n            (u.deactivated_at IS NULL OR u.deactivated_at < ?2)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "u_id: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "u_provider: IdentityProvider",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "u_foreign_id",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "u_name",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "u_created_at: DateTime<Utc>",
+        "ordinal": 4,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "u_deactivated_at: DateTime<Utc>",
+        "ordinal": 5,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "u_license_plate_number",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "upc_handle",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "upc_argon2_password",
+        "ordinal": 8,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "ff6395d43605b22b6bab71d4fd31e12be354785c29c26e1829e80a67ed9c8a4f"
+}

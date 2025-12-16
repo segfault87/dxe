@@ -1,13 +1,16 @@
 use actix_web::web;
-use dxe_data::queries::booking::{
-    get_booking_with_user_id, get_cash_payment_status, get_toss_payment_status_by_booking_id,
+use chrono::TimeDelta;
+use dxe_data::queries::booking::{get_booking_with_user_id, get_occupied_slots};
+use dxe_data::queries::payment::{
+    get_cash_transaction, get_toss_payments_transaction_by_product_id,
+    get_toss_payments_transactions_by_booking_amentments,
 };
-use dxe_types::BookingId;
+use dxe_types::{BookingId, ProductId};
 use sqlx::SqlitePool;
 
 use crate::config::{BookingConfig, TimeZoneConfig};
 use crate::middleware::datetime_injector::Now;
-use crate::models::entities::{Booking, BookingCashPaymentStatus, BookingTossPaymentStatus};
+use crate::models::entities::{Booking, CashTransaction, TossPaymentsTransaction, Transaction};
 use crate::models::handlers::booking::GetBookingResponse;
 use crate::models::{Error, IntoView};
 use crate::session::UserSession;
@@ -26,29 +29,70 @@ pub async fn get(
         .await?
         .ok_or(Error::BookingNotFound)?;
 
-    let cash_payment_status = get_cash_payment_status(&mut tx, &booking_id).await?;
-    let toss_payment_status = get_toss_payment_status_by_booking_id(&mut tx, &booking_id).await?;
+    let product_id = ProductId::from(booking.id);
+
+    let transaction = if let Some(mut toss_tx) =
+        get_toss_payments_transaction_by_product_id(&mut tx, &product_id).await?
+    {
+        let amendment_txs =
+            get_toss_payments_transactions_by_booking_amentments(&mut tx, &now, &booking_id)
+                .await?;
+
+        for tx in amendment_txs {
+            toss_tx.price += tx.price;
+        }
+
+        Some(Transaction::TossPayments(TossPaymentsTransaction::convert(
+            toss_tx,
+            &timezone_config,
+            &now,
+        )?))
+    } else if let Some(cash_tx) = get_cash_transaction(&mut tx, &product_id).await? {
+        Some(Transaction::Cash(CashTransaction::convert(
+            cash_tx,
+            &timezone_config,
+            &now,
+        )?))
+    } else {
+        None
+    };
+
+    let amendable = booking_config
+        .calculate_refund_price(&timezone_config, 100, booking.time_from, *now)
+        .map_err(|_| Error::UnitNotFound)?
+        != 0;
+
+    let hours = (booking.time_to - booking.time_from).num_hours();
+    let mut extendable_hours = booking_config.max_booking_hours - hours;
+
+    if extendable_hours > 0 {
+        let start = booking.time_to;
+        let end = start + TimeDelta::hours(extendable_hours);
+        let mut slots = get_occupied_slots(
+            &mut tx,
+            &now,
+            &booking.unit_id,
+            &start,
+            &end,
+            Some(booking_id.as_ref()),
+            None,
+        )
+        .await?;
+        slots.sort_by(|a, b| a.time_from.cmp(&b.time_from));
+
+        if let Some(first) = slots.first() {
+            extendable_hours = std::cmp::min(
+                extendable_hours,
+                (first.time_from - booking.time_to).num_hours(),
+            );
+        }
+    }
 
     Ok(web::Json(GetBookingResponse {
         booking: Booking::convert(booking, &timezone_config, &now)?
             .finish(booking_config.as_ref(), &now),
-        cash_payment_status: if let Some(cash_payment_status) = cash_payment_status {
-            Some(BookingCashPaymentStatus::convert(
-                cash_payment_status,
-                &timezone_config,
-                &now,
-            )?)
-        } else {
-            None
-        },
-        toss_payment_status: if let Some(toss_payment_status) = toss_payment_status {
-            Some(BookingTossPaymentStatus::convert(
-                toss_payment_status,
-                &timezone_config,
-                &now,
-            )?)
-        } else {
-            None
-        },
+        transaction,
+        amendable,
+        extendable_hours,
     }))
 }

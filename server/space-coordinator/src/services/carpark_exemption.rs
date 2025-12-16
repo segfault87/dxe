@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use dxe_extern::amano::{AmanoClient, CarParkExemptionResult};
 
 use crate::config::CarparkExemptionConfig;
@@ -15,14 +16,20 @@ impl CarparkExemptionService {
         }
     }
 
-    pub async fn exempt(&self, license_plate_number: &str) -> Result<bool, Error> {
+    pub async fn exempt(
+        &self,
+        license_plate_number: &str,
+    ) -> Result<(bool, Option<DateTime<Utc>>), Error> {
         match self {
             Self::Amano(client) => match client.exempt(license_plate_number).await? {
-                CarParkExemptionResult::Success => {
+                CarParkExemptionResult::Success { entry_date } => {
                     log::info!("Parking exemption for {license_plate_number} applied successfully");
-                    Ok(true)
+                    Ok((true, Some(entry_date)))
                 }
-                _ => Ok(false),
+                CarParkExemptionResult::AlreadyApplied { entry_date } => {
+                    Ok((false, Some(entry_date)))
+                }
+                CarParkExemptionResult::NotFound => Ok((false, None)),
             },
         }
     }

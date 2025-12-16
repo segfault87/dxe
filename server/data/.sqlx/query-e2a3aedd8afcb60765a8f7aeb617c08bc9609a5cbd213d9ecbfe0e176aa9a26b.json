@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                (SELECT COUNT(*)\n                FROM booking\n                WHERE\n                    time_to >= ?1 AND\n                    MAX(time_from, ?1) < MIN(time_to, ?2) AND\n                    (canceled_at IS NULL OR canceled_at > ?4) AND\n                    unit_id = ?3 AND\n                    id != ?5) +\n                (SELECT COUNT(*)\n                FROM adhoc_reservation\n                WHERE\n                    time_to >= ?1 AND\n                    MAX(time_from, ?1) < MIN(time_to, ?2) AND\n                    (deleted_at IS NULL OR deleted_at > ?4) AND\n                    unit_id = ?3 AND\n                    id != ?6)\n                AS \"count\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "count",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e2a3aedd8afcb60765a8f7aeb617c08bc9609a5cbd213d9ecbfe0e176aa9a26b"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE cash_transaction\n        SET confirmed_at=?1\n        WHERE product_id=?2 AND confirmed_at IS NULL\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "34e5082994f5b7b99d349d8311ee0e92b348aff0f13be3cdd6534998992dbbcb"
+}

@@ -3,16 +3,12 @@ import type {
   BookingId,
   DateTime,
   ForeignPaymentId,
+  ProductType,
   IdentityId,
   UnitId,
 } from "../models/base";
-import type {
-  AudioRecording,
-  Booking,
-  CashPaymentStatus,
-  OccupiedSlot,
-  TossPaymentStatus,
-} from "../models/booking";
+import type { AudioRecording, Booking, OccupiedSlot } from "../models/booking";
+import type { CashTransaction, Transaction } from "../models/payment";
 
 export interface CalendarResponse {
   start: DateTime;
@@ -25,6 +21,9 @@ export interface CheckRequest {
   unitId: UnitId;
   timeFrom: DateTime;
   desiredHours: number;
+  additionalHours?: number;
+  excludeBookingId?: BookingId;
+  excludeAdhocReservationId?: AdhocReservationId;
 }
 
 export interface CheckResponse {
@@ -41,25 +40,29 @@ export interface SubmitBookingRequest {
 
 export interface SubmitBookingResponse {
   booking: Booking;
-  cashPaymentStatus: CashPaymentStatus;
+  cashTransaction: CashTransaction;
 }
 
 export interface GetBookingResponse {
   booking: Booking;
-  cashPaymentStatus: CashPaymentStatus | null;
-  tossPaymentStatus: TossPaymentStatus | null;
+  transaction: Transaction | null;
+  amendable: boolean;
+  extendableHours: number;
 }
 
 export interface CancelBookingResponse {
-  cashPaymentStatus: CashPaymentStatus | null;
+  transaction: Transaction | null;
 }
 
 export interface AmendBookingRequest {
-  newIdentityId: IdentityId | null;
+  newIdentityId?: IdentityId;
+  newTimeFrom?: DateTime;
+  additionalHours?: number;
 }
 
 export interface AmendBookingResponse {
   booking: Booking;
+  foreignPaymentId: ForeignPaymentId | null;
 }
 
 export interface GetAudioRecordingResponse {
@@ -92,6 +95,7 @@ export interface TossPaymentConfirmResponse {
 }
 
 export interface GetTossPaymentStateResponse {
+  type: ProductType;
   timeFrom: DateTime;
   timeTo: DateTime;
 }

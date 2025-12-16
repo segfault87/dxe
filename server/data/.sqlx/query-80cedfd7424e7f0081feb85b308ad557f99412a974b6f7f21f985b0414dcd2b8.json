@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            product_id AS \"product_id: _\",\n            depositor_name AS \"depositor_name: _\",\n            price AS \"price: _\",\n            created_at AS \"created_at: _\",\n            confirmed_at AS \"confirmed_at: _\",\n            refund_price AS \"refund_price: _\",\n            refund_account AS \"refund_account: _\",\n            refunded_at AS \"refunded_at: _\"\n        FROM cash_transaction\n        WHERE product_id=?1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "product_id: _",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "depositor_name: _",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "price: _",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at: _",
+        "ordinal": 3,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "confirmed_at: _",
+        "ordinal": 4,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "refund_price: _",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "refund_account: _",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "refunded_at: _",
+        "ordinal": 7,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "80cedfd7424e7f0081feb85b308ad557f99412a974b6f7f21f985b0414dcd2b8"
+}

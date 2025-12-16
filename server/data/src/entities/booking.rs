@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use dxe_types::{
-    AdhocParkingId, AdhocReservationId, BookingId, ForeignPaymentId, IdentityId, SpaceId,
-    TelemetryType, UnitId, UserId,
+    AdhocParkingId, AdhocReservationId, BookingAmendmentId, BookingId, SpaceId, TelemetryType,
+    UnitId,
 };
 use sqlx::FromRow;
 
@@ -29,29 +29,29 @@ pub struct Booking {
 }
 
 #[derive(Debug, Clone, FromRow)]
-pub struct CashPaymentStatus {
+pub struct BookingAmendment {
+    pub id: BookingAmendmentId,
     pub booking_id: BookingId,
-    pub depositor_name: String,
-    pub price: i64,
+    pub original_time_from: DateTime<Utc>,
+    pub original_time_to: DateTime<Utc>,
+    pub desired_time_from: DateTime<Utc>,
+    pub desired_time_to: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub confirmed_at: Option<DateTime<Utc>>,
-    pub refund_price: Option<i64>,
-    pub refund_account: Option<String>,
-    pub refunded_at: Option<DateTime<Utc>>,
+    pub canceled_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, FromRow)]
-pub struct TossPaymentStatus {
-    pub id: ForeignPaymentId,
-    pub user_id: UserId,
-    pub temporary_reservation_id: AdhocReservationId,
-    pub booking_id: Option<BookingId>,
-    pub price: i64,
-    pub payment_key: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub confirmed_at: Option<DateTime<Utc>>,
-    pub refund_price: Option<i64>,
-    pub refunded_at: Option<DateTime<Utc>>,
+#[derive(Clone, Debug, sqlx::Type)]
+#[sqlx(rename_all = "snake_case")]
+pub enum ProductDiscriminator {
+    Booking,
+    BookingAmendment,
+}
+
+#[derive(Debug, Clone)]
+pub enum Product {
+    Booking(Box<Booking>),
+    Amendment(BookingAmendment),
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -64,16 +64,6 @@ pub struct AdhocReservation {
     pub time_to: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
     pub remark: Option<String>,
-}
-
-#[derive(Debug, Clone, FromRow)]
-pub struct BookingChangeHistory {
-    pub seq: i64,
-    pub booking_id: BookingId,
-    pub created_at: DateTime<Utc>,
-    pub new_customer_id: Option<IdentityId>,
-    pub new_time_from: Option<DateTime<Utc>>,
-    pub new_time_to: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, FromRow)]

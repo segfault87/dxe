@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE cash_transaction\n        SET refund_price=?1, refund_account=?2\n        WHERE product_id=?3 AND refunded_at IS NULL\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "a9e266258995d67375f00d306cdb138b4441ef521d264c375f039f41aa7b0220"
+}

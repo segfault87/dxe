@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            id AS \"id: _\",\n            provider AS \"provider: _\",\n            foreign_id,\n            name,\n            created_at AS \"created_at: _\",\n            deactivated_at AS \"deactivated_at: _\",\n            license_plate_number\n        FROM user\n        WHERE id = ?1 AND\n            (deactivated_at IS NULL OR deactivated_at < ?2)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: _",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "provider: _",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "foreign_id",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at: _",
+        "ordinal": 4,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "deactivated_at: _",
+        "ordinal": 5,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "license_plate_number",
+        "ordinal": 6,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "acbfcd1573340942d4b8357d8b2b097bd6228cda49c615eb37d414a2cf0d7392"
+}

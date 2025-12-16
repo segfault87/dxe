@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE booking_amendment\n        SET canceled_at=?1\n        WHERE\n            id=?2 AND\n            (confirmed_at IS NULL OR confirmed_at > ?1) AND\n            (canceled_at IS NULL OR canceled_at > ?1)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "6044764882ea394172759d6eea24c516938bda4c6b397b684f7ab13768dd0900"
+}

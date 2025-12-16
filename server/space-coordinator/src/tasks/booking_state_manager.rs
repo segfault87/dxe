@@ -23,7 +23,7 @@ pub struct BookingStateManager {
     scheduler: Scheduler,
     client: DxeClient,
     callbacks: Vec<Arc<dyn EventStateCallback<BookingWithUsers> + Send + Sync + 'static>>,
-    pending_tasks: Mutex<HashMap<String, String>>,
+    pending_tasks: Mutex<HashMap<String, (String, DateTime<Utc>)>>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -43,10 +43,6 @@ fn create_task_name(booking_id: &BookingId, phase: BookingPhase) -> String {
     };
 
     format!("booking_{booking_id}_{task_name}")
-}
-
-fn temp_pending_active_bookings() -> Vec<BookingWithUsers> {
-    serde_json::from_str(include_str!("../../booking_overrides.json")).unwrap()
 }
 
 impl BookingStateManager {
@@ -73,7 +69,7 @@ impl BookingStateManager {
     }
 
     async fn update(self: Arc<Self>) {
-        let mut response = match self
+        let response = match self
             .client
             .get::<GetBookingsResponse>(
                 "/pending-bookings",
@@ -87,12 +83,6 @@ impl BookingStateManager {
                 return;
             }
         };
-
-        response
-            .bookings
-            .get_mut(&UnitId::from("default".to_owned()))
-            .unwrap()
-            .extend(temp_pending_active_bookings());
 
         let now = Utc::now();
 
@@ -182,7 +172,7 @@ impl BookingStateManager {
                 }
             }
 
-            for task in tasks_to_remove {
+            for (task, _) in tasks_to_remove {
                 let _ = self.scheduler.remove(&task).await;
             }
 
@@ -229,7 +219,7 @@ impl BookingStateManager {
                                         .pending_tasks
                                         .lock()
                                         .remove(&task_name);
-                                    if let Some(task_id) = task_id {
+                                    if let Some((task_id, _)) = task_id {
                                         let _ = arc_self.scheduler.remove(&task_id).await;
                                     }
                                 });
@@ -257,7 +247,7 @@ impl BookingStateManager {
                                     .pending_tasks
                                     .lock()
                                     .remove(&task_name);
-                                if let Some(task_id) = task_id {
+                                if let Some((task_id, _)) = task_id {
                                     let _ = arc_self.scheduler.remove(&task_id).await;
                                 }
                             });
@@ -284,7 +274,7 @@ impl BookingStateManager {
                                     .pending_tasks
                                     .lock()
                                     .remove(&task_name);
-                                if let Some(task_id) = task_id {
+                                if let Some((task_id, _)) = task_id {
                                     let _ = arc_self.scheduler.remove(&task_id).await;
                                 }
                             });
@@ -315,7 +305,7 @@ impl BookingStateManager {
                                         .pending_tasks
                                         .lock()
                                         .remove(&task_name);
-                                    if let Some(task_id) = task_id {
+                                    if let Some((task_id, _)) = task_id {
                                         let _ = arc_self.scheduler.remove(&task_id).await;
                                     }
                                 });
@@ -340,10 +330,22 @@ impl BookingStateManager {
         F: Fn() -> Result<(), SchedulerError> + Send + Sync + 'static,
     {
         let delta = date - now;
-        if delta.num_seconds() > 0
-            && delta.num_days() == 0
-            && !self.pending_tasks.lock().contains_key(task_name)
-        {
+        if delta.num_seconds() > 0 && delta.num_days() == 0 {
+            let prev_task = {
+                let guard = self.pending_tasks.lock();
+                guard.get(task_name).cloned()
+            };
+
+            if let Some((prev_task, prev_date)) = prev_task {
+                if prev_date != date {
+                    if let Err(e) = self.scheduler.remove(&prev_task).await {
+                        log::warn!("Could not remove previous task {task_name}: {e}");
+                    }
+                } else {
+                    return false;
+                }
+            }
+
             let task = TaskBuilder::new(task_name, f)
                 .daily()
                 .at(date.format("%H:%M:%S").to_string().as_str())
@@ -356,7 +358,9 @@ impl BookingStateManager {
                         "Task {task_name} scheduled at {}",
                         date.with_timezone(&Local).format("%H:%M:%S")
                     );
-                    self.pending_tasks.lock().insert(task_name.to_owned(), id);
+                    self.pending_tasks
+                        .lock()
+                        .insert(task_name.to_owned(), (id, date));
                     true
                 }
                 Err(e) => {

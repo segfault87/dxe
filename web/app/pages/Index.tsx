@@ -8,6 +8,8 @@ import type { Route } from "./+types/Index";
 import Image1 from "../assets/interior1.jpg";
 import Image2 from "../assets/interior2.jpg";
 import Image3 from "../assets/interior3.jpg";
+import Image4 from "../assets/interior4.jpg";
+import Image5 from "../assets/interior5.jpg";
 import Section from "../components/Section";
 import { useAuth } from "../context/AuthContext";
 
@@ -48,10 +50,16 @@ function Carousel() {
         <img src={Image1} alt="합주실 내부" />
       </div>
       <div className="container">
-        <img src={Image2} alt="합주실 내부 배면" />
+        <img src={Image2} alt="대기실" />
       </div>
       <div className="container">
-        <img src={Image3} alt="대기실" />
+        <img src={Image3} alt="합주실 측면" />
+      </div>
+      <div className="container">
+        <img src={Image4} alt="합주실 측면" />
+      </div>
+      <div className="container">
+        <img src={Image5} alt="대기실" />
       </div>
     </SliderComponent>
   );

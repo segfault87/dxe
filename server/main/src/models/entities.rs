@@ -27,7 +27,6 @@ pub struct SelfUser {
     // Payment information
     pub depositor_name: Option<String>,
     pub refund_account: Option<String>,
-    pub use_pg_payment: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -70,6 +69,13 @@ pub enum BookingStatus {
     Complete,
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ProductType {
+    Booking,
+    BookingAmendment,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Booking {
@@ -90,7 +96,7 @@ pub struct Booking {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct BookingCashPaymentStatus {
+pub struct CashTransaction {
     pub depositor_name: String,
     pub price: i64,
     pub confirmed_at: Option<DateTime<FixedOffset>>,
@@ -103,12 +109,19 @@ pub struct BookingCashPaymentStatus {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct BookingTossPaymentStatus {
+pub struct TossPaymentsTransaction {
     pub price: i64,
     pub confirmed_at: Option<DateTime<FixedOffset>>,
     pub refund_price: Option<i64>,
     pub refunded_at: Option<DateTime<FixedOffset>>,
     pub is_refunded: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Transaction {
+    Cash(CashTransaction),
+    TossPayments(TossPaymentsTransaction),
 }
 
 #[derive(Debug, Serialize)]
@@ -137,7 +150,7 @@ pub struct OccupiedSlot {
 #[serde(rename_all = "camelCase")]
 pub struct BookingWithPayments {
     pub booking: Booking,
-    pub payment: Option<BookingCashPaymentStatus>,
+    pub transaction: Option<Transaction>,
 }
 
 #[derive(Debug, Serialize)]

@@ -18,11 +18,13 @@ use tokio_task_scheduler::{Task, TaskBuilder};
 use crate::callback::{EventStateCallback, PresenceCallback};
 use crate::config::telemetry::TableKey;
 use crate::config::z2m::{self, SwitchPolicy};
-use crate::services::mqtt::{Error as MqttError, MqttService};
+use crate::services::mqtt::{Error as MqttError, MqttService, MqttTopicPrefix};
 use crate::services::notification::NotificationService;
 use crate::tasks::telemetry_manager::z2m_power_meter::{
     PUBLISH_DURATION, Z2mPowerMeterRow, Z2mPowerMeterTable,
 };
+
+const MQTT_TOPIC_PREFIX_Z2M: MqttTopicPrefix = MqttTopicPrefix::new_const("zigbee2mqtt");
 
 #[derive(Debug)]
 pub enum Z2mPublishTopic {
@@ -43,7 +45,8 @@ impl From<String> for DeviceName {
 impl DeviceName {
     pub fn topic_name(&self, command: Option<Z2mPublishTopic>) -> String {
         format!(
-            "zigbee2mqtt/{}{}",
+            "{}/{}{}",
+            MQTT_TOPIC_PREFIX_Z2M,
             self.0,
             match command {
                 None => "",
@@ -257,7 +260,7 @@ impl Z2mController {
         let state_key = &device.state_key;
         let state_key = json!({state_key: {}});
 
-        let mut receiver = self.mqtt_service.receiver();
+        let mut receiver = self.mqtt_service.receiver(MQTT_TOPIC_PREFIX_Z2M);
 
         let (tx, rx) = oneshot::channel();
 
@@ -269,23 +272,20 @@ impl Z2mController {
                     break;
                 };
 
-                if let Some(device_name) = DeviceName::from_topic_name(&publish.topic) {
-                    if expected_device_name == device_name {
-                        let payload =
-                            match serde_json::from_slice::<serde_json::Value>(&publish.payload) {
-                                Ok(v) => v,
-                                Err(e) => {
-                                    log::warn!(
-                                        "Invalid JSON string from topic {}: {e}",
-                                        publish.topic
-                                    );
-                                    continue;
-                                }
-                            };
+                if let Some(device_name) = DeviceName::from_topic_name(&publish.topic)
+                    && expected_device_name == device_name
+                {
+                    let payload =
+                        match serde_json::from_slice::<serde_json::Value>(&publish.payload) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                log::warn!("Invalid JSON string from topic {}: {e}", publish.topic);
+                                continue;
+                            }
+                        };
 
-                        let _ = tx.send(payload);
-                        break;
-                    }
+                    let _ = tx.send(payload);
+                    break;
                 }
             }
         });
@@ -309,7 +309,7 @@ impl Z2mController {
         name: DeviceName,
         states: &[serde_json::Value],
     ) -> Result<(), Error> {
-        let mut receiver = self.mqtt_service.receiver();
+        let mut receiver = self.mqtt_service.receiver(MQTT_TOPIC_PREFIX_Z2M);
 
         let (tx, rx) = oneshot::channel();
 
@@ -346,50 +346,50 @@ impl Z2mController {
                     break;
                 };
 
-                if let Some(device_name) = DeviceName::from_topic_name(&publish.topic) {
-                    if name == device_name {
-                        let payload = match serde_json::from_slice::<
-                            serde_json::Map<String, serde_json::Value>,
-                        >(&publish.payload)
-                        {
-                            Ok(v) => v,
-                            Err(e) => {
-                                log::warn!("Invalid JSON string from topic {}: {e}", publish.topic);
-                                continue;
-                            }
-                        };
-
-                        for (key, value) in first.iter() {
-                            if let Some(payload_value) = payload.get(key)
-                                && payload_value != value
-                            {
-                                continue;
-                            }
+                if let Some(device_name) = DeviceName::from_topic_name(&publish.topic)
+                    && name == device_name
+                {
+                    let payload = match serde_json::from_slice::<
+                        serde_json::Map<String, serde_json::Value>,
+                    >(&publish.payload)
+                    {
+                        Ok(v) => v,
+                        Err(e) => {
+                            log::warn!("Invalid JSON string from topic {}: {e}", publish.topic);
+                            continue;
                         }
+                    };
 
-                        states_to_inspect.remove(0);
-
-                        first = if let Some(first) = states_to_inspect.first() {
-                            if let Err(e) = mqtt_service
-                                .publish(
-                                    &name.topic_name(Some(Z2mPublishTopic::Set)),
-                                    serde_json::Value::Object(
-                                        states_to_inspect.first().unwrap().clone(),
-                                    )
-                                    .to_string()
-                                    .as_bytes(),
-                                )
-                                .await
-                            {
-                                log::warn!("Could not publish set command: {e}");
-                                return;
-                            }
-                            first
-                        } else {
-                            let _ = tx.send(());
-                            return;
-                        };
+                    for (key, value) in first.iter() {
+                        if let Some(payload_value) = payload.get(key)
+                            && payload_value != value
+                        {
+                            continue;
+                        }
                     }
+
+                    states_to_inspect.remove(0);
+
+                    first = if let Some(first) = states_to_inspect.first() {
+                        if let Err(e) = mqtt_service
+                            .publish(
+                                &name.topic_name(Some(Z2mPublishTopic::Set)),
+                                serde_json::Value::Object(
+                                    states_to_inspect.first().unwrap().clone(),
+                                )
+                                .to_string()
+                                .as_bytes(),
+                            )
+                            .await
+                        {
+                            log::warn!("Could not publish set command: {e}");
+                            return;
+                        }
+                        first
+                    } else {
+                        let _ = tx.send(());
+                        return;
+                    };
                 }
             }
         });
@@ -414,14 +414,14 @@ impl Z2mController {
 
             self.device_states.lock().insert(device_name.clone(), value);
 
-            if device.classes.power_meter.is_some() {
-                if let Ok(power_meter) = self.read_power_meter(device) {
-                    for hook in self.power_meters.values() {
-                        let mut guard = hook.lock();
+            if device.classes.power_meter.is_some()
+                && let Ok(power_meter) = self.read_power_meter(device)
+            {
+                for hook in self.power_meters.values() {
+                    let mut guard = hook.lock();
 
-                        if guard.devices.contains(&device_name) {
-                            guard.update(device_name.clone(), &power_meter);
-                        }
+                    if guard.devices.contains(&device_name) {
+                        guard.update(device_name.clone(), &power_meter);
                     }
                 }
             }
@@ -546,10 +546,10 @@ impl Z2mController {
 
     async fn sync_switch_states(&self) {
         for device in self.devices.values() {
-            if let Some(switch) = &device.classes.switch {
-                if let Err(e) = self.sync_switch_state(&device.name, switch).await {
-                    log::warn!("Failed to sync switch state for {}: {e}", device.name);
-                }
+            if let Some(switch) = &device.classes.switch
+                && let Err(e) = self.sync_switch_state(&device.name, switch).await
+            {
+                log::warn!("Failed to sync switch state for {}: {e}", device.name);
             }
         }
     }
@@ -770,7 +770,7 @@ impl Z2mController {
     pub fn task(self) -> (Arc<Self>, JoinHandle<()>, Task) {
         let task_name = "mqtt_controller".to_string();
 
-        let mut receiver = self.mqtt_service.receiver();
+        let mut receiver = self.mqtt_service.receiver(MQTT_TOPIC_PREFIX_Z2M);
 
         let arc_self = Arc::new(self);
 

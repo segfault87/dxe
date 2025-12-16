@@ -4,6 +4,8 @@ mod config;
 mod services;
 mod tasks;
 
+use std::sync::Arc;
+
 use clap::Parser;
 
 use crate::client::DxeClient;
@@ -15,6 +17,7 @@ use crate::tasks::TaskContext;
 use crate::tasks::audio_recorder::AudioRecorder;
 use crate::tasks::booking_state_manager::BookingStateManager;
 use crate::tasks::carpark_exempter::CarparkExempter;
+use crate::tasks::osd_controller::OsdController;
 use crate::tasks::presence_monitor::PresenceMonitor;
 use crate::tasks::telemetry_manager::TelemetryManager;
 use crate::tasks::z2m_controller::Z2mController;
@@ -59,6 +62,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     z2m_controller.start().await;
 
+    let osd_controller = Arc::new(OsdController::new(mqtt_service.clone(), &config.osd));
+
     let telemetry_manager = TelemetryManager::new(&config.telemetry, client.clone());
     let telemetry_tasks = telemetry_manager
         .clone()
@@ -77,6 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     booking_state_manager.add_callback(z2m_controller.clone());
     booking_state_manager.add_callback(audio_recorder);
     booking_state_manager.add_callback(telemetry_manager.clone());
+    booking_state_manager.add_callback(osd_controller.clone());
 
     presence_monitor.add_callback(z2m_controller);
 
@@ -85,6 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             client.clone(),
             booking_states.clone(),
             CarparkExemptionService::new(carpark_exemption),
+            osd_controller.clone(),
             notification_service.clone(),
         );
 

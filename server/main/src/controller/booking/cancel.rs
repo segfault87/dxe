@@ -1,18 +1,20 @@
 #![allow(clippy::too_many_arguments)]
 
 use actix_web::web;
-use dxe_data::queries::booking::{
-    cancel_booking, get_booking_with_user_id, get_cash_payment_status,
-    get_toss_payment_status_by_booking_id, refund_toss_payment, update_cash_refund_information,
+use dxe_data::queries::booking::{cancel_booking, get_booking_with_user_id};
+use dxe_data::queries::payment::{
+    get_cash_transaction, get_toss_payments_transaction_by_product_id,
+    get_toss_payments_transactions_by_booking_amentments, refund_toss_payments,
+    update_cash_refund_information,
 };
 use dxe_data::queries::user::update_user_cash_payment_refund_account;
 use dxe_extern::toss_payments::{Error as TossPaymentsError, TossPaymentsClient};
-use dxe_types::BookingId;
+use dxe_types::{BookingId, ProductId};
 use sqlx::SqlitePool;
 
 use crate::config::{BookingConfig, TimeZoneConfig};
 use crate::middleware::datetime_injector::Now;
-use crate::models::entities::{BookingCashPaymentStatus, BookingTossPaymentStatus};
+use crate::models::entities::{CashTransaction, TossPaymentsTransaction, Transaction};
 use crate::models::handlers::booking::{CancelBookingRequest, CancelBookingResponse};
 use crate::models::{Error, IntoView};
 use crate::services::calendar::CalendarService;
@@ -42,12 +44,13 @@ pub async fn delete(
 
     cancel_booking(&mut tx, &now, booking_id.as_ref()).await?;
 
-    let mut cash_payment_status = get_cash_payment_status(&mut tx, booking_id.as_ref()).await?;
-    if let Some(cash_payment_status) = &mut cash_payment_status {
+    let product_id = ProductId::from(*booking_id);
+
+    let transaction = if let Some(mut cash_tx) = get_cash_transaction(&mut tx, &product_id).await? {
         let refund_price = booking_config
             .calculate_refund_price(
                 timezone_config.as_ref(),
-                cash_payment_status.price,
+                cash_tx.price,
                 booking.time_from,
                 *now,
             )
@@ -59,14 +62,14 @@ pub async fn delete(
 
         if update_cash_refund_information(
             &mut tx,
-            booking_id.as_ref(),
+            &product_id,
             refund_price,
             query.refund_account.clone(),
         )
         .await?
         {
-            cash_payment_status.refund_price = Some(refund_price);
-            cash_payment_status.refund_account = query.refund_account.clone();
+            cash_tx.refund_price = Some(refund_price);
+            cash_tx.refund_account = query.refund_account.clone();
         }
 
         if let Some(refund_account) = &query.refund_account {
@@ -78,7 +81,7 @@ pub async fn delete(
             .await?;
         }
 
-        let refund_rate = (refund_price * 100 / cash_payment_status.price) as i32;
+        let refund_rate = (refund_price * 100 / cash_tx.price) as i32;
 
         send_cancellation(
             biztalk_sender.as_ref(),
@@ -88,17 +91,20 @@ pub async fn delete(
             refund_rate,
         )
         .await?;
-    }
 
-    let mut toss_payment_status =
-        get_toss_payment_status_by_booking_id(&mut tx, &booking_id).await?;
-    if let Some(toss_payment_status) = &mut toss_payment_status
-        && let Some(payment_key) = toss_payment_status.payment_key.as_ref()
+        Some(Transaction::Cash(CashTransaction::convert(
+            cash_tx,
+            &timezone_config,
+            &now,
+        )?))
+    } else if let Some(mut toss_tx) =
+        get_toss_payments_transaction_by_product_id(&mut tx, &product_id).await?
+        && let Some(payment_key) = toss_tx.payment_key.as_ref()
     {
         let refund_price = booking_config
             .calculate_refund_price(
                 timezone_config.as_ref(),
-                toss_payment_status.price,
+                toss_tx.price,
                 booking.time_from,
                 *now,
             )
@@ -133,12 +139,50 @@ pub async fn delete(
             }
         }
 
-        if refund_toss_payment(&mut tx, &now, &toss_payment_status.id, refund_price).await? {
-            toss_payment_status.refund_price = Some(refund_price);
-            toss_payment_status.refunded_at = Some(*now);
+        if refund_toss_payments(&mut tx, &now, &toss_tx.id, refund_price).await? {
+            toss_tx.refund_price = Some(refund_price);
+            toss_tx.refunded_at = Some(*now);
         }
 
-        let refund_rate = (refund_price * 100 / toss_payment_status.price) as i32;
+        for amendment in
+            get_toss_payments_transactions_by_booking_amentments(&mut tx, &now, &booking_id).await?
+        {
+            let Some(payment_key) = amendment.payment_key else {
+                continue;
+            };
+
+            let refund_price = booking_config
+                .calculate_refund_price(
+                    timezone_config.as_ref(),
+                    amendment.price,
+                    booking.time_from,
+                    *now,
+                )
+                .map_err(|_| Error::NotRefundable)?;
+
+            if refund_price > 0 {
+                match toss_payments_service
+                    .cancel_payment(
+                        &payment_key,
+                        query
+                            .cancel_reason
+                            .as_deref()
+                            .unwrap_or("Cancellation request by user"),
+                        Some(refund_price),
+                    )
+                    .await
+                {
+                    Ok(_) => {
+                        log::info!(
+                            "Amendment payment {payment_key} refunded successfully. Refunded amount: {refund_price}"
+                        );
+                    }
+                    Err(e) => log::error!("Couldn't refund amendment tx {payment_key}: {e}"),
+                }
+            }
+        }
+
+        let refund_rate = (refund_price * 100 / toss_tx.price) as i32;
         send_cancellation(
             biztalk_sender.as_ref(),
             &mut tx,
@@ -147,14 +191,22 @@ pub async fn delete(
             refund_rate,
         )
         .await?;
-    }
+
+        Some(Transaction::TossPayments(TossPaymentsTransaction::convert(
+            toss_tx,
+            &timezone_config,
+            &now,
+        )?))
+    } else {
+        None
+    };
 
     tx.commit().await?;
 
-    if let Some(calendar_service) = calendar_service.as_ref() {
-        if let Err(e) = calendar_service.delete_booking(&booking.id).await {
-            log::error!("Failed to delete event on calendar: {e}");
-        }
+    if let Some(calendar_service) = calendar_service.as_ref()
+        && let Err(e) = calendar_service.delete_booking(&booking.id).await
+    {
+        log::error!("Failed to delete event on calendar: {e}");
     }
 
     notification_sender.enqueue(
@@ -166,24 +218,5 @@ pub async fn delete(
         ),
     );
 
-    Ok(web::Json(CancelBookingResponse {
-        cash_payment_status: if let Some(cash_payment_status) = cash_payment_status {
-            Some(BookingCashPaymentStatus::convert(
-                cash_payment_status,
-                &timezone_config,
-                &now,
-            )?)
-        } else {
-            None
-        },
-        toss_payment_status: if let Some(toss_payment_status) = toss_payment_status {
-            Some(BookingTossPaymentStatus::convert(
-                toss_payment_status,
-                &timezone_config,
-                &now,
-            )?)
-        } else {
-            None
-        },
-    }))
+    Ok(web::Json(CancelBookingResponse { transaction }))
 }

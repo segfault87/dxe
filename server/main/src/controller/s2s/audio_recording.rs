@@ -32,20 +32,17 @@ pub async fn post(
         Some(&body.expires_in.to_utc()),
     )
     .await?
+        && let Some(audio_recording) = get_audio_recording(&mut tx, &booking_id).await?
+        && let Err(e) = send_audio_recording(
+            &biztalk_sender,
+            &mut tx,
+            &timezone_config,
+            &booking,
+            &audio_recording,
+        )
+        .await
     {
-        if let Some(audio_recording) = get_audio_recording(&mut tx, &booking_id).await? {
-            if let Err(e) = send_audio_recording(
-                &biztalk_sender,
-                &mut tx,
-                &timezone_config,
-                &booking,
-                &audio_recording,
-            )
-            .await
-            {
-                log::warn!("Couldn't send audio recording notification: {e}");
-            }
-        }
+        log::warn!("Couldn't send audio recording notification: {e}");
     }
 
     tx.commit().await?;

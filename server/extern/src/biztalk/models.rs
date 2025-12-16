@@ -18,28 +18,18 @@ pub(super) struct GetTokenResponse {
     pub expire_date: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub(super) enum SendMethod {
+    #[default]
     Push,
 }
 
-impl Default for SendMethod {
-    fn default() -> Self {
-        Self::Push
-    }
-}
-
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ButtonType {
+    #[default]
     Wl,
-}
-
-impl Default for ButtonType {
-    fn default() -> Self {
-        Self::Wl
-    }
 }
 
 #[derive(Debug, Serialize)]

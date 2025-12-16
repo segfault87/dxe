@@ -64,8 +64,8 @@ export default function PendingBookings({ loaderData }: Route.ComponentProps) {
             <td>{new Date(e.booking.bookingStart).toLocaleString()}</td>
             <td>{new Date(e.booking.bookingEnd).toLocaleString()}</td>
             <td>{e.booking.status}</td>
-            <td>{e.payment?.depositorName}</td>
-            <td>{e.payment?.price}</td>
+            <td>{e.transaction?.cash?.depositorName}</td>
+            <td>{e.transaction?.cash?.price}</td>
             <td>
               {e.booking.status === "PENDING" ? (
                 <button onClick={() => modifyBooking(e.booking.id, "CONFIRM")}>

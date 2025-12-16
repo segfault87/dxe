@@ -31,10 +31,26 @@ pub async fn post(
     let time_from = truncate_time(body.time_from).to_utc();
     let time_to = time_from + TimeDelta::hours(body.desired_hours);
 
-    if is_booking_available(&mut connection, &now, &body.unit_id, &time_from, &time_to).await? {
-        let total_price = booking_config
-            .calculate_price(&body.unit_id, time_from, time_to)
-            .map_err(|_| Error::UnitNotFound)?;
+    if is_booking_available(
+        &mut connection,
+        &now,
+        &body.unit_id,
+        &time_from,
+        &time_to,
+        body.exclude_booking_id.as_ref(),
+        body.exclude_adhoc_reservation_id.as_ref(),
+    )
+    .await?
+    {
+        let total_price = if let Some(additional_hours) = body.additional_hours {
+            booking_config
+                .calculate_additive_price(&body.unit_id, additional_hours)
+                .map_err(|_| Error::UnitNotFound)?
+        } else {
+            booking_config
+                .calculate_price(&body.unit_id, time_from, time_to)
+                .map_err(|_| Error::UnitNotFound)?
+        };
 
         Ok(web::Json(CheckResponse { total_price }))
     } else {

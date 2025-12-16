@@ -42,7 +42,6 @@ pub async fn get(
         refund_account: cash_payment_information
             .as_ref()
             .and_then(|v| v.refund_account.clone()),
-        use_pg_payment: user.use_pg_payment,
     };
 
     let mut bookings =
@@ -111,7 +110,6 @@ pub async fn post(
         refund_account: cash_payment_information
             .as_ref()
             .and_then(|v| v.refund_account.clone()),
-        use_pg_payment: result.use_pg_payment,
     };
 
     Ok(web::Json(UpdateMeResponse { user }))

@@ -1,0 +1,92 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            g.id AS \"g_id: GroupId\",\n            g.name AS \"g_name\",\n            g.owner_id AS \"g_owner_id: UserId\",\n            g.is_open AS \"g_is_open: bool\",\n            g.created_at AS \"g_created_at: DateTime<Utc>\",\n            g.deleted_at AS \"g_deleted_at: DateTime<Utc>\",\n            u.id AS \"u_id: UserId\",\n            u.provider AS \"u_provider: IdentityProvider\",\n            u.foreign_id AS \"u_foreign_id\",\n            u.name AS \"u_name\",\n            u.created_at AS \"u_created_at: DateTime<Utc>\",\n            u.deactivated_at AS \"u_deactivated_at: DateTime<Utc>\",\n            u.license_plate_number AS \"u_license_plate_number\"\n        FROM \"group\" \"g\"\n        JOIN group_association \"ga\" ON g.id = ga.group_id\n        JOIN user \"u\" ON ga.user_id = u.id\n        WHERE\n            (g.deleted_at IS NULL OR g.deleted_at < ?2) AND\n            (u.deactivated_at IS NULL OR u.deactivated_at < ?2) AND\n            EXISTS (\n                SELECT\n                    user_id\n                FROM\n                    group_association\n                WHERE\n                    group_association.group_id = g.id AND\n                    group_association.user_id = ?1\n            )\n        ORDER BY g.created_at DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "g_id: GroupId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "g_name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "g_owner_id: UserId",
+        "ordinal": 2,
+        "type_info": "Blob"
+      },
+      {
+        "name": "g_is_open: bool",
+        "ordinal": 3,
+        "type_info": "Bool"
+      },
+      {
+        "name": "g_created_at: DateTime<Utc>",
+        "ordinal": 4,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "g_deleted_at: DateTime<Utc>",
+        "ordinal": 5,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "u_id: UserId",
+        "ordinal": 6,
+        "type_info": "Blob"
+      },
+      {
+        "name": "u_provider: IdentityProvider",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "u_foreign_id",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "u_name",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "u_created_at: DateTime<Utc>",
+        "ordinal": 10,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "u_deactivated_at: DateTime<Utc>",
+        "ordinal": 11,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "u_license_plate_number",
+        "ordinal": 12,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "9d261688c2c9188e497b1b5a94e7d53e343f88772cbe14fe945089bac696bfd3"
+}

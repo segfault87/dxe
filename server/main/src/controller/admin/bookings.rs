@@ -1,12 +1,13 @@
 use actix_web::web;
 use dxe_data::queries::booking::{
-    get_bookings_pending, get_bookings_refund_pending, get_confirmed_bookings_with_payments,
+    get_bookings_with_pending_cash_payment, get_bookings_with_pending_cash_refunds,
+    get_confirmed_bookings,
 };
 use sqlx::SqlitePool;
 
 use crate::config::{BookingConfig, TimeZoneConfig};
 use crate::middleware::datetime_injector::Now;
-use crate::models::entities::{Booking, BookingCashPaymentStatus, BookingWithPayments};
+use crate::models::entities::{Booking, BookingWithPayments, CashTransaction, Transaction};
 use crate::models::handlers::admin::{GetBookingsQuery, GetBookingsResponse, GetBookingsType};
 use crate::models::{Error, IntoView};
 use crate::session::UserSession;
@@ -24,30 +25,43 @@ pub async fn get(
 
     let mut connection = database.acquire().await?;
 
-    let mut bookings = match query.r#type {
-        GetBookingsType::Pending => get_bookings_pending(&mut connection, &now, false).await?,
-        GetBookingsType::RefundPending => get_bookings_refund_pending(&mut connection)
+    let mut bookings: Vec<_> = match query.r#type {
+        GetBookingsType::Pending => {
+            get_bookings_with_pending_cash_payment(&mut connection, &now, false)
+                .await?
+                .into_iter()
+                .map(|(booking, tx)| (booking, Some(tx)))
+                .collect()
+        }
+        GetBookingsType::RefundPending => get_bookings_with_pending_cash_refunds(&mut connection)
             .await?
             .into_iter()
-            .map(|(b, payment)| (b, Some(payment)))
+            .map(|(booking, tx)| (booking, Some(tx)))
             .collect(),
-        GetBookingsType::Canceled => {
-            get_confirmed_bookings_with_payments(&mut connection, &now, date_from)
-                .await?
-                .into_iter()
-                .filter(|(booking, _)| is_in_effect(&booking.canceled_at, &now))
-                .collect()
-        }
-        GetBookingsType::Confirmed => {
-            get_confirmed_bookings_with_payments(&mut connection, &now, date_from)
-                .await?
-                .into_iter()
-                .filter(|(booking, _)| {
-                    is_in_effect(&booking.confirmed_at, &now)
-                        && !is_in_effect(&booking.canceled_at, &now)
-                })
-                .collect()
-        }
+        GetBookingsType::Canceled => get_confirmed_bookings(&mut connection, &now, date_from)
+            .await?
+            .into_iter()
+            .filter_map(|booking| {
+                if is_in_effect(&booking.canceled_at, &now) {
+                    Some((booking, None))
+                } else {
+                    None
+                }
+            })
+            .collect(),
+        GetBookingsType::Confirmed => get_confirmed_bookings(&mut connection, &now, date_from)
+            .await?
+            .into_iter()
+            .filter_map(|booking| {
+                if is_in_effect(&booking.confirmed_at, &now)
+                    && !is_in_effect(&booking.canceled_at, &now)
+                {
+                    Some((booking, None))
+                } else {
+                    None
+                }
+            })
+            .collect(),
     };
 
     match query.r#type {
@@ -63,16 +77,16 @@ pub async fn get(
     Ok(web::Json(GetBookingsResponse {
         bookings: bookings
             .into_iter()
-            .map(|(booking, payment)| -> Result<BookingWithPayments, Error> {
+            .map(|(booking, cash_tx)| -> Result<BookingWithPayments, Error> {
                 Ok(BookingWithPayments {
                     booking: Booking::convert(booking, &timezone_config, &now)?
                         .finish(&booking_config, &now),
-                    payment: if let Some(cash_payment_status) = payment {
-                        Some(BookingCashPaymentStatus::convert(
-                            cash_payment_status,
+                    transaction: if let Some(cash_tx) = cash_tx {
+                        Some(Transaction::Cash(CashTransaction::convert(
+                            cash_tx,
                             &timezone_config,
                             &now,
-                        )?)
+                        )?))
                     } else {
                         None
                     },

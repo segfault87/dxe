@@ -72,6 +72,10 @@ impl UnitBookingConfig {
 
         self.base_price + self.price_per_hour * hours
     }
+
+    fn calculate_additive_price(&self, num_hours: i64) -> i64 {
+        self.price_per_hour * num_hours
+    }
 }
 
 #[derive(Clone, Deserialize, Debug)]
@@ -98,6 +102,14 @@ impl BookingConfig {
         let upper = to + self.buffer_time.1;
 
         now >= &lower && now < &upper
+    }
+
+    pub fn calculate_additive_price(&self, unit_id: &UnitId, hours: i64) -> Result<i64, ()> {
+        let Some(unit_booking_config) = self.units.get(unit_id) else {
+            return Err(());
+        };
+
+        Ok(unit_booking_config.calculate_additive_price(hours))
     }
 
     pub fn calculate_price(
@@ -190,9 +202,11 @@ pub struct DoorLockConfig {
     pub itsokey: Option<ItsokeyConfig>,
 }
 
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum NotificationBackend {
+    #[default]
+    Noop,
     Ntfy,
 }
 
@@ -216,7 +230,7 @@ impl dxe_extern::ntfy::NtfyConfig for NtfyConfig {
     }
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Default, Deserialize, Clone, Debug)]
 pub struct NotificationConfig {
     pub backend: NotificationBackend,
     pub ntfy: Option<NtfyConfig>,
@@ -243,7 +257,7 @@ impl dxe_extern::biztalk::BiztalkConfig for BiztalkConfig {
     }
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Default, Deserialize, Clone, Debug)]
 pub struct MessagingConfig {
     pub biztalk: Option<BiztalkConfig>,
 }
@@ -296,12 +310,12 @@ pub struct TelemetryConfig {
 
 #[derive(Clone, Deserialize, Debug)]
 pub struct TossPaymentsConfig {
-    pub toss_payments_secret_key: String,
+    pub secret_key: String,
 }
 
 impl dxe_extern::toss_payments::TossPaymentsConfig for TossPaymentsConfig {
     fn server_secret_key(&self) -> &str {
-        &self.toss_payments_secret_key
+        &self.secret_key
     }
 }
 
@@ -317,11 +331,12 @@ pub struct Config {
     pub database: DatabaseConfig,
     pub auth: AuthConfig,
     pub spaces: HashMap<SpaceId, SpaceConfig>,
+    #[serde(default)]
     pub notifications: NotificationConfig,
+    #[serde(default)]
     pub messaging: MessagingConfig,
     pub google_apis: Option<GoogleApiConfig>,
+    pub toss_payments: TossPaymentsConfig,
     #[serde(flatten)]
     pub telemetry: TelemetryConfig,
-    #[serde(flatten)]
-    pub toss_payments: TossPaymentsConfig,
 }

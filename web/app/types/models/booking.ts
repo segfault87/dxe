@@ -6,6 +6,7 @@ import type {
   UnitId,
 } from "./base";
 import type { Identity } from "./identity";
+import type { Transaction } from "./payment";
 import type { User } from "./user";
 
 export type BookingStatus =
@@ -33,28 +34,9 @@ export interface Booking {
   status: BookingStatus;
 }
 
-export interface CashPaymentStatus {
-  depositorName: string;
-  price: number;
-  confirmedAt: DateTime | null;
-  refundPrice: number | null;
-  refundAccount: string | null;
-  refundedAt: DateTime | null;
-  isRefundRequested: boolean;
-  isRefunded: boolean;
-}
-
-export interface TossPaymentStatus {
-  price: number;
-  confirmedAt: DateTime | null;
-  refundPrice: number | null;
-  refundedAt: DateTime | null;
-  isRefunded: boolean;
-}
-
 export interface BookingWithPayments {
   booking: Booking;
-  payment: CashPaymentStatus | null;
+  transaction: Transaction | null;
 }
 
 export interface OccupiedSlot {

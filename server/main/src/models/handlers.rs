@@ -7,8 +7,8 @@ use dxe_types::{
 use serde::{Deserialize, Serialize};
 
 use crate::models::entities::{
-    AdhocParking, AdhocReservation, AudioRecording, Booking, BookingCashPaymentStatus,
-    BookingTossPaymentStatus, BookingWithPayments, Group, GroupWithUsers, OccupiedSlot, SelfUser,
+    AdhocParking, AdhocReservation, AudioRecording, Booking, BookingWithPayments, CashTransaction,
+    Group, GroupWithUsers, OccupiedSlot, ProductType, SelfUser, Transaction,
 };
 
 pub mod admin {
@@ -54,7 +54,7 @@ pub mod admin {
     #[serde(rename_all = "camelCase")]
     pub struct ModifyBookingResponse {
         pub booking: Booking,
-        pub cash_payment_status: Option<BookingCashPaymentStatus>,
+        pub cash_transaction: Option<CashTransaction>,
     }
 
     #[derive(Debug, Deserialize)]
@@ -161,6 +161,8 @@ pub mod booking {
     #[derive(Debug, Deserialize)]
     pub struct CalendarQuery {
         pub unit_id: UnitId,
+        pub exclude_booking_id: Option<BookingId>,
+        pub exclude_adhoc_reservation_id: Option<AdhocReservationId>,
     }
 
     #[derive(Debug, Serialize)]
@@ -178,6 +180,9 @@ pub mod booking {
         pub unit_id: UnitId,
         pub time_from: DateTime<FixedOffset>,
         pub desired_hours: i64,
+        pub additional_hours: Option<i64>,
+        pub exclude_booking_id: Option<BookingId>,
+        pub exclude_adhoc_reservation_id: Option<AdhocReservationId>,
     }
 
     #[derive(Debug, Serialize)]
@@ -200,15 +205,16 @@ pub mod booking {
     #[serde(rename_all = "camelCase")]
     pub struct SubmitBookingResponse {
         pub booking: Booking,
-        pub cash_payment_status: BookingCashPaymentStatus,
+        pub cash_transaction: CashTransaction,
     }
 
     #[derive(Debug, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct GetBookingResponse {
         pub booking: Booking,
-        pub cash_payment_status: Option<BookingCashPaymentStatus>,
-        pub toss_payment_status: Option<BookingTossPaymentStatus>,
+        pub transaction: Option<Transaction>,
+        pub amendable: bool,
+        pub extendable_hours: i64,
     }
 
     #[derive(Debug, Deserialize)]
@@ -220,20 +226,22 @@ pub mod booking {
     #[derive(Debug, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct CancelBookingResponse {
-        pub cash_payment_status: Option<BookingCashPaymentStatus>,
-        pub toss_payment_status: Option<BookingTossPaymentStatus>,
+        pub transaction: Option<Transaction>,
     }
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct AmendBookingRequest {
         pub new_identity_id: Option<IdentityId>,
+        pub new_time_from: Option<DateTime<FixedOffset>>,
+        pub additional_hours: Option<i64>,
     }
 
     #[derive(Debug, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct AmendBookingResponse {
         pub booking: Booking,
+        pub foreign_payment_id: Option<ForeignPaymentId>,
     }
 
     #[derive(Debug, Serialize)]
@@ -278,6 +286,7 @@ pub mod booking {
     #[derive(Debug, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct GetTossPaymentStateResponse {
+        pub r#type: ProductType,
         pub time_from: DateTime<FixedOffset>,
         pub time_to: DateTime<FixedOffset>,
     }

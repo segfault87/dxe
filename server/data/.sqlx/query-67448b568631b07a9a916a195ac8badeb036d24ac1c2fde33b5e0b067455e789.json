@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            u.id AS \"u_id: UserId\",\n            u.provider AS \"u_provider: IdentityProvider\",\n            u.foreign_id AS \"u_foreign_id: String\",\n            u.name AS \"u_name: String\",\n            u.created_at AS \"u_created_at: DateTime<Utc>\",\n            u.deactivated_at AS \"u_deactivated_at: DateTime<Utc>\",\n            u.license_plate_number AS \"u_license_plate_number\"\n        FROM\n            group_association \"ga\"\n        JOIN\n            user \"u\" ON ga.user_id = u.id\n        WHERE\n            ga.group_id = ?1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "u_id: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "u_provider: IdentityProvider",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "u_foreign_id: String",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "u_name: String",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "u_created_at: DateTime<Utc>",
+        "ordinal": 4,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "u_deactivated_at: DateTime<Utc>",
+        "ordinal": 5,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "u_license_plate_number",
+        "ordinal": 6,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "67448b568631b07a9a916a195ac8badeb036d24ac1c2fde33b5e0b067455e789"
+}

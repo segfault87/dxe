@@ -6,7 +6,7 @@ import "./TossPayment.css";
 import type { Route } from "./+types/TossPaymentSuccess";
 import BookingService from "../../../api/booking";
 import RequiresAuth from "../../../lib/RequiresAuth";
-import type { BookingId } from "../../../types/models/base";
+import type { BookingId, ProductType } from "../../../types/models/base";
 import { defaultErrorHandler } from "../../../lib/error";
 import { redirect } from "react-router";
 
@@ -15,6 +15,7 @@ export function meta({}: Route.MetaArgs) {
 }
 
 interface LoaderData {
+  productType: ProductType;
   paymentType: string;
   orderId: string;
   paymentKey: string;
@@ -42,8 +43,10 @@ export async function clientLoader({
   const state = await BookingService.getTossPaymentState(orderId);
   const timeFrom = new Date(state.data.timeFrom);
   const timeTo = new Date(state.data.timeTo);
+  const productType = state.data.type;
 
   return {
+    productType,
     paymentType,
     orderId,
     paymentKey,
@@ -54,7 +57,8 @@ export async function clientLoader({
 }
 
 function TossPaymentSuccess({ loaderData }: { loaderData: LoaderData }) {
-  const { orderId, paymentKey, amount, timeFrom, timeTo } = loaderData;
+  const { productType, orderId, paymentKey, amount, timeFrom, timeTo } =
+    loaderData;
 
   const navigate = useNavigate();
 
@@ -108,7 +112,11 @@ function TossPaymentSuccess({ loaderData }: { loaderData: LoaderData }) {
     <div className="contents">
       {bookingId ? (
         <>
-          <p>예약이 확정되었습니다. 이용해 주셔서 감사합니다.</p>
+          {productType === "BOOKING_AMENDMENT" ? (
+            <p>예약이 연장되었습니다. 이용해 주셔서 감사합니다.</p>
+          ) : (
+            <p>예약이 확정되었습니다. 이용해 주셔서 감사합니다.</p>
+          )}
           <Link to={`/reservation/${bookingId}`} className="cta">
             예약 확인
           </Link>
@@ -124,7 +132,10 @@ function TossPaymentSuccess({ loaderData }: { loaderData: LoaderData }) {
             이용 시간: {timeFrom.toLocaleString()} - {timeTo.toLocaleString()}
           </p>
           <p className="price">
-            결제 금액: <em>₩{parseInt(amount).toLocaleString()}</em>
+            {productType === "BOOKING_AMENDMENT"
+              ? "추가 결제 금액"
+              : "결제 금액"}
+            : <em>₩{parseInt(amount).toLocaleString()}</em>
           </p>
           <span>
             <button
@@ -132,7 +143,7 @@ function TossPaymentSuccess({ loaderData }: { loaderData: LoaderData }) {
               onClick={confirmPayment}
               disabled={isRequestInProgress}
             >
-              예약 확정
+              {productType === "BOOKING_AMENDMENT" ? "예약 변경" : "예약 확정"}
             </button>{" "}
             <button
               className="cta"

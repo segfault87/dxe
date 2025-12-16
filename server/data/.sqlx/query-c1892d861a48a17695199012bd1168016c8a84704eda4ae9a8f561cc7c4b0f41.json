@@ -1,0 +1,242 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            p.discriminator AS \"p_discriminator: ProductDiscriminator\",\n            b.id AS \"b_id: Option<BookingId>\",\n            b.unit_id AS \"b_unit_id: Option<UnitId>\",\n            hu.id AS \"hu_id: Option<UserId>\",\n            hu.provider AS \"hu_provider: Option<IdentityProvider>\",\n            hu.foreign_id AS \"hu_foreign_id: Option<String>\",\n            hu.name AS \"hu_name: Option<String>\",\n            hu.created_at AS \"hu_created_at: Option<DateTime<Utc>>\",\n            hu.deactivated_at AS \"hu_deactivated_at: DateTime<Utc>\",\n            hu.license_plate_number AS \"hu_license_plate_number\",\n            ci.discriminator AS \"ci_discriminator: Option<IdentityDiscriminator>\",\n            cu.id AS \"cu_id: Option<UserId>\",\n            cu.provider AS \"cu_provider: Option<IdentityProvider>\",\n            cu.foreign_id AS \"cu_foreign_id: Option<String>\",\n            cu.name AS \"cu_name: Option<String>\",\n            cu.created_at AS \"cu_created_at: Option<DateTime<Utc>>\",\n            cu.deactivated_at AS \"cu_deactivated_at: DateTime<Utc>\",\n            cu.license_plate_number AS \"cu_license_plate_number\",\n            cg.id AS \"cg_id: Option<GroupId>\",\n            cg.name AS \"cg_name: Option<String>\",\n            cg.owner_id AS \"cg_owner_id: Option<UserId>\",\n            cg.is_open AS \"cg_is_open: Option<bool>\",\n            cg.created_at AS \"cg_created_at: Option<DateTime<Utc>>\",\n            cg.deleted_at AS \"cg_deleted_at: DateTime<Utc>\",\n            b.time_from AS \"b_time_from: Option<DateTime<Utc>>\",\n            b.time_to AS \"b_time_to: Option<DateTime<Utc>>\",\n            b.created_at AS \"b_created_at: Option<DateTime<Utc>>\",\n            b.confirmed_at AS \"b_confirmed_at: DateTime<Utc>\",\n            b.canceled_at AS \"b_canceled_at: DateTime<Utc>\",\n            ba.id AS \"ba_id: Option<BookingAmendmentId>\",\n            ba.booking_id AS \"ba_booking_id: Option<BookingId>\",\n            ba.original_time_from AS \"ba_original_time_from: Option<DateTime<Utc>>\",\n            ba.original_time_to AS \"ba_original_time_to: Option<DateTime<Utc>>\",\n            ba.desired_time_from AS \"ba_desired_time_from: Option<DateTime<Utc>>\",\n            ba.desired_time_to AS \"ba_desired_time_to: Option<DateTime<Utc>>\",\n            ba.created_at AS \"ba_created_at: Option<DateTime<Utc>>\",\n            ba.confirmed_at AS \"ba_confirmed_at: DateTime<Utc>\",\n            ba.canceled_at AS \"ba_canceled_at: DateTime<Utc>\"\n        FROM product \"p\"\n        LEFT OUTER JOIN booking \"b\" ON\n            b.id = p.id AND\n            p.discriminator = 'booking'\n        LEFT OUTER JOIN booking_amendment \"ba\" ON\n            ba.id = p.id AND\n            p.discriminator = 'booking_amendment'\n        LEFT OUTER JOIN user \"hu\" ON b.holder_id = hu.id\n        LEFT OUTER JOIN identity \"ci\" ON b.customer_id = ci.id\n        LEFT OUTER JOIN user \"cu\" ON\n            ci.discriminator = 'user' AND\n            ci.id = cu.id\n        LEFT OUTER JOIN \"group\" \"cg\" ON\n            ci.discriminator = 'group' AND\n            ci.id = cg.id\n        WHERE\n            p.id = ?1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "p_discriminator: ProductDiscriminator",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "b_id: Option<BookingId>",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "b_unit_id: Option<UnitId>",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "hu_id: Option<UserId>",
+        "ordinal": 3,
+        "type_info": "Blob"
+      },
+      {
+        "name": "hu_provider: Option<IdentityProvider>",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "hu_foreign_id: Option<String>",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "hu_name: Option<String>",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "hu_created_at: Option<DateTime<Utc>>",
+        "ordinal": 7,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "hu_deactivated_at: DateTime<Utc>",
+        "ordinal": 8,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "hu_license_plate_number",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "ci_discriminator: Option<IdentityDiscriminator>",
+        "ordinal": 10,
+        "type_info": "Text"
+      },
+      {
+        "name": "cu_id: Option<UserId>",
+        "ordinal": 11,
+        "type_info": "Blob"
+      },
+      {
+        "name": "cu_provider: Option<IdentityProvider>",
+        "ordinal": 12,
+        "type_info": "Text"
+      },
+      {
+        "name": "cu_foreign_id: Option<String>",
+        "ordinal": 13,
+        "type_info": "Text"
+      },
+      {
+        "name": "cu_name: Option<String>",
+        "ordinal": 14,
+        "type_info": "Text"
+      },
+      {
+        "name": "cu_created_at: Option<DateTime<Utc>>",
+        "ordinal": 15,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "cu_deactivated_at: DateTime<Utc>",
+        "ordinal": 16,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "cu_license_plate_number",
+        "ordinal": 17,
+        "type_info": "Text"
+      },
+      {
+        "name": "cg_id: Option<GroupId>",
+        "ordinal": 18,
+        "type_info": "Blob"
+      },
+      {
+        "name": "cg_name: Option<String>",
+        "ordinal": 19,
+        "type_info": "Text"
+      },
+      {
+        "name": "cg_owner_id: Option<UserId>",
+        "ordinal": 20,
+        "type_info": "Blob"
+      },
+      {
+        "name": "cg_is_open: Option<bool>",
+        "ordinal": 21,
+        "type_info": "Bool"
+      },
+      {
+        "name": "cg_created_at: Option<DateTime<Utc>>",
+        "ordinal": 22,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "cg_deleted_at: DateTime<Utc>",
+        "ordinal": 23,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "b_time_from: Option<DateTime<Utc>>",
+        "ordinal": 24,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "b_time_to: Option<DateTime<Utc>>",
+        "ordinal": 25,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "b_created_at: Option<DateTime<Utc>>",
+        "ordinal": 26,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "b_confirmed_at: DateTime<Utc>",
+        "ordinal": 27,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "b_canceled_at: DateTime<Utc>",
+        "ordinal": 28,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "ba_id: Option<BookingAmendmentId>",
+        "ordinal": 29,
+        "type_info": "Blob"
+      },
+      {
+        "name": "ba_booking_id: Option<BookingId>",
+        "ordinal": 30,
+        "type_info": "Blob"
+      },
+      {
+        "name": "ba_original_time_from: Option<DateTime<Utc>>",
+        "ordinal": 31,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "ba_original_time_to: Option<DateTime<Utc>>",
+        "ordinal": 32,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "ba_desired_time_from: Option<DateTime<Utc>>",
+        "ordinal": 33,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "ba_desired_time_to: Option<DateTime<Utc>>",
+        "ordinal": 34,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "ba_created_at: Option<DateTime<Utc>>",
+        "ordinal": 35,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "ba_confirmed_at: DateTime<Utc>",
+        "ordinal": 36,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "ba_canceled_at: DateTime<Utc>",
+        "ordinal": 37,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "c1892d861a48a17695199012bd1168016c8a84704eda4ae9a8f561cc7c4b0f41"
+}

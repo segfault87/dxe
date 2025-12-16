@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE booking_amendment\n        SET confirmed_at=?1\n        WHERE id=?2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "0831f96ab2b6790da43dcee70f0d41fef3fe2ebaa23fafa88309d027b71fda03"
+}

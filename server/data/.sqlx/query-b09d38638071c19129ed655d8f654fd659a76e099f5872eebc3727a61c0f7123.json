@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO booking_amendment(\n            id,\n            booking_id,\n            original_time_from,\n            original_time_to,\n            desired_time_from,\n            desired_time_to,\n            created_at,\n            confirmed_at)\n        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "b09d38638071c19129ed655d8f654fd659a76e099f5872eebc3727a61c0f7123"
+}

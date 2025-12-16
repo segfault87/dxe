@@ -91,17 +91,6 @@ CREATE INDEX idx_reservation_holder_id ON reservation(holder_id);
 CREATE INDEX idx_reservation_time_from ON reservation(time_from);
 CREATE INDEX idx_reservation_time_to ON reservation(time_to);
 
-CREATE TABLE booking_change_history(
-    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    booking_id BLOB NOT NULL,
-    created_at DATETIME NOT NULL,
-    new_customer_id BLOB,
-    new_time_from DATETIME,
-    new_time_to DATETIME,
-    FOREIGN KEY(booking_id) REFERENCES booking(id)
-);
-CREATE INDEX idx_booking_change_history ON booking_change_history(booking_id);
-
 CREATE TABLE cash_payment_status(
     booking_id BLOB NOT NULL PRIMARY KEY,
     depositor_name VARCHAR(40) NOT NULL,

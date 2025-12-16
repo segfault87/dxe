@@ -12,7 +12,6 @@ export interface SelfUser {
 
   depositorName: string | null;
   refundAccount: string | null;
-  usePgPayment: boolean;
 }
 
 export interface User {

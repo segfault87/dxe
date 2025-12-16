@@ -2,7 +2,7 @@ use actix_web::web;
 use chrono::{DateTime, TimeDelta};
 use dxe_data::queries::booking::{
     create_adhoc_reservation, delete_adhoc_reservation, get_adhoc_reservation,
-    get_adhoc_reservations_by_unit_id, is_booking_available,
+    get_adhoc_reservations_by_unit_id,
 };
 use dxe_types::AdhocReservationId;
 use sqlx::SqlitePool;
@@ -54,10 +54,6 @@ pub async fn post(
 
     let expires_at = body.expires_at.as_ref().map(DateTime::to_utc);
 
-    if !is_booking_available(&mut tx, &now, &body.unit_id, &time_from, &time_to).await? {
-        return Err(Error::TimeRangeOccupied);
-    }
-
     let id = create_adhoc_reservation(
         &mut tx,
         &now,
@@ -77,13 +73,12 @@ pub async fn post(
 
     tx.commit().await?;
 
-    if let Some(calendar_service) = calendar_service.as_ref() {
-        if let Err(e) = calendar_service
+    if let Some(calendar_service) = calendar_service.as_ref()
+        && let Err(e) = calendar_service
             .register_adhoc_reservation(&reservation, &timezone_config)
             .await
-        {
-            log::error!("Failed to create ad hoc reservation on calendar: {e}");
-        }
+    {
+        log::error!("Failed to create ad hoc reservation on calendar: {e}");
     }
 
     Ok(web::Json(CreateAdhocReservationResponse {
@@ -106,13 +101,12 @@ pub async fn delete(
 
     tx.commit().await?;
 
-    if let Some(calendar_service) = calendar_service.as_ref() {
-        if let Err(e) = calendar_service
+    if let Some(calendar_service) = calendar_service.as_ref()
+        && let Err(e) = calendar_service
             .delete_adhoc_reservation(&reservation_id)
             .await
-        {
-            log::error!("Failed to delete ad hoc reservation on calendar: {e}");
-        }
+    {
+        log::error!("Failed to delete ad hoc reservation on calendar: {e}");
     }
 
     Ok(web::Json(serde_json::json!({})))

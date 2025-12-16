@@ -10,3 +10,5 @@ export type AdhocParkingId = number;
 export type ForeignPaymentId = string;
 
 export type IdentityId = UserId | GroupId;
+
+export type ProductType = "BOOKING" | "BOOKING_AMENDMENT";

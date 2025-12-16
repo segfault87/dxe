@@ -17,6 +17,8 @@ pub enum Error {
     InvalidKakaoAccessToken,
     #[error("잘못된 날짜 범위입니다.")]
     InvalidTimeRange,
+    #[error("현재 진행중인 예약은 변경할 수 없습니다.")]
+    OngoingBookingNotModifiable,
     #[error("입력하신 날짜는 이미 예약이 완료되었습니다.")]
     TimeRangeOccupied,
     #[error("잘못된 요청입니다.")]
@@ -29,6 +31,8 @@ pub enum Error {
     UserNotFound,
     #[error("예약을 찾을 수 없습니다.")]
     BookingNotFound,
+    #[error("예약 변경 요청을 찾을 수 없습니다.")]
+    BookingAmendmentNotFound,
     #[error("녹음 파일을 찾을 수 없습니다.")]
     AudioRecordingNotFound,
     #[error("이미 그룹에 속해있기 때문에 그룹으로 전환할 수 없습니다.")]
@@ -89,6 +93,8 @@ impl From<DataError> for Error {
             DataError::TimeRangeOccupied => Self::TimeRangeOccupied,
             DataError::UnitNotFound => Self::UnitNotFound,
             DataError::UserNotFound => Self::UserNotFound,
+            DataError::BookingNotFound => Self::BookingNotFound,
+            DataError::BookingAmendmentNotFound => Self::BookingAmendmentNotFound,
             DataError::MissingField(field) => Self::MissingField(field),
             DataError::Sqlx(e) => Self::Sqlx(e),
         }
@@ -111,12 +117,14 @@ impl ResponseError for Error {
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::InvalidKakaoAccessToken => StatusCode::BAD_REQUEST,
             Self::InvalidTimeRange => StatusCode::BAD_REQUEST,
+            Self::OngoingBookingNotModifiable => StatusCode::BAD_REQUEST,
             Self::TimeRangeOccupied => StatusCode::BAD_REQUEST,
             Self::MissingField(_) => StatusCode::BAD_REQUEST,
             Self::UnitNotFound => StatusCode::BAD_REQUEST,
             Self::GroupNotFound => StatusCode::NOT_FOUND,
             Self::UserNotFound => StatusCode::NOT_FOUND,
             Self::BookingNotFound => StatusCode::NOT_FOUND,
+            Self::BookingAmendmentNotFound => StatusCode::NOT_FOUND,
             Self::AudioRecordingNotFound => StatusCode::NOT_FOUND,
             Self::BookingNotAssignableToGroup => StatusCode::BAD_REQUEST,
             Self::UserNotMemberOf => StatusCode::BAD_REQUEST,
@@ -149,11 +157,13 @@ impl ResponseError for Error {
             Self::InvalidKakaoAccessToken => "InvalidKakaoAccessToken",
             Self::InvalidTimeRange => "InvalidTimeRange",
             Self::TimeRangeOccupied => "TimeRangeOccupied",
+            Self::OngoingBookingNotModifiable => "OngoingBookingNotModifiable",
             Self::MissingField(_) => "MissingField",
             Self::UnitNotFound => "UnitNotFound",
             Self::GroupNotFound => "GroupNotFound",
             Self::UserNotFound => "UserNotFound",
             Self::BookingNotFound => "BookingNotFound",
+            Self::BookingAmendmentNotFound => "BookingAmendmentNotFound",
             Self::AudioRecordingNotFound => "AudioRecordingNotFound",
             Self::BookingNotAssignableToGroup => "BookingNotAssignableToGroup",
             Self::UserNotMemberOf => "UserNotMemberOf",

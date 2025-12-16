@@ -5,6 +5,7 @@ export interface Environment {
   kakaoSdkKey: string;
   gtmId: string;
   gaMeasurementId: string;
+  enableTossPayments: boolean;
   tossPaymentClientKey: string;
 }
 
@@ -13,6 +14,7 @@ const EnvContext = createContext<Environment>({
   kakaoSdkKey: import.meta.env.VITE_KAKAO_SDK_KEY,
   gtmId: import.meta.env.VITE_GTM_ID,
   gaMeasurementId: import.meta.env.VITE_GA_MEASUREMENT_ID,
+  enableTossPayments: import.meta.env.VITE_ENABLE_TOSS_PAYMENTS === "true",
   tossPaymentClientKey: import.meta.env.VITE_TOSS_PAYMENT_CLIENT_KEY,
 });
 
@@ -22,6 +24,7 @@ export function EnvProvider({ children }: { children: React.ReactNode }) {
     kakaoSdkKey: import.meta.env.VITE_KAKAO_SDK_KEY,
     gtmId: import.meta.env.VITE_GTM_ID,
     gaMeasurementId: import.meta.env.VITE_GA_MEASUREMENT_ID,
+    enableTossPayments: import.meta.env.VITE_ENABLE_TOSS_PAYMENTS === "true",
     tossPaymentClientKey: import.meta.env.VITE_TOSS_PAYMENT_CLIENT_KEY,
   };
 

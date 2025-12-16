@@ -5,18 +5,13 @@ use serde::Deserialize;
 
 use crate::tasks::z2m_controller::DeviceName;
 
-#[derive(Copy, Clone, Debug, Deserialize)]
+#[derive(Copy, Clone, Debug, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum SwitchPolicy {
+    #[default]
     Uncontrolled,
     StayOn,
     Off,
-}
-
-impl Default for SwitchPolicy {
-    fn default() -> Self {
-        Self::Uncontrolled
-    }
 }
 
 #[derive(Clone, Debug, Deserialize)]

@@ -2,12 +2,11 @@ use chrono::{DateTime, Utc};
 use dxe_data::entities;
 
 use super::{
-    AdhocParking, AdhocReservation, AudioRecording, Booking, BookingCashPaymentStatus,
-    BookingStatus, Group, GroupWithUsers, Identity, OccupiedSlot, SelfUser, User,
+    AdhocParking, AdhocReservation, AudioRecording, Booking, BookingStatus, CashTransaction, Group,
+    GroupWithUsers, Identity, OccupiedSlot, SelfUser, TossPaymentsTransaction, User,
 };
 use crate::config::{BookingConfig, TimeZoneConfig};
 use crate::models::Error;
-use crate::models::entities::BookingTossPaymentStatus;
 use crate::utils::datetime::is_in_effect;
 use crate::utils::mask_identity;
 
@@ -56,7 +55,6 @@ impl IntoView for SelfUser {
             is_administrator: false,
             depositor_name: None,
             refund_account: None,
-            use_pg_payment: false,
         })
     }
 }
@@ -205,8 +203,8 @@ impl IntoView for OccupiedSlot {
     }
 }
 
-impl IntoView for BookingCashPaymentStatus {
-    type Entity = entities::CashPaymentStatus;
+impl IntoView for CashTransaction {
+    type Entity = entities::CashTransaction;
     type Error = Error;
 
     fn convert(
@@ -227,8 +225,8 @@ impl IntoView for BookingCashPaymentStatus {
     }
 }
 
-impl IntoView for BookingTossPaymentStatus {
-    type Entity = entities::TossPaymentStatus;
+impl IntoView for TossPaymentsTransaction {
+    type Entity = entities::TossPaymentsTransaction;
     type Error = Error;
 
     fn convert(

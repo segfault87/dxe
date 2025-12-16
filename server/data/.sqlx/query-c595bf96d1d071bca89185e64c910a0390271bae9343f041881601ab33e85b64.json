@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE booking\n            SET\n                time_from=?1,\n                time_to=?2\n            WHERE id=?3\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "c595bf96d1d071bca89185e64c910a0390271bae9343f041881601ab33e85b64"
+}

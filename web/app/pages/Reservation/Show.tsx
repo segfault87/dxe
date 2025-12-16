@@ -6,11 +6,9 @@ import type { Route } from "./+types/Show";
 import BookingService from "../../api/booking";
 import { useAuth } from "../../context/AuthContext";
 import RequiresAuth from "../../lib/RequiresAuth";
-import type {
-  Booking,
-  CashPaymentStatus,
-  TossPaymentStatus,
-} from "../../types/models/booking";
+import type { Booking } from "../../types/models/booking";
+import type { Transaction } from "../../types/models/payment";
+import ExtendReservation from "../../components/ExtendReservation";
 import GroupSelection from "../../components/GroupSelection";
 import Section from "../../components/Section";
 import { defaultErrorHandler } from "../../lib/error";
@@ -22,8 +20,9 @@ export function meta({}: Route.MetaArgs) {
 
 interface LoaderData {
   booking: Booking | null;
-  cashPaymentStatus: CashPaymentStatus | null;
-  tossPaymentStatus: TossPaymentStatus | null;
+  transaction: Transaction | null;
+  amendable: boolean;
+  extendableHours: number;
 }
 
 export async function clientLoader({
@@ -38,27 +37,31 @@ export async function clientLoader({
 
     return {
       booking: result.data.booking,
-      cashPaymentStatus: result.data.cashPaymentStatus,
-      tossPaymentStatus: result.data.tossPaymentStatus,
+      transaction: result.data.transaction,
+      amendable: result.data.amendable,
+      extendableHours: result.data.extendableHours,
     };
   } catch (error) {
     defaultErrorHandler(error);
     return {
       booking: null,
-      cashPaymentStatus: null,
-      tossPaymentStatus: null,
+      transaction: null,
+      amendable: false,
+      extendableHours: 0,
     };
   }
 }
 
 function ShowReservationInner({
   booking,
-  cashPaymentStatus,
-  tossPaymentStatus,
+  transaction,
+  amendable,
+  extendableHours,
 }: {
   booking: Booking;
-  cashPaymentStatus: CashPaymentStatus | null;
-  tossPaymentStatus: TossPaymentStatus | null;
+  transaction: Transaction | null;
+  amendable: boolean;
+  extendableHours: number;
 }) {
   const auth = useAuth();
   const navigate = useNavigate();
@@ -69,7 +72,7 @@ function ShowReservationInner({
   const cancelReservation = async () => {
     let refundAccount: string | null = null;
 
-    if (cashPaymentStatus !== null) {
+    if (transaction?.cash) {
       if (bookingStart.toDateString() !== new Date().toDateString()) {
         refundAccount = prompt(
           "환불받으실 계좌번호를 입력해 주세요.",
@@ -85,7 +88,7 @@ function ShowReservationInner({
       } catch (error) {
         defaultErrorHandler(error);
       }
-    } else if (tossPaymentStatus !== null) {
+    } else if (transaction?.tossPayments) {
       const cancelReason = prompt("취소 사유를 입력해 주세요.");
       if (cancelReason === null) {
         return;
@@ -106,6 +109,7 @@ function ShowReservationInner({
   };
 
   const [groupTransferModal, setGroupTransferModal] = useState(false);
+  const [extendReservationModal, setExtendReservationModal] = useState(false);
 
   const [isRequestInProgress, setRequestInProgress] = useState(false);
 
@@ -208,34 +212,34 @@ function ShowReservationInner({
           <li>예약 상태: {status}</li>
         </ul>
       </Section>
-      {cashPaymentStatus !== null ? (
+      {transaction?.cash ? (
         <Section id="payment-info" title="현금결제 정보">
           <ul>
-            <li>금액 : ₩{cashPaymentStatus.price.toLocaleString()}</li>
+            <li>금액 : ₩{transaction.cash.price.toLocaleString()}</li>
             <li>
               확정 일시 :{" "}
-              {booking.isConfirmed && cashPaymentStatus.confirmedAt !== null
-                ? new Date(cashPaymentStatus.confirmedAt).toLocaleString()
+              {booking.isConfirmed && transaction.cash.confirmedAt !== null
+                ? new Date(transaction.cash.confirmedAt).toLocaleString()
                 : "미확정"}
             </li>
-            {cashPaymentStatus.isRefundRequested &&
-            cashPaymentStatus.refundPrice !== null ? (
+            {transaction.cash.isRefundRequested &&
+            transaction.cash.refundPrice !== null ? (
               <>
                 <li>
-                  환불 금액 : ₩{cashPaymentStatus.refundPrice.toLocaleString()}
+                  환불 금액 : ₩{transaction.cash.refundPrice.toLocaleString()}
                 </li>
                 <li>
                   환불 상태 :{" "}
-                  {cashPaymentStatus.isRefunded &&
-                  cashPaymentStatus.refundedAt !== null
-                    ? `완료 (${new Date(cashPaymentStatus.refundedAt).toLocaleString()})`
+                  {transaction.cash.isRefunded &&
+                  transaction.cash.refundedAt !== null
+                    ? `완료 (${new Date(transaction.cash.refundedAt).toLocaleString()})`
                     : "미처리"}
                 </li>
               </>
             ) : null}
-            {cashPaymentStatus.refundAccount !== null ? (
+            {transaction.cash.refundAccount !== null ? (
               <li>
-                환불 계좌 : {cashPaymentStatus.refundAccount.toLocaleString()}
+                환불 계좌 : {transaction.cash.refundAccount.toLocaleString()}
               </li>
             ) : null}
           </ul>
@@ -250,26 +254,30 @@ function ShowReservationInner({
           ) : null}
         </Section>
       ) : null}
-      {tossPaymentStatus !== null ? (
+      {transaction?.tossPayments ? (
         <Section id="payment-info" title="결제 정보">
           <ul>
-            <li>금액 : ₩{tossPaymentStatus.price.toLocaleString()}</li>
+            <li>금액 : ₩{transaction.tossPayments.price.toLocaleString()}</li>
             <li>
               확정 일시 :{" "}
-              {booking.isConfirmed && tossPaymentStatus.confirmedAt !== null
-                ? new Date(tossPaymentStatus.confirmedAt).toLocaleString()
+              {booking.isConfirmed &&
+              transaction.tossPayments.confirmedAt !== null
+                ? new Date(
+                    transaction.tossPayments.confirmedAt,
+                  ).toLocaleString()
                 : "미확정"}
             </li>
-            {tossPaymentStatus.refundPrice !== null ? (
+            {transaction.tossPayments.refundPrice !== null ? (
               <>
                 <li>
-                  환불 금액 : ₩{tossPaymentStatus.refundPrice.toLocaleString()}
+                  환불 금액 : ₩
+                  {transaction.tossPayments.refundPrice.toLocaleString()}
                 </li>
                 <li>
                   환불 상태 :{" "}
-                  {tossPaymentStatus.isRefunded &&
-                  tossPaymentStatus.refundedAt !== null
-                    ? `완료 (${new Date(tossPaymentStatus.refundedAt).toLocaleString()})`
+                  {transaction.tossPayments.isRefunded &&
+                  transaction.tossPayments.refundedAt !== null
+                    ? `완료 (${new Date(transaction.tossPayments.refundedAt).toLocaleString()})`
                     : "미처리"}
                 </li>
               </>
@@ -283,6 +291,25 @@ function ShowReservationInner({
           <button className="primary" onClick={cancelReservation}>
             예약 취소
           </button>
+          {amendable ? (
+            <>
+              {" "}
+              <Link to={`/reservation/${booking.id}/amend`} className="primary">
+                예약 변경
+              </Link>
+            </>
+          ) : null}
+          {extendableHours > 0 ? (
+            <>
+              {" "}
+              <button
+                className="primary"
+                onClick={() => setExtendReservationModal(true)}
+              >
+                예약 연장
+              </button>
+            </>
+          ) : null}
         </Section>
       ) : null}
       <GroupSelection
@@ -290,10 +317,17 @@ function ShowReservationInner({
         bookingId={booking.id}
         onSelectGroup={transferIdentity}
         isOpen={groupTransferModal}
-        close={() => {
-          setGroupTransferModal(false);
-        }}
+        close={() => setGroupTransferModal(false)}
       />
+      {auth ? (
+        <ExtendReservation
+          userId={auth.user.id}
+          booking={booking}
+          extendableHours={extendableHours}
+          isOpen={extendReservationModal}
+          close={() => setExtendReservationModal(false)}
+        />
+      ) : null}
     </>
   );
 }
@@ -303,8 +337,9 @@ function ShowReservation({ loaderData }: Route.ComponentProps) {
     return (
       <ShowReservationInner
         booking={loaderData.booking}
-        cashPaymentStatus={loaderData.cashPaymentStatus}
-        tossPaymentStatus={loaderData.tossPaymentStatus}
+        transaction={loaderData.transaction}
+        amendable={loaderData.amendable}
+        extendableHours={loaderData.extendableHours}
       />
     );
   } else {

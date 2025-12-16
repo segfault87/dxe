@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO product(id, discriminator)\n        VALUES(?1, 'booking')\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "d30e26a22b486ece17cb2b6978581bfd1037b90f2471273f4f438e6c711f0f95"
+}

@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::sync::Arc;
 
@@ -14,12 +14,16 @@ use crate::config::AlertPriority;
 use crate::services::carpark_exemption::CarparkExemptionService;
 use crate::services::notification::NotificationService;
 use crate::tasks::booking_state_manager::BookingStates;
+use crate::tasks::osd_controller::OsdController;
+use crate::tasks::osd_controller::topics::ParkingStates;
+use crate::tasks::osd_controller::types::ParkingState;
 
 pub struct CarparkExempter {
     client: DxeClient,
     booking_states: Arc<Mutex<BookingStates>>,
     service: CarparkExemptionService,
     notification_service: NotificationService,
+    osd_controller: Arc<OsdController>,
 
     active_bookings: Mutex<HashSet<BookingId>>,
 }
@@ -29,6 +33,7 @@ impl CarparkExempter {
         client: DxeClient,
         booking_states: Arc<Mutex<BookingStates>>,
         service: CarparkExemptionService,
+        osd_controller: Arc<OsdController>,
         notification_service: NotificationService,
     ) -> Self {
         Self {
@@ -36,6 +41,7 @@ impl CarparkExempter {
             booking_states,
             service,
             notification_service,
+            osd_controller,
 
             active_bookings: Mutex::new(HashSet::new()),
         }
@@ -52,6 +58,7 @@ impl CarparkExempter {
             Ok(parkings) => {
                 for parking in parkings.parkings {
                     license_plate_numbers.insert((
+                        None,
                         String::new(),
                         String::new(),
                         parking.license_plate_number,
@@ -74,6 +81,7 @@ impl CarparkExempter {
                                 && !license_plate_number.is_empty()
                             {
                                 license_plate_numbers.insert((
+                                    Some(booking.booking.unit_id.clone()),
                                     booking.booking.customer_name.clone(),
                                     user.name.clone(),
                                     license_plate_number.clone(),
@@ -85,13 +93,55 @@ impl CarparkExempter {
             }
         }
 
-        for (customer_name, user_name, license_plate_number) in license_plate_numbers {
+        let mut parking_results = HashMap::new();
+
+        for (unit_id, customer_name, user_name, license_plate_number) in license_plate_numbers {
             if let Err(e) = match self.service.exempt(&license_plate_number).await {
-                Ok(true) => self.notification_service.notify(AlertPriority::Low, format!("Car parking exempted sucessfully for user {user_name} ({customer_name})")).await,
-                Ok(false) => continue,
-                Err(e) => self.notification_service.notify(AlertPriority::Low, format!("Car parking exemption error: {e}")).await,
+                Ok((success, entry_date)) => {
+                    if let Some(unit_id) = unit_id
+                        && let Some(entry_date) = entry_date
+                    {
+                        parking_results
+                            .entry(unit_id)
+                            .or_insert_with(Vec::new)
+                            .push(ParkingState {
+                                license_plate_number: license_plate_number.clone(),
+                                user_name: user_name.clone(),
+                                entry_date,
+                                exempted: success,
+                            });
+                    }
+
+                    if success {
+                        self.notification_service.notify(AlertPriority::Low, format!("Car parking exempted sucessfully for user {user_name} ({customer_name})")).await
+                    } else {
+                        continue;
+                    }
+                }
+                Err(e) => {
+                    self.notification_service
+                        .notify(
+                            AlertPriority::Low,
+                            format!("Car parking exemption error: {e}"),
+                        )
+                        .await
+                }
             } {
                 log::error!("Could not send notification while processing parking exemption: {e}");
+            }
+        }
+
+        for (unit_id, mut states) in parking_results.into_iter() {
+            if !states.is_empty() {
+                states.sort_by(|a, b| a.user_name.cmp(&b.user_name));
+                let parking_states = ParkingStates {
+                    unit_id: unit_id.clone(),
+                    states,
+                };
+
+                if let Err(e) = self.osd_controller.publish(&parking_states).await {
+                    log::warn!("Could not publish parking state to OSD: {e}");
+                }
             }
         }
     }

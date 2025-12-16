@@ -59,8 +59,8 @@ pub async fn get(
 
     let amendable = booking_config
         .calculate_refund_price(&timezone_config, 100, booking.time_from, *now)
-        .map_err(|_| Error::UnitNotFound)?
-        != 0;
+        .map(|v| v != 0)
+        .unwrap_or(false);
 
     let hours = (booking.time_to - booking.time_from).num_hours();
     let mut extendable_hours = booking_config.max_booking_hours - hours;

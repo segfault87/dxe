@@ -3,15 +3,20 @@ pub mod types;
 
 use std::collections::HashSet;
 use std::error::Error as StdError;
+use std::sync::Arc;
 
 use dxe_s2s_shared::entities::BookingWithUsers;
 use dxe_types::BookingId;
 use parking_lot::Mutex;
+use rumqttc::Publish;
 use serde::Serialize;
+use tokio::task::JoinHandle;
 
 use crate::callback::EventStateCallback;
+use crate::client::DxeClient;
 use crate::config::OsdConfig;
 use crate::services::mqtt::{Error as MqttError, MqttService, MqttTopicPrefix};
+use crate::tasks::osd_controller::topics::DoorLockOpenResult;
 
 pub trait OsdTopic: Serialize {
     fn topic_name(&self) -> String;
@@ -19,6 +24,7 @@ pub trait OsdTopic: Serialize {
 
 #[derive(Debug)]
 pub struct OsdController {
+    client: DxeClient,
     mqtt_service: MqttService,
     topic_prefix: MqttTopicPrefix,
 
@@ -26,12 +32,58 @@ pub struct OsdController {
 }
 
 impl OsdController {
-    pub fn new(mqtt_service: MqttService, config: &OsdConfig) -> Self {
-        Self {
+    pub async fn new(
+        client: DxeClient,
+        mqtt_service: MqttService,
+        config: &OsdConfig,
+    ) -> Result<(Arc<Self>, JoinHandle<()>), Error> {
+        mqtt_service
+            .subscribe(&config.topic_prefix.topic("doorlock/set"))
+            .await?;
+        let mut subscriber = mqtt_service.receiver(config.topic_prefix.clone());
+
+        let controller = Arc::new(Self {
+            client,
             mqtt_service,
             topic_prefix: config.topic_prefix.clone(),
 
             active_bookings: Mutex::new(HashSet::new()),
+        });
+
+        let controller_inner = controller.clone();
+        let task = tokio::task::spawn(async move {
+            while let Ok(message) = subscriber.recv().await {
+                controller_inner.clone().handle_message(message).await;
+            }
+        });
+
+        Ok((controller, task))
+    }
+
+    async fn handle_message(self: Arc<Self>, message: Publish) {
+        if message.topic == self.topic_prefix.topic("doorlock/set") {
+            let result = match self
+                .client
+                .post::<serde_json::Value, serde_json::Value>(
+                    "/doorlock",
+                    None,
+                    serde_json::Value::Null,
+                )
+                .await
+            {
+                Ok(_) => DoorLockOpenResult {
+                    success: true,
+                    error: None,
+                },
+                Err(e) => DoorLockOpenResult {
+                    success: false,
+                    error: Some(e.to_string()),
+                },
+            };
+
+            if let Err(e) = self.publish(&result).await {
+                log::warn!("Could not publish door lock open result: {e}");
+            }
         }
     }
 

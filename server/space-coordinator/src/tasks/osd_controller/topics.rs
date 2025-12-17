@@ -74,3 +74,16 @@ impl OsdTopic for StopSession {
         format!("stop_session/{}", self.unit_id)
     }
 }
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DoorLockOpenResult {
+    pub success: bool,
+    pub error: Option<String>,
+}
+
+impl OsdTopic for DoorLockOpenResult {
+    fn topic_name(&self) -> String {
+        String::from("doorlock/get")
+    }
+}

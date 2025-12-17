@@ -4,8 +4,6 @@ mod config;
 mod services;
 mod tasks;
 
-use std::sync::Arc;
-
 use clap::Parser;
 
 use crate::client::DxeClient;
@@ -63,7 +61,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     z2m_controller.start().await;
 
-    let osd_controller = Arc::new(OsdController::new(mqtt_service.clone(), &config.osd));
+    let (osd_controller, osd_task) =
+        OsdController::new(client.clone(), mqtt_service.clone(), &config.osd).await?;
 
     let telemetry_manager = TelemetryManager::new(&config.telemetry, client.clone());
     let telemetry_tasks = telemetry_manager
@@ -123,6 +122,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     telemetry_manager.abort();
 
     z2m_consumer_task.abort();
+    osd_task.abort();
     mqtt_service_task.abort();
 
     Ok(())

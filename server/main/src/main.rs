@@ -63,8 +63,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let timezone_config = Data::new(config.timezone.clone());
     let doorlock_service = Data::new(DoorLockService::new(&config.spaces));
     let s2s_public_keys = Arc::new(PublicKeyBundle::new(&config.spaces));
-    let calendar_service = if let Some(config) = &config.google_apis {
-        Some(CalendarService::new(config)?)
+    let calendar_service = if let Some(google_api_config) = &config.google_apis {
+        Some(CalendarService::new(
+            google_api_config,
+            config.timezone.clone(),
+        )?)
     } else {
         None
     };

@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use dxe_data::entities::{AdhocReservation, Booking, User};
 use dxe_extern::google_cloud::calendar::{
-    DateTimeRepresentation, Error as CalendarError, Event, EventId, EventVisibility,
-    ExtendedProperties, GoogleCalendarClient,
+    DateTimeRepresentation, Error as CalendarError, Event, EventId, EventPartialUpdate,
+    EventVisibility, ExtendedProperties, GoogleCalendarClient,
 };
 use dxe_extern::google_cloud::{CredentialManager, Error as GcpError};
 use dxe_types::{AdhocReservationId, BookingId};
@@ -14,6 +14,7 @@ use crate::config::{GoogleApiConfig, TimeZoneConfig};
 #[derive(Clone, Debug)]
 pub struct CalendarService {
     client: Arc<GoogleCalendarClient>,
+    timezone_config: TimeZoneConfig,
 }
 
 fn booking_id_to_event_id(booking_id: &BookingId) -> EventId {
@@ -25,30 +26,42 @@ fn adhoc_reservation_id_to_event_id(reservation_id: &AdhocReservationId) -> Even
 }
 
 impl CalendarService {
-    pub fn new(config: &GoogleApiConfig) -> Result<Self, Error> {
+    pub fn new(config: &GoogleApiConfig, timezone_config: TimeZoneConfig) -> Result<Self, Error> {
         let credential = CredentialManager::new(config, Some(config.calendar.identity.clone()))?;
         let client = GoogleCalendarClient::new(credential, &config.calendar);
 
         Ok(Self {
             client: Arc::new(client),
+            timezone_config,
         })
     }
 
-    pub async fn register_booking(
-        &self,
-        timezone_config: &TimeZoneConfig,
-        booking: &Booking,
-        users: &[User],
-    ) -> Result<(), Error> {
+    pub async fn update_booking_time(&self, booking: &Booking) -> Result<(), Error> {
+        let event_id = booking_id_to_event_id(&booking.id);
+
+        let update = EventPartialUpdate {
+            start: Some(DateTimeRepresentation {
+                date_time: self.timezone_config.convert(booking.time_from),
+            }),
+            end: Some(DateTimeRepresentation {
+                date_time: self.timezone_config.convert(booking.time_to),
+            }),
+            ..Default::default()
+        };
+
+        Ok(self.client.update_event(&event_id, update).await?)
+    }
+
+    pub async fn register_booking(&self, booking: &Booking, users: &[User]) -> Result<(), Error> {
         let event = Event {
             id: booking_id_to_event_id(&booking.id),
             summary: booking.customer.name().to_owned(),
             description: Default::default(),
             start: DateTimeRepresentation {
-                date_time: timezone_config.convert(booking.time_from),
+                date_time: self.timezone_config.convert(booking.time_from),
             },
             end: DateTimeRepresentation {
-                date_time: timezone_config.convert(booking.time_to),
+                date_time: self.timezone_config.convert(booking.time_to),
             },
             visibility: EventVisibility::Private,
             extended_properties: ExtendedProperties {
@@ -90,7 +103,6 @@ impl CalendarService {
     pub async fn register_adhoc_reservation(
         &self,
         adhoc_reservation: &AdhocReservation,
-        timezone_config: &TimeZoneConfig,
     ) -> Result<(), Error> {
         let event = Event {
             id: adhoc_reservation_id_to_event_id(&adhoc_reservation.id),
@@ -100,10 +112,10 @@ impl CalendarService {
                 .unwrap_or(adhoc_reservation.customer.name().to_owned()),
             description: Default::default(),
             start: DateTimeRepresentation {
-                date_time: timezone_config.convert(adhoc_reservation.time_from),
+                date_time: self.timezone_config.convert(adhoc_reservation.time_from),
             },
             end: DateTimeRepresentation {
-                date_time: timezone_config.convert(adhoc_reservation.time_to),
+                date_time: self.timezone_config.convert(adhoc_reservation.time_to),
             },
             visibility: EventVisibility::Private,
             extended_properties: ExtendedProperties {

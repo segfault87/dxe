@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::models::{AccountPropertyKey, KakaoAccount, Partner};
-use super::{BearerToken, BearerTokenExt, KakaoRestApiConfig};
+use super::{BearerToken, KakaoRestApiConfig};
 
 const KAKAO_OAUTH_TOKEN_URL: &str = "https://kauth.kakao.com/oauth/token";
 const KAKAO_USER_ME_URL: &str = "https://kapi.kakao.com/v2/user/me";
@@ -111,12 +111,10 @@ pub async fn get_me(
         ),
     ]);
 
-    let (key, value) = bearer_token.header();
-
     reqwest::Client::new()
         .post(KAKAO_USER_ME_URL)
         .form(&form)
-        .header(key, value)
+        .bearer_auth(bearer_token.access_token())
         .send()
         .await?
         .json::<Response<UserMeResponse>>()

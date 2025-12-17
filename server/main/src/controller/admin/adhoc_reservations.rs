@@ -75,7 +75,7 @@ pub async fn post(
 
     if let Some(calendar_service) = calendar_service.as_ref()
         && let Err(e) = calendar_service
-            .register_adhoc_reservation(&reservation, &timezone_config)
+            .register_adhoc_reservation(&reservation)
             .await
     {
         log::error!("Failed to create ad hoc reservation on calendar: {e}");

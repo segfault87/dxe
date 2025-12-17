@@ -47,6 +47,23 @@ pub struct Event {
     pub extended_properties: ExtendedProperties,
 }
 
+#[derive(Debug, Deserialize, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct EventPartialUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start: Option<DateTimeRepresentation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end: Option<DateTimeRepresentation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visibility: Option<EventVisibility>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extended_properties: Option<ExtendedProperties>,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(transparent)]
 pub struct EventId(String);
@@ -89,6 +106,32 @@ impl GoogleCalendarClient {
         let response = self
             .client
             .post(url)
+            .bearer_auth(token.as_str())
+            .json(&event)
+            .send()
+            .await?;
+
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(Error::Calendar(response.json().await?))
+        }
+    }
+
+    pub async fn update_event(
+        &self,
+        event_id: &EventId,
+        event: EventPartialUpdate,
+    ) -> Result<(), Error> {
+        let token = self.credential.get_token(&[SCOPE]).await?;
+
+        let url = CALENDAR_EVENT_URL
+            .replace("{calendar_id}", &self.calendar_id)
+            .replace("{event_id}", &event_id.to_string());
+
+        let response = self
+            .client
+            .patch(url)
             .bearer_auth(token.as_str())
             .json(&event)
             .send()

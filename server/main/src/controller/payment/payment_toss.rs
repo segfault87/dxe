@@ -266,7 +266,7 @@ async fn confirm_booking_payment<'tx>(
 
     if let Some(calendar_service) = calendar_service.as_ref()
         && let Err(e) = calendar_service
-            .register_booking(timezone_config, &booking, &customers)
+            .register_booking(&booking, &customers)
             .await
     {
         log::error!("Failed to register event on calendar: {e}");
@@ -377,21 +377,12 @@ async fn confirm_amend_payment<'tx>(
     }
 
     if let Some(calendar_service) = calendar_service.as_ref() {
-        let users = match &booking.customer {
-            Identity::User(u) => {
-                vec![u.clone()]
-            }
-            Identity::Group(g) => get_group_members(tx, &g.id).await?,
-        };
+        let mut updated_booking = booking.clone();
+        updated_booking.time_from = booking_amendment.desired_time_from;
+        updated_booking.time_to = booking_amendment.desired_time_to;
 
-        if let Err(e) = calendar_service.delete_booking(&booking.id).await {
-            log::warn!("Could not remove previous booking from calendar: {e}");
-        }
-        if let Err(e) = calendar_service
-            .register_booking(timezone_config, &booking, &users)
-            .await
-        {
-            log::warn!("Could not adding new booking entry to calendar: {e}");
+        if let Err(e) = calendar_service.update_booking_time(&booking).await {
+            log::warn!("Could not update booking {} to calendar: {e}", booking.id);
         }
     }
 

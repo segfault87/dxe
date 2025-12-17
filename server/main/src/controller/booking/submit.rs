@@ -107,7 +107,7 @@ pub async fn post(
 
     if let Some(calendar_service) = calendar_service.as_ref()
         && let Err(e) = calendar_service
-            .register_booking(&timezone_config, &booking, &customers)
+            .register_booking(&booking, &customers)
             .await
     {
         log::error!("Failed to register event on calendar: {e}");

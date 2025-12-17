@@ -5,7 +5,7 @@ use dxe_data::queries::booking::{
     create_booking_amendment, get_booking_with_user_id, update_booking_customer,
     update_booking_time,
 };
-use dxe_data::queries::identity::{get_group_members, is_member_of};
+use dxe_data::queries::identity::is_member_of;
 use dxe_data::queries::payment::create_toss_payments_transaction;
 use dxe_data::utils::is_in_effect;
 use dxe_types::{BookingId, ForeignPaymentId, GroupId, ProductId};
@@ -165,21 +165,11 @@ pub async fn put(
             );
 
             if let Some(calendar_service) = calendar_service.as_ref() {
-                let users = match &booking.customer {
-                    Identity::User(u) => {
-                        vec![u.clone()]
-                    }
-                    Identity::Group(g) => get_group_members(&mut tx, &g.id).await?,
-                };
-
-                if let Err(e) = calendar_service.delete_booking(&booking_id).await {
-                    log::warn!("Could not remove previous booking from calendar: {e}");
-                }
-                if let Err(e) = calendar_service
-                    .register_booking(&timezone_config, &booking, &users)
-                    .await
-                {
-                    log::warn!("Could not adding new booking entry to calendar: {e}");
+                let mut updated_booking = booking.clone();
+                updated_booking.time_from = desired_time_from;
+                updated_booking.time_to = desired_time_to;
+                if let Err(e) = calendar_service.update_booking_time(&updated_booking).await {
+                    log::warn!("Could not update booking {} to calendar: {e}", booking.id);
                 }
             }
         }

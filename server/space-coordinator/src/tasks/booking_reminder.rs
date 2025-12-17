@@ -19,7 +19,7 @@ impl BookingReminder {
 #[async_trait::async_trait]
 impl EventStateCallback<BookingWithUsers> for BookingReminder {
     async fn on_event_start(
-        &self,
+        self: Arc<Self>,
         event: &BookingWithUsers,
         buffered: bool,
     ) -> Result<(), Box<dyn std::error::Error>> {

@@ -1,16 +1,15 @@
-use dxe_types::{BookingId, UnitId};
+use dxe_types::UnitId;
 use serde::Serialize;
 
 use super::OsdTopic;
-use super::types::{AlertSeverity, Booking, ParkingState};
+use super::types::{AlertData, Booking, ParkingState};
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Alert {
     #[serde(skip)]
     pub unit_id: UnitId,
-    pub severity: AlertSeverity,
-    pub message: String,
+    pub alert: Option<AlertData>,
 }
 
 impl OsdTopic for Alert {
@@ -49,29 +48,15 @@ impl OsdTopic for SetScreenState {
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct StartSession {
+pub struct CurrentSession {
     #[serde(skip)]
     pub unit_id: UnitId,
-    pub booking: Booking,
+    pub booking: Option<Booking>,
 }
 
-impl OsdTopic for StartSession {
+impl OsdTopic for CurrentSession {
     fn topic_name(&self) -> String {
-        format!("start_session/{}", self.unit_id)
-    }
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StopSession {
-    #[serde(skip)]
-    pub unit_id: UnitId,
-    pub booking_id: BookingId,
-}
-
-impl OsdTopic for StopSession {
-    fn topic_name(&self) -> String {
-        format!("stop_session/{}", self.unit_id)
+        format!("current_session/{}", self.unit_id)
     }
 }
 

@@ -1,12 +1,25 @@
 use chrono::{DateTime, Utc};
 use dxe_types::BookingId;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, Debug, Serialize)]
+#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AlertSeverity {
     Urgent,
     Normal,
+}
+
+fn default_closeable() -> bool {
+    true
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct AlertData {
+    pub severity: AlertSeverity,
+    pub title: String,
+    pub contents: String,
+    #[serde(default = "default_closeable")]
+    pub closeable: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]

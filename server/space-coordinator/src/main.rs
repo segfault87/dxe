@@ -61,8 +61,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     z2m_controller.start().await;
 
-    let (osd_controller, osd_task) =
-        OsdController::new(client.clone(), mqtt_service.clone(), &config.osd).await?;
+    let osd_controller = OsdController::new(
+        client.clone(),
+        mqtt_service.clone(),
+        task_context.scheduler.clone(),
+        &config.osd,
+    );
 
     let telemetry_manager = TelemetryManager::new(&config.telemetry, client.clone());
     let telemetry_tasks = telemetry_manager
@@ -78,6 +82,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await?;
     let (audio_recorder, audio_recorder_task) = audio_recorder.task();
+
+    let (osd_controller, osd_message_handler_task, osd_task) = osd_controller.task().await?;
 
     let booking_reminder = BookingReminder::new(client.clone());
 
@@ -110,6 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     task_context.add_task(presence_monitor_task).await?;
     task_context.add_task(z2m_controller_task).await?;
     task_context.add_task(audio_recorder_task).await?;
+    task_context.add_task(osd_task).await?;
 
     task_context.add_task(booking_state_manager_task).await?;
 
@@ -122,7 +129,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     telemetry_manager.abort();
 
     z2m_consumer_task.abort();
-    osd_task.abort();
+    osd_message_handler_task.abort();
     mqtt_service_task.abort();
 
     Ok(())

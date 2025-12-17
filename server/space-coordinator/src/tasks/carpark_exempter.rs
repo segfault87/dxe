@@ -168,7 +168,7 @@ impl CarparkExempter {
 #[async_trait::async_trait]
 impl EventStateCallback<BookingWithUsers> for CarparkExempter {
     async fn on_event_start(
-        &self,
+        self: Arc<Self>,
         event: &BookingWithUsers,
         buffered: bool,
     ) -> Result<(), Box<dyn Error>> {
@@ -180,7 +180,7 @@ impl EventStateCallback<BookingWithUsers> for CarparkExempter {
     }
 
     async fn on_event_end(
-        &self,
+        self: Arc<Self>,
         event: &BookingWithUsers,
         buffered: bool,
     ) -> Result<(), Box<dyn Error>> {

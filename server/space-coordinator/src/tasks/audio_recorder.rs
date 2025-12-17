@@ -260,7 +260,7 @@ impl AudioRecorder {
 #[async_trait::async_trait]
 impl EventStateCallback<BookingWithUsers> for AudioRecorder {
     async fn on_event_start(
-        &self,
+        self: Arc<Self>,
         event: &BookingWithUsers,
         buffered: bool,
     ) -> Result<(), Box<dyn StdError>> {
@@ -275,7 +275,7 @@ impl EventStateCallback<BookingWithUsers> for AudioRecorder {
     }
 
     async fn on_event_end(
-        &self,
+        self: Arc<Self>,
         event: &BookingWithUsers,
         buffered: bool,
     ) -> Result<(), Box<dyn StdError>> {

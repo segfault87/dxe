@@ -9,6 +9,7 @@ use dxe_types::{SpaceId, UnitId};
 use serde::Deserialize;
 
 use crate::services::mqtt::MqttTopicPrefix;
+use crate::tasks::osd_controller::types::AlertData;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -137,9 +138,24 @@ pub struct AudioRecorderConfig {
     pub path_prefix: PathBuf,
 }
 
+#[derive(Deserialize, Clone, Debug, Default)]
+pub struct OsdAlertConfig {
+    pub sign_off_mins: i64,
+    pub on_sign_in: Option<AlertData>,
+    pub on_sign_off: Option<AlertData>,
+}
+
+impl OsdAlertConfig {
+    pub fn sign_off_duration(&self) -> chrono::TimeDelta {
+        chrono::TimeDelta::minutes(self.sign_off_mins)
+    }
+}
+
 #[derive(Deserialize, Clone, Debug)]
 pub struct OsdConfig {
     pub topic_prefix: MqttTopicPrefix,
+    #[serde(default)]
+    pub alerts: OsdAlertConfig,
 }
 
 #[derive(Debug, Deserialize)]

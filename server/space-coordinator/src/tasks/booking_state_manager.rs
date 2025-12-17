@@ -375,7 +375,7 @@ impl BookingStateManager {
 
     async fn on_booking_start(self: Arc<Self>, booking: BookingWithUsers, buffered: bool) {
         for callback in self.callbacks.iter() {
-            if let Err(e) = callback.on_event_start(&booking, buffered).await {
+            if let Err(e) = callback.clone().on_event_start(&booking, buffered).await {
                 log::error!("Error while start booking {}: {e}", booking.booking.id);
             }
         }
@@ -383,7 +383,7 @@ impl BookingStateManager {
 
     async fn on_booking_end(self: Arc<Self>, booking: BookingWithUsers, buffered: bool) {
         for callback in self.callbacks.iter() {
-            if let Err(e) = callback.on_event_end(&booking, buffered).await {
+            if let Err(e) = callback.clone().on_event_end(&booking, buffered).await {
                 log::error!("Error while end booking {}: {e}", booking.booking.id);
             }
         }
@@ -401,10 +401,12 @@ impl BookingStateManager {
             let has_started = &start < now && now < &end;
 
             for callback in self.callbacks.iter() {
-                if let Err(e) = callback.on_event_start(&booking, true).await {
+                if let Err(e) = callback.clone().on_event_start(&booking, true).await {
                     log::error!("Error while starting booking {}: {e}", booking.booking.id);
                 }
-                if has_started && let Err(e) = callback.on_event_start(&booking, false).await {
+                if has_started
+                    && let Err(e) = callback.clone().on_event_start(&booking, false).await
+                {
                     log::error!("Error while starting booking {}: {e}", booking.booking.id);
                 }
             }
@@ -422,10 +424,12 @@ impl BookingStateManager {
             let is_in_buffer = now >= &end;
 
             for callback in self.callbacks.iter() {
-                if !is_in_buffer && let Err(e) = callback.on_event_end(&booking, false).await {
+                if !is_in_buffer
+                    && let Err(e) = callback.clone().on_event_end(&booking, false).await
+                {
                     log::error!("Error while stopping booking {}: {e}", booking.booking.id);
                 }
-                if let Err(e) = callback.on_event_end(&booking, true).await {
+                if let Err(e) = callback.clone().on_event_end(&booking, true).await {
                     log::error!("Error while stopping booking {}: {e}", booking.booking.id);
                 }
             }

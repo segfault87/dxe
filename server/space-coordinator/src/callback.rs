@@ -1,15 +1,23 @@
-use std::error::Error;
+use std::{error::Error, sync::Arc};
 
 #[async_trait::async_trait]
 #[allow(unused_variables)]
 pub trait EventStateCallback<T> {
     fn on_initialized(&self) {}
 
-    async fn on_event_start(&self, event: &T, buffered: bool) -> Result<(), Box<dyn Error>> {
+    async fn on_event_start(
+        self: Arc<Self>,
+        event: &T,
+        buffered: bool,
+    ) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
 
-    async fn on_event_end(&self, event: &T, buffered: bool) -> Result<(), Box<dyn Error>> {
+    async fn on_event_end(
+        self: Arc<Self>,
+        event: &T,
+        buffered: bool,
+    ) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
 }

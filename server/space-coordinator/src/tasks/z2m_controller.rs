@@ -805,7 +805,7 @@ impl EventStateCallback<BookingWithUsers> for Z2mController {
     }
 
     async fn on_event_start(
-        &self,
+        self: Arc<Self>,
         event: &BookingWithUsers,
         buffered: bool,
     ) -> Result<(), Box<dyn StdError>> {
@@ -827,7 +827,7 @@ impl EventStateCallback<BookingWithUsers> for Z2mController {
     }
 
     async fn on_event_end(
-        &self,
+        self: Arc<Self>,
         event: &BookingWithUsers,
         buffered: bool,
     ) -> Result<(), Box<dyn StdError>> {

@@ -1,20 +1,21 @@
 pub mod topics;
 pub mod types;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error as StdError;
 use std::sync::Arc;
 
 use dxe_s2s_shared::entities::BookingWithUsers;
-use dxe_types::BookingId;
+use dxe_types::{BookingId, UnitId};
 use parking_lot::Mutex;
 use rumqttc::Publish;
 use serde::Serialize;
 use tokio::task::JoinHandle;
+use tokio_task_scheduler::{Scheduler, Task, TaskBuilder, TaskStatus};
 
 use crate::callback::EventStateCallback;
 use crate::client::DxeClient;
-use crate::config::OsdConfig;
+use crate::config::{OsdAlertConfig, OsdConfig};
 use crate::services::mqtt::{Error as MqttError, MqttService, MqttTopicPrefix};
 use crate::tasks::osd_controller::topics::DoorLockOpenResult;
 
@@ -25,39 +26,34 @@ pub trait OsdTopic: Serialize {
 #[derive(Debug)]
 pub struct OsdController {
     client: DxeClient,
+    scheduler: Scheduler,
     mqtt_service: MqttService,
-    topic_prefix: MqttTopicPrefix,
 
-    active_bookings: Mutex<HashSet<BookingId>>,
+    topic_prefix: MqttTopicPrefix,
+    alerts: OsdAlertConfig,
+
+    current_bookings: Mutex<HashMap<UnitId, (Option<types::Booking>, HashSet<BookingId>)>>,
+    sign_off_tasks: Mutex<Vec<String>>,
 }
 
 impl OsdController {
-    pub async fn new(
+    pub fn new(
         client: DxeClient,
         mqtt_service: MqttService,
+        scheduler: Scheduler,
         config: &OsdConfig,
-    ) -> Result<(Arc<Self>, JoinHandle<()>), Error> {
-        mqtt_service
-            .subscribe(&config.topic_prefix.topic("doorlock/set"))
-            .await?;
-        let mut subscriber = mqtt_service.receiver(config.topic_prefix.clone());
-
-        let controller = Arc::new(Self {
+    ) -> Self {
+        Self {
             client,
+            scheduler,
             mqtt_service,
+
             topic_prefix: config.topic_prefix.clone(),
+            alerts: config.alerts.clone(),
 
-            active_bookings: Mutex::new(HashSet::new()),
-        });
-
-        let controller_inner = controller.clone();
-        let task = tokio::task::spawn(async move {
-            while let Ok(message) = subscriber.recv().await {
-                controller_inner.clone().handle_message(message).await;
-            }
-        });
-
-        Ok((controller, task))
+            current_bookings: Mutex::new(HashMap::new()),
+            sign_off_tasks: Mutex::new(Vec::new()),
+        }
     }
 
     async fn handle_message(self: Arc<Self>, message: Publish) {
@@ -97,17 +93,85 @@ impl OsdController {
 
         Ok(())
     }
+
+    async fn push_current_states(&self) {
+        let bookings_per_units: Vec<_> = self
+            .current_bookings
+            .lock()
+            .iter()
+            .map(|(k, v)| (k.clone(), v.0.clone()))
+            .collect();
+        for (unit_id, booking) in bookings_per_units {
+            let _ = self
+                .publish(&topics::SetScreenState {
+                    unit_id: unit_id.clone(),
+                    is_active: booking.is_some(),
+                })
+                .await;
+
+            let _ = self
+                .publish(&topics::CurrentSession { unit_id, booking })
+                .await;
+        }
+    }
+
+    async fn update(self: Arc<Self>) {
+        self.push_current_states().await;
+
+        let mut tasks_to_retain = vec![];
+        let sign_off_tasks = self.sign_off_tasks.lock().clone();
+        for task in sign_off_tasks {
+            if matches!(
+                self.scheduler.get_task_status(&task).await,
+                Ok(TaskStatus::Completed)
+            ) {
+                let _ = self.scheduler.remove(&task).await;
+            } else {
+                tasks_to_retain.push(task);
+            }
+        }
+        *self.sign_off_tasks.lock() = tasks_to_retain;
+    }
+
+    pub async fn task(self) -> Result<(Arc<Self>, JoinHandle<()>, Task), Error> {
+        self.mqtt_service
+            .subscribe(&self.topic_prefix.topic("doorlock/set"))
+            .await?;
+        let mut subscriber = self.mqtt_service.receiver(self.topic_prefix.clone());
+
+        let arc_self = Arc::new(self);
+
+        let arc_self_inner = arc_self.clone();
+        let message_handler_task = tokio::task::spawn(async move {
+            while let Ok(message) = subscriber.recv().await {
+                arc_self_inner.clone().handle_message(message).await;
+            }
+        });
+
+        let arc_self_inner = arc_self.clone();
+        let task = TaskBuilder::new("osd_controller", move || {
+            let arc_self_inner = arc_self_inner.clone();
+            tokio::task::spawn(async move {
+                arc_self_inner.update().await;
+            });
+
+            Ok(())
+        })
+        .every_minutes(1)
+        .build();
+
+        Ok((arc_self, message_handler_task, task))
+    }
 }
 
 #[async_trait::async_trait]
 impl EventStateCallback<BookingWithUsers> for OsdController {
     async fn on_event_start(
-        &self,
+        self: Arc<Self>,
         event: &BookingWithUsers,
         buffered: bool,
     ) -> Result<(), Box<dyn StdError>> {
         if buffered {
-            self.active_bookings.lock().insert(event.booking.id);
             if let Err(e) = self
                 .publish(&topics::SetScreenState {
                     unit_id: event.booking.unit_id.clone(),
@@ -117,19 +181,109 @@ impl EventStateCallback<BookingWithUsers> for OsdController {
             {
                 log::warn!("Could not send SetScreenState to OSD: {e}");
             }
+
+            if let Some(on_sign_in) = &self.alerts.on_sign_in
+                && self
+                    .current_bookings
+                    .lock()
+                    .entry(event.booking.unit_id.clone())
+                    .or_default()
+                    .1
+                    .is_empty()
+                && let Err(e) = self
+                    .publish(&topics::Alert {
+                        unit_id: event.booking.unit_id.clone(),
+                        alert: Some(on_sign_in.clone()),
+                    })
+                    .await
+            {
+                log::warn!("Could not send sign in alert to OSD: {e}");
+            }
+
+            self.current_bookings
+                .lock()
+                .get_mut(&event.booking.unit_id)
+                .unwrap()
+                .1
+                .insert(event.booking.id);
+        } else {
+            let booking = types::Booking {
+                booking_id: event.booking.id,
+                customer_name: event.booking.customer_name.clone(),
+                time_from: event.booking.date_start.to_utc(),
+                time_to: event.booking.date_end.to_utc(),
+            };
+
+            if let Some(on_sign_in) = &self.alerts.on_sign_in
+                && self
+                    .current_bookings
+                    .lock()
+                    .entry(event.booking.unit_id.clone())
+                    .or_default()
+                    .1
+                    .len()
+                    > 1
+                && let Err(e) = self
+                    .publish(&topics::Alert {
+                        unit_id: event.booking.unit_id.clone(),
+                        alert: Some(on_sign_in.clone()),
+                    })
+                    .await
+            {
+                log::warn!("Could not send sign in alert to OSD: {e}");
+            }
+
             if let Err(e) = self
-                .publish(&topics::StartSession {
+                .publish(&topics::CurrentSession {
                     unit_id: event.booking.unit_id.clone(),
-                    booking: types::Booking {
-                        booking_id: event.booking.id,
-                        customer_name: event.booking.customer_name.clone(),
-                        time_from: event.booking.date_start.to_utc(),
-                        time_to: event.booking.date_end.to_utc(),
-                    },
+                    booking: Some(booking.clone()),
                 })
                 .await
             {
-                log::warn!("Could not send StartSession to OSD: {e}");
+                log::warn!("Could not send current session to OSD: {e}");
+            }
+
+            self.current_bookings
+                .lock()
+                .entry(event.booking.unit_id.clone())
+                .or_default()
+                .0 = Some(booking);
+
+            if let Some(on_sign_off) = self.alerts.on_sign_off.clone() {
+                let arc_self = self.clone();
+                let unit_id = event.booking.unit_id.clone();
+                let time = event.booking.date_end.to_utc() - self.alerts.sign_off_duration();
+                let task_name = format!("osd_sign_off_notification_{unit_id}");
+                let task = move || {
+                    let arc_self = self.clone();
+                    let unit_id = unit_id.clone();
+                    let on_sign_off = on_sign_off.clone();
+                    tokio::task::spawn(async move {
+                        if let Err(e) = arc_self
+                            .publish(&topics::Alert {
+                                unit_id,
+                                alert: Some(on_sign_off),
+                            })
+                            .await
+                        {
+                            log::warn!("Could not send sign off alert to OSD: {e}");
+                        }
+                    });
+                    Ok(())
+                };
+                let task = TaskBuilder::new(&task_name, task)
+                    .daily()
+                    .at(time.format("%H:%M:%S").to_string().as_str())
+                    .unwrap()
+                    .build();
+
+                log::info!(
+                    "Scheduling sign off notification task at {}",
+                    time.format("%H:%M:%S")
+                );
+
+                arc_self.sign_off_tasks.lock().push(task.id().to_owned());
+                let _ = arc_self.scheduler.add_task(task).await;
             }
         }
 
@@ -137,31 +291,42 @@ impl EventStateCallback<BookingWithUsers> for OsdController {
     }
 
     async fn on_event_end(
-        &self,
+        self: Arc<Self>,
         event: &BookingWithUsers,
         buffered: bool,
     ) -> Result<(), Box<dyn StdError>> {
         if !buffered {
-            self.active_bookings.lock().remove(&event.booking.id);
-            if let Err(e) = self
-                .publish(&topics::StopSession {
-                    unit_id: event.booking.unit_id.clone(),
-                    booking_id: event.booking.id,
-                })
-                .await
-            {
-                log::warn!("Could not send StopSession to OSD: {e}");
-            }
+            let remaining_count = {
+                let mut guard = self.current_bookings.lock();
+                let ids = &mut guard.get_mut(&event.booking.unit_id).unwrap().1;
+                ids.remove(&event.booking.id);
+                ids.len()
+            };
 
-            if self.active_bookings.lock().is_empty()
-                && let Err(e) = self
+            let _ = self
+                .publish(&topics::Alert {
+                    unit_id: event.booking.unit_id.clone(),
+                    alert: None,
+                })
+                .await;
+            if remaining_count == 0 {
+                let _ = self
+                    .publish(&topics::CurrentSession {
+                        unit_id: event.booking.unit_id.clone(),
+                        booking: None,
+                    })
+                    .await;
+                let _ = self
                     .publish(&topics::SetScreenState {
                         unit_id: event.booking.unit_id.clone(),
                         is_active: false,
                     })
-                    .await
-            {
-                log::warn!("Could not send SetScreenState to OSD: {e}");
+                    .await;
+                self.current_bookings
+                    .lock()
+                    .get_mut(&event.booking.unit_id)
+                    .unwrap()
+                    .0 = None;
             }
         }
 

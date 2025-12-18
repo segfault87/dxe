@@ -296,20 +296,21 @@ impl EventStateCallback<BookingWithUsers> for OsdController {
         buffered: bool,
     ) -> Result<(), Box<dyn StdError>> {
         if !buffered {
-            let remaining_count = {
-                let mut guard = self.current_bookings.lock();
-                let ids = &mut guard.get_mut(&event.booking.unit_id).unwrap().1;
-                ids.remove(&event.booking.id);
-                ids.len()
-            };
+            let remaining_count = self
+                .current_bookings
+                .lock()
+                .get(&event.booking.unit_id)
+                .unwrap()
+                .1
+                .len();
 
-            let _ = self
-                .publish(&topics::Alert {
-                    unit_id: event.booking.unit_id.clone(),
-                    alert: None,
-                })
-                .await;
-            if remaining_count == 0 {
+            if remaining_count == 1 {
+                let _ = self
+                    .publish(&topics::Alert {
+                        unit_id: event.booking.unit_id.clone(),
+                        alert: None,
+                    })
+                    .await;
                 let _ = self
                     .publish(&topics::CurrentSession {
                         unit_id: event.booking.unit_id.clone(),
@@ -328,6 +329,13 @@ impl EventStateCallback<BookingWithUsers> for OsdController {
                     .unwrap()
                     .0 = None;
             }
+        } else {
+            self.current_bookings
+                .lock()
+                .get_mut(&event.booking.unit_id)
+                .unwrap()
+                .1
+                .remove(&event.booking.id);
         }
 
         Ok(())

@@ -1,5 +1,5 @@
 [workspace]
-members = ["data", "extern", "main", "space-coordinator", "s2s-shared", "types"]
+members = ["data", "extern", "server", "space-coordinator", "s2s-shared", "types"]
 resolver = "3"
 
 [workspace.dependencies]

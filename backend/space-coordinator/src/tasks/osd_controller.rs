@@ -95,17 +95,12 @@ impl OsdController {
     }
 
     async fn push_current_states(&self) {
-        let bookings_per_units: Vec<_> = self
-            .current_bookings
-            .lock()
-            .iter()
-            .map(|(k, v)| (k.clone(), v.0.clone()))
-            .collect();
-        for (unit_id, booking) in bookings_per_units {
+        let bookings_per_units = self.current_bookings.lock().clone();
+        for (unit_id, (booking, ids)) in bookings_per_units {
             let _ = self
                 .publish(&topics::SetScreenState {
                     unit_id: unit_id.clone(),
-                    is_active: booking.is_some(),
+                    is_active: !ids.is_empty(),
                 })
                 .await;
 

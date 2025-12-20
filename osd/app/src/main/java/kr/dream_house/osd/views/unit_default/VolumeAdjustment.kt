@@ -38,56 +38,6 @@ private const val MAX_PAGE_INDEX = 2
 private fun VolumeAdjustmentStep1() {
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
-            modifier = Modifier.fillMaxSize(),
-            painter = painterResource(R.drawable.img_volume_step1),
-            contentScale = ContentScale.Crop,
-            contentDescription = "믹서 볼륨 조절"
-        )
-
-        IndicatorArrow(modifier = Modifier.fractionalOffset(0.3f, 0.45f).rotate(-90.0f))
-        Text(
-            modifier = Modifier.fractionalOffset(0.3f, 0.45f, xOffset = 48.dp, yOffset = 48.dp)
-                .background(LabelBackground).padding(horizontal = 16.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.headlineSmall,
-            text = "개별 마이크 음량")
-
-        IndicatorArrow(modifier = Modifier.fractionalOffset(0.7f, 0.35f, xOffset = (-48).dp, yOffset = (-48).dp).rotate(90.0f))
-        Text(
-            modifier = Modifier.fractionalOffset(0.7f, 0.35f, xOffset = (-180).dp, yOffset = (-105).dp)
-                .background(LabelBackground).padding(horizontal = 16.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.headlineSmall,
-            text = "전체 음량")
-
-        Text(
-            modifier = Modifier.fractionalOffset(0.05f, 0.85f)
-                .background(Color.White).padding(horizontal = 16.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.bodyLarge,
-            text = "믹서의 음량을 조절해 주세요.\n단, 믹서의 음량을 너무 키우면 하울링이 자주 발생하게 되니 유의해 주세요.")
-    }
-}
-
-@Composable
-private fun VolumeAdjustmentStep2() {
-    Box(modifier = Modifier.fillMaxSize()) {
-        Image(
-            modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
-            painter = painterResource(R.drawable.img_volume_step2),
-            contentScale = ContentScale.FillWidth,
-            contentDescription = "무선 마이크 수신기 볼륨 조절"
-        )
-
-        Text(
-            modifier = Modifier.fractionalOffset(0.05f, 0.1f)
-                .background(Color.White).padding(horizontal = 16.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.bodyLarge,
-            text = "무선 마이크 수신기에서 음량을 추가로 조절하실 수 있습니다.")
-    }
-}
-
-@Composable
-private fun VolumeAdjustmentStep3() {
-    Box(modifier = Modifier.fillMaxSize()) {
-        Image(
             modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
             painter = painterResource(R.drawable.img_volume_step3),
             contentScale = ContentScale.FillWidth,
@@ -113,6 +63,56 @@ private fun VolumeAdjustmentStep3() {
                 .background(Color.White).padding(horizontal = 16.dp, vertical = 8.dp),
             style = MaterialTheme.typography.bodyLarge,
             text = "다른 악기와 앰프의 소리에 묻혀서 잘 들리지 않는 경우에는\n뒷편에 있는 모니터링 스피커를 추가로 사용하실 수 있습니다.")
+    }
+}
+
+@Composable
+private fun VolumeAdjustmentStep2() {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
+            painter = painterResource(R.drawable.img_volume_step2),
+            contentScale = ContentScale.FillWidth,
+            contentDescription = "무선 마이크 수신기 볼륨 조절"
+        )
+
+        Text(
+            modifier = Modifier.fractionalOffset(0.05f, 0.1f)
+                .background(Color.White).padding(horizontal = 16.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.bodyLarge,
+            text = "무선 마이크 수신기에서 음량을 추가로 조절하실 수 있습니다.")
+    }
+}
+
+@Composable
+private fun VolumeAdjustmentStep3() {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            modifier = Modifier.fillMaxSize(),
+            painter = painterResource(R.drawable.img_volume_step1),
+            contentScale = ContentScale.Crop,
+            contentDescription = "믹서 볼륨 조절"
+        )
+
+        IndicatorArrow(modifier = Modifier.fractionalOffset(0.3f, 0.45f).rotate(-90.0f))
+        Text(
+            modifier = Modifier.fractionalOffset(0.3f, 0.45f, xOffset = 48.dp, yOffset = 48.dp)
+                .background(LabelBackground).padding(horizontal = 16.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.headlineSmall,
+            text = "개별 마이크 음량")
+
+        IndicatorArrow(modifier = Modifier.fractionalOffset(0.7f, 0.35f, xOffset = (-48).dp, yOffset = (-48).dp).rotate(90.0f))
+        Text(
+            modifier = Modifier.fractionalOffset(0.7f, 0.35f, xOffset = (-180).dp, yOffset = (-105).dp)
+                .background(LabelBackground).padding(horizontal = 16.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.headlineSmall,
+            text = "전체 음량")
+
+        Text(
+            modifier = Modifier.fractionalOffset(0.05f, 0.85f)
+                .background(Color.White).padding(horizontal = 16.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.bodyLarge,
+            text = "믹서의 음량을 조절해 주세요.\n단, 믹서의 음량을 너무 키우면 하울링이 자주 발생하게 되니 유의해 주세요.")
     }
 }
 

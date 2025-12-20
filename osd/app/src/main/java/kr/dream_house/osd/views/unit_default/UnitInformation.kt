@@ -33,7 +33,7 @@ enum class Subpage(val contents: @Composable (onClose: () -> Unit) -> Unit) {
 
 @Composable
 fun MenuItemButton(onClick: () -> Unit, text: String) {
-    Button(modifier = Modifier.width(420.dp), onClick = onClick) {
+    Button(modifier = Modifier.width(520.dp), onClick = onClick) {
         Text(modifier = Modifier.padding(16.dp), text = text, style = MaterialTheme.typography.bodyLarge)
     }
 }
@@ -59,11 +59,11 @@ fun UnitInformation() {
             ) {
                 MenuItemButton(
                     onClick = { currentPage = Subpage.MIXER_SETUP },
-                    text = "마이크, 건반 소리가 안 나요"
+                    text = "믹서 설정방법 / 마이크, 건반 소리가 안 나요"
                 )
                 MenuItemButton(
                     onClick = { currentPage = Subpage.VOLUME_ADJUSTMENT },
-                    text = "마이크 소리가 잘 안 들려요"
+                    text = "모니터링이 잘 안 돼요 / 마이크 소리가 너무 작아요"
                 )
                 MenuItemButton(
                     onClick = { currentPage = Subpage.REVERB_SETTINGS },

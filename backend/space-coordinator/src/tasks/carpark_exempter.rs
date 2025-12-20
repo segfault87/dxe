@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::sync::Arc;
 
+use chrono::Utc;
 use dxe_s2s_shared::entities::BookingWithUsers;
 use dxe_s2s_shared::handlers::GetAdhocParkingsResponse;
 use dxe_types::BookingId;
@@ -62,6 +63,7 @@ impl CarparkExempter {
                         String::new(),
                         String::new(),
                         parking.license_plate_number,
+                        false,
                     ));
                 }
             }
@@ -73,8 +75,12 @@ impl CarparkExempter {
         {
             let active_bookings = self.active_bookings.lock();
 
+            let now = Utc::now();
+
             for bookings in self.booking_states.lock().bookings_1d.values() {
                 for booking in bookings {
+                    let is_current_booking = now >= booking.booking.date_start.to_utc()
+                        && booking.booking.date_end.to_utc() > now;
                     if active_bookings.contains(&booking.booking.id) {
                         for user in booking.users.iter() {
                             if let Some(license_plate_number) = &user.license_plate_number
@@ -85,6 +91,7 @@ impl CarparkExempter {
                                     booking.booking.customer_name.clone(),
                                     user.name.clone(),
                                     license_plate_number.clone(),
+                                    is_current_booking,
                                 ));
                             }
                         }
@@ -95,11 +102,14 @@ impl CarparkExempter {
 
         let mut parking_results = HashMap::new();
 
-        for (unit_id, customer_name, user_name, license_plate_number) in license_plate_numbers {
+        for (unit_id, customer_name, user_name, license_plate_number, is_current_booking) in
+            license_plate_numbers
+        {
             if let Err(e) = match self.service.exempt(&license_plate_number).await {
                 Ok((success, entry_date)) => {
                     if let Some(unit_id) = unit_id
                         && let Some(entry_date) = entry_date
+                        && is_current_booking
                     {
                         parking_results
                             .entry(unit_id)
@@ -132,16 +142,14 @@ impl CarparkExempter {
         }
 
         for (unit_id, mut states) in parking_results.into_iter() {
-            if !states.is_empty() {
-                states.sort_by(|a, b| a.user_name.cmp(&b.user_name));
-                let parking_states = ParkingStates {
-                    unit_id: unit_id.clone(),
-                    states,
-                };
+            states.sort_by(|a, b| a.user_name.cmp(&b.user_name));
+            let parking_states = ParkingStates {
+                unit_id: unit_id.clone(),
+                states,
+            };
 
-                if let Err(e) = self.osd_controller.publish(&parking_states).await {
-                    log::warn!("Could not publish parking state to OSD: {e}");
-                }
+            if let Err(e) = self.osd_controller.publish(&parking_states).await {
+                log::warn!("Could not publish parking state to OSD: {e}");
             }
         }
     }

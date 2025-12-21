@@ -96,7 +96,7 @@ pub async fn redirect(
                 refresh_cookie.set_domain(domain);
             }
 
-            Ok(HttpResponse::TemporaryRedirect()
+            Ok(HttpResponse::Found()
                 .insert_header((LOCATION, redirect_to))
                 .cookie(access_cookie)
                 .cookie(refresh_cookie)
@@ -113,7 +113,7 @@ pub async fn redirect(
                 cookie_bearer = cookie_bearer.domain(domain);
             }
 
-            Ok(HttpResponse::TemporaryRedirect()
+            Ok(HttpResponse::Found()
                 .insert_header((
                     LOCATION,
                     format!(

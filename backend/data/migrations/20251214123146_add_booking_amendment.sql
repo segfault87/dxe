@@ -128,4 +128,3 @@ FROM toss_payment_status;
 DROP TABLE cash_payment_status;
 DROP TABLE toss_payment_status;
 DROP TABLE old_booking;
-DROP TABLE booking_change_history;

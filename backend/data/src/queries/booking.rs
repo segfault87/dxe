@@ -1924,6 +1924,7 @@ pub async fn get_telemetry_files(
         FROM telemetry_file
         WHERE
             booking_id = ?1
+        ORDER BY type ASC
         "#,
         booking_id
     )

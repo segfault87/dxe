@@ -27,6 +27,7 @@ pub async fn get(
     now: Now,
     booking_id: web::Path<BookingId>,
     database: web::Data<SqlitePool>,
+    booking_config: web::Data<BookingConfig>,
     timezone_config: web::Data<TimeZoneConfig>,
 ) -> Result<web::Json<GetBookingResponse>, Error> {
     let mut tx = database.begin().await?;
@@ -60,7 +61,8 @@ pub async fn get(
 
     Ok(web::Json(GetBookingResponse {
         booking: BookingWithPayments {
-            booking: Booking::convert(booking, &timezone_config, &now)?,
+            booking: Booking::convert(booking, &timezone_config, &now)?
+                .finish(&booking_config, &now),
             transaction,
         },
         telemetry_entries: telemetry_files

@@ -57,7 +57,7 @@ export default function BookingDetails({ loaderData }: Route.ComponentProps) {
         ))}
       </Section>
       {audioRecording ? (
-        <Section id="recirdubg" title="측정 데이터">
+        <Section id="recirdubg" title="음원 파일">
           <a href={audioRecording.url}>다운로드</a>
         </Section>
       ) : null}

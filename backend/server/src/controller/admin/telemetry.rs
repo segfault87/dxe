@@ -151,6 +151,7 @@ pub async fn get(
             chart
                 .configure_mesh()
                 .y_desc("Sound level (dB)")
+                .y_label_formatter(&|y| format!("{:.1}", y))
                 .x_desc("Time elapsed")
                 .x_label_formatter(&|x| {
                     format!("{:02}:{:02}", x.num_minutes(), x.num_seconds() % 60)

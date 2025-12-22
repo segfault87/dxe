@@ -44,8 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = toml::from_str::<Config>(&std::fs::read_to_string(&args.config_path)?)?;
     config.booking.sanitize();
 
-    let database = sqlx::SqlitePool::connect(config.database.url.as_str()).await?;
-    let database = Data::new(database);
+    let database = Data::new(sqlx::SqlitePool::connect(config.database.url.as_str()).await?);
 
     if args.migrate {
         let mut connection = database.acquire().await?;
@@ -56,12 +55,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let aes = AesCrypto::new(config.aes_key.as_slice());
-    let aes = Data::new(aes);
-
+    let aes = Data::new(AesCrypto::new(config.aes_key.as_slice()));
+    let kakao_auth_config = Data::new(config.auth.kakao.clone());
     let booking_config = Data::new(config.booking.clone());
     let timezone_config = Data::new(config.timezone.clone());
     let doorlock_service = Data::new(DoorLockService::new(&config.spaces));
+    let url_config = Data::new(config.url.clone());
+    let telemetry_config = Data::new(config.telemetry.clone());
     let s2s_public_keys = Arc::new(PublicKeyBundle::new(&config.spaces));
     let calendar_service = if let Some(google_api_config) = &config.google_apis {
         Some(CalendarService::new(
@@ -71,6 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         None
     };
+    let calendar_service = Data::new(calendar_service);
     let toss_payments_client = Data::new(TossPaymentsClient::new(&config.toss_payments));
 
     let (messaging_service, messaging_consumers) = MessagingService::new(
@@ -82,29 +83,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (notification_task, notification_sender) =
         spawn_notification_service_task(config.notifications.clone());
+    let notification_sender = Data::new(notification_sender);
 
     let key_pair = config.jwt.key_pair()?;
 
-    actix_web::HttpServer::new(move || {
-        let authority = Authority::<UserSession, Ed25519, _, _>::new()
-            .refresh_authorizer(|| async move { Ok(()) })
-            .token_signer(Some(
-                TokenSigner::new()
-                    .signing_key(key_pair.sk.clone())
-                    .access_token_name("dxe_access_token")
-                    .refresh_token_name("dxe_refresh_token")
-                    .algorithm(Ed25519)
-                    .refresh_token_lifetime(Duration::from_secs(60 * 60 * 24 * 30))
-                    .build()
-                    .unwrap(),
-            ))
-            .verifying_key(key_pair.pk)
-            .build()
-            .unwrap();
+    let authority = Authority::<UserSession, Ed25519, _, _>::new()
+        .refresh_authorizer(|| async move { Ok(()) })
+        .token_signer(Some(
+            TokenSigner::new()
+                .signing_key(key_pair.sk.clone())
+                .access_token_name("dxe_access_token")
+                .refresh_token_name("dxe_refresh_token")
+                .algorithm(Ed25519)
+                .refresh_token_lifetime(Duration::from_secs(60 * 60 * 24 * 30))
+                .build()
+                .unwrap(),
+        ))
+        .verifying_key(key_pair.pk)
+        .build()
+        .unwrap();
+    let token_signer = Data::new(authority.token_signer().unwrap());
 
+    actix_web::HttpServer::new(move || {
         actix_web::App::new()
-            .app_data(Data::new(config.auth.kakao.clone()))
-            .app_data(Data::new(authority.token_signer().unwrap()))
+            .app_data(token_signer.clone())
+            .app_data(kakao_auth_config.clone())
             .app_data(database.clone())
             .app_data(aes.clone())
             .app_data(timezone_config.clone())
@@ -112,11 +115,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .app_data(doorlock_service.clone())
             .app_data(toss_payments_client.clone())
             .app_data(messaging_service.clone())
-            .app_data(Data::new(notification_sender.clone()))
-            .app_data(Data::new(config.url.clone()))
-            .app_data(Data::new(calendar_service.clone()))
-            .app_data(Data::new(config.telemetry.clone()))
-            .service(controller::api(authority, s2s_public_keys.clone()))
+            .app_data(notification_sender.clone())
+            .app_data(url_config.clone())
+            .app_data(calendar_service.clone())
+            .app_data(telemetry_config.clone())
+            .service(controller::api(authority.clone(), s2s_public_keys.clone()))
     })
     .bind(&args.address)?
     .run()

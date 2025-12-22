@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n        SELECT\n            booking_id AS \"booking_id: _\",\n            type AS \"type: _\",\n            file_name,\n            uploaded_at AS \"uploaded_at: _\"\n        FROM telemetry_file\n        WHERE\n            booking_id = ?1\n        ",
+  "query": "\n        SELECT\n            booking_id AS \"booking_id: _\",\n            type AS \"type: _\",\n            file_name,\n            uploaded_at AS \"uploaded_at: _\"\n        FROM telemetry_file\n        WHERE\n            booking_id = ?1\n        ORDER BY type ASC\n        ",
   "describe": {
     "columns": [
       {
@@ -34,5 +34,5 @@
       false
     ]
   },
-  "hash": "d20c5f3a772846478d4f1ec96b0c69ff562d62125b995cfdaff939d6004cc7ec"
+  "hash": "f6440d2d6cbc5f497fa1bc85dcaa208c27d3079dc9b27e5e1a0eb8197342ed56"
 }

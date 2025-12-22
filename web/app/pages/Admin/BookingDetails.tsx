@@ -34,7 +34,7 @@ export default function BookingDetails({ loaderData }: Route.ComponentProps) {
 
   return (
     <>
-      <Section id="telemetry" title="예약 정보">
+      <Section id="booking-info" title="예약 정보">
         <ul>
           <li>ID: {booking.booking.id}</li>
           <li>

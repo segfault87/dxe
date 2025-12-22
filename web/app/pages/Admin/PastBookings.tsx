@@ -1,22 +1,25 @@
 import { Link } from "react-router";
 
-import type { Route } from "./+types/PendingBookings";
+import type { Route } from "./+types/PastBookings";
 import AdminService from "../../api/admin";
-import type { BookingWithPayments } from "../../types/models/booking";
 import { handleUnauthorizedError } from "../../lib/error";
+import type { BookingWithPayments } from "../../types/models/booking";
 
 const ITEMS_PER_PAGES = 30;
 
 interface LoaderData {
   bookings: BookingWithPayments[];
-  page?: number;
+  page: number;
 }
 
 export async function clientLoader({
-  params,
+  request,
 }: Route.ClientLoaderArgs): Promise<LoaderData> {
   try {
-    const page = parseInt(params.page ?? "0");
+    const url = new URL(request.url);
+    const searchParams = url.searchParams;
+
+    const page = parseInt(searchParams.get("page") ?? "0");
     const offset = page * ITEMS_PER_PAGES;
     const limit = ITEMS_PER_PAGES;
     const result = await AdminService.getBookings(
@@ -29,16 +32,17 @@ export async function clientLoader({
 
     return {
       bookings: result.data.bookings,
+      page: page,
     };
   } catch (error) {
     handleUnauthorizedError(error);
 
-    return { bookings: [] };
+    return { bookings: [], page: 0 };
   }
 }
 
 export default function PastBookings({ loaderData }: Route.ComponentProps) {
-  const { bookings } = loaderData;
+  const { bookings, page } = loaderData;
 
   return (
     <>
@@ -61,6 +65,12 @@ export default function PastBookings({ loaderData }: Route.ComponentProps) {
           </tr>
         ))}
       </table>
+      {page > 0 ? (
+        <>
+          <Link to={`?page=${page - 1}`}>이전</Link>{" "}
+        </>
+      ) : null}
+      <Link to={`?page=${page + 1}`}>다음</Link>
     </>
   );
 }

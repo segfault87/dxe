@@ -1,3 +1,4 @@
+import ReactGA from "react-ga4";
 import { Link } from "react-router";
 
 import "./Recording.css";
@@ -50,7 +51,13 @@ export function Recording({ loaderData }: { loaderData: LoaderData }) {
               ? new Date(audioRecording.expiresIn).toLocaleString()
               : "-"}
           </p>
-          <a href={audioRecording.url} className="cta">
+          <a
+            onClick={() => {
+              ReactGA.event("download_audio");
+            }}
+            href={audioRecording.url}
+            className="cta"
+          >
             다운로드
           </a>
         </>

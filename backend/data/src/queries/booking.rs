@@ -789,8 +789,9 @@ pub async fn get_complete_bookings(
         LEFT OUTER JOIN user "cu" ON ci.discriminator = 'user' AND ci.id = cu.id
         LEFT OUTER JOIN "group" "cg" ON ci.discriminator = 'group' AND ci.id = cg.id
         WHERE
-            (b.confirmed_at IS NULL OR b.confirmed_at >= ?1) AND
-            b.time_to >= ?1 AND
+            b.confirmed_at < ?1 AND
+            (b.canceled_at IS NULL OR b.canceled_at >= ?1) AND
+            b.time_to < ?1 AND
             b.time_to >= ?2 AND b.time_from < ?3
         ORDER BY b.time_to DESC
         LIMIT ?4 OFFSET ?5

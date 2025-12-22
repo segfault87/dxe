@@ -50,7 +50,7 @@ pub async fn post(
         && bytes > 0
     {
         writer
-            .write(&buffer[0..bytes])
+            .write_all(&buffer[0..bytes])
             .await
             .map_err(|e| Error::Internal(Box::new(e)))?;
     }

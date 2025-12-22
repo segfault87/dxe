@@ -7,6 +7,7 @@ use dxe_s2s_shared::csv::{SoundMeterRow, Z2mPowerMeterRow};
 use dxe_types::{BookingId, TelemetryType};
 use plotters::backend::SVGBackend;
 use plotters::chart::{ChartBuilder, LabelAreaPosition};
+use plotters::coord::combinators::IntoLogRange;
 use plotters::drawing::IntoDrawingArea;
 use plotters::series::LineSeries;
 use plotters::style::{AsRelative, BLACK, RGBAColor};
@@ -144,7 +145,7 @@ pub async fn get(
             }
 
             let mut chart = chart
-                .build_cartesian_2d(TimeDelta::zero()..last, min..max)
+                .build_cartesian_2d(TimeDelta::zero()..last, (min..max).log_scale().base(2.0))
                 .map_err(|e| Error::Internal(Box::new(e)))?;
 
             chart

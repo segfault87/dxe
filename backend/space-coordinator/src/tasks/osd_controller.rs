@@ -19,6 +19,8 @@ use crate::config::{OsdAlertConfig, OsdConfig};
 use crate::services::mqtt::{Error as MqttError, MqttService, MqttTopicPrefix};
 use crate::tasks::osd_controller::topics::DoorLockOpenResult;
 
+type BookingEntry = (Option<types::Booking>, HashSet<BookingId>);
+
 pub trait OsdTopic: Serialize {
     fn topic_name(&self) -> String;
 }
@@ -32,7 +34,7 @@ pub struct OsdController {
     topic_prefix: MqttTopicPrefix,
     alerts: OsdAlertConfig,
 
-    current_bookings: Mutex<HashMap<UnitId, (Option<types::Booking>, HashSet<BookingId>)>>,
+    current_bookings: Mutex<HashMap<UnitId, BookingEntry>>,
     sign_off_tasks: Mutex<Vec<String>>,
 }
 

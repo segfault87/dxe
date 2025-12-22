@@ -93,9 +93,7 @@ impl super::TableSpec for SoundMeterTable {
     type Value = SoundMeterRow;
     type Row = SoundMeterRow;
 
-    fn new_state(&self) -> Self::State {
-        ()
-    }
+    fn new_state(&self) -> Self::State {}
 
     fn table_key(&self) -> TableKey {
         self.table_key.clone()

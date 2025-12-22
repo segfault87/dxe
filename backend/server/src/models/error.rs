@@ -61,12 +61,16 @@ pub enum Error {
     ForeignPaymentNotFound,
     #[error("잘못된 파일 업로드입니다.")]
     BadFileUpload,
+    #[error("파일을 찾지 못했습니다.")]
+    FileNotFound,
     #[error("결제에 실패했습니다: {0}")]
     PaymentFailed(String),
     #[error("로그인에 실패했습니다.")]
     AuthFailed,
     #[error("{message}")]
     TossPaymentsFailed { code: String, message: String },
+    #[error("Error parsing CSV: {0}")]
+    Csv(#[from] csv_async::Error),
     #[error("인증에 실패했습니다.")]
     Jwt(actix_jwt_auth_middleware::AuthError),
     #[error("카카오 API 에러가 발생했습니다: {0}")]
@@ -139,9 +143,11 @@ impl ResponseError for Error {
             Self::BookingAlreadyConfirmed => StatusCode::BAD_REQUEST,
             Self::ForeignPaymentNotFound => StatusCode::NOT_FOUND,
             Self::BadFileUpload => StatusCode::BAD_REQUEST,
+            Self::FileNotFound => StatusCode::NOT_FOUND,
             Self::PaymentFailed(_) => StatusCode::BAD_REQUEST,
             Self::AuthFailed => StatusCode::FORBIDDEN,
             Self::TossPaymentsFailed { .. } => StatusCode::BAD_REQUEST,
+            Self::Csv(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::Jwt(_) => StatusCode::UNAUTHORIZED,
             Self::Kakao(_) => StatusCode::UNAUTHORIZED,
             Self::Http(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -178,9 +184,11 @@ impl ResponseError for Error {
             Self::BookingAlreadyConfirmed => "BookingAlreadyConfirmed",
             Self::ForeignPaymentNotFound => "ForeignPaymentNotFound",
             Self::BadFileUpload => "BadFileUpload",
+            Self::FileNotFound => "FileNotFound",
             Self::PaymentFailed(_) => "PaymentFailed",
             Self::AuthFailed => "AuthError",
             Self::TossPaymentsFailed { .. } => "TossPaymentsFailed",
+            Self::Csv(_) => "CsvError",
             Self::Jwt(_) => "AuthError",
             Self::Http(_) => "HttpError",
             Self::Kakao(_) => "KakaoApiError",

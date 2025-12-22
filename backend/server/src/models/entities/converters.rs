@@ -3,7 +3,8 @@ use dxe_data::entities;
 
 use super::{
     AdhocParking, AdhocReservation, AudioRecording, Booking, BookingStatus, CashTransaction, Group,
-    GroupWithUsers, Identity, OccupiedSlot, SelfUser, TossPaymentsTransaction, User,
+    GroupWithUsers, Identity, OccupiedSlot, SelfUser, TelemetryEntry, TelemetryType,
+    TossPaymentsTransaction, User,
 };
 use crate::config::{BookingConfig, TimeZoneConfig};
 use crate::models::Error;
@@ -304,6 +305,25 @@ impl IntoView for AdhocParking {
             time_to: timezone.convert(entity.time_to),
             license_plate_number: entity.license_plate_number,
             created_at: timezone.convert(entity.created_at),
+        })
+    }
+}
+
+impl IntoView for TelemetryEntry {
+    type Entity = entities::TelemetryFile;
+    type Error = Error;
+
+    fn convert(
+        entity: Self::Entity,
+        _timezone: &TimeZoneConfig,
+        _now: &DateTime<Utc>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            r#type: match entity.r#type {
+                dxe_types::TelemetryType::PowerUsageRoom => TelemetryType::PowerUsageRoom,
+                dxe_types::TelemetryType::PowerUsageTotal => TelemetryType::PowerUsageTotal,
+                dxe_types::TelemetryType::SoundMeter => TelemetryType::SoundMeter,
+            },
         })
     }
 }

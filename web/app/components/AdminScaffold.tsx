@@ -26,13 +26,8 @@ export default function AdminScaffold() {
               </NavLink>
             </li>
             <li>
-              <NavLink to="/admin/pending-bookings/" end>
-                대기중 예약 목록
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to="/admin/pending-refunds/" end>
-                환불 요청 목록
+              <NavLink to="/admin/past-bookings/" end>
+                과거 이용 내역
               </NavLink>
             </li>
             <li>

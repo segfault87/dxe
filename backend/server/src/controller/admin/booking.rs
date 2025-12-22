@@ -1,22 +1,80 @@
 use actix_web::web;
-use dxe_data::queries::booking::{cancel_booking, confirm_booking, get_booking};
-use dxe_data::queries::payment::{confirm_cash_payment, get_cash_transaction, refund_cash_payment};
+use dxe_data::queries::booking::{
+    cancel_booking, confirm_booking, get_audio_recording, get_booking, get_telemetry_files,
+};
+use dxe_data::queries::payment::{
+    confirm_cash_payment, get_cash_transaction, get_toss_payments_transaction_by_product_id,
+    refund_cash_payment,
+};
 use dxe_types::{BookingId, ProductId};
 use sqlx::SqlitePool;
 
 use crate::config::{BookingConfig, TimeZoneConfig};
 use crate::middleware::datetime_injector::Now;
-use crate::models::entities::{Booking, CashTransaction};
-use crate::models::handlers::admin::{ModifyAction, ModifyBookingRequest, ModifyBookingResponse};
+use crate::models::entities::{
+    AudioRecording, Booking, BookingWithPayments, CashTransaction, TelemetryEntry,
+    TossPaymentsTransaction, Transaction,
+};
+use crate::models::handlers::admin::{
+    GetBookingResponse, ModifyAction, ModifyBookingRequest, ModifyBookingResponse,
+};
 use crate::models::{Error, IntoView};
 use crate::services::calendar::CalendarService;
 use crate::services::messaging::MessagingService;
-use crate::session::UserSession;
 use crate::utils::datetime::is_in_effect;
+
+pub async fn get(
+    now: Now,
+    booking_id: web::Path<BookingId>,
+    database: web::Data<SqlitePool>,
+    timezone_config: web::Data<TimeZoneConfig>,
+) -> Result<web::Json<GetBookingResponse>, Error> {
+    let mut tx = database.begin().await?;
+
+    let booking = get_booking(&mut tx, &booking_id)
+        .await?
+        .ok_or(Error::BookingNotFound)?;
+
+    let product_id: ProductId = (*booking_id).into();
+
+    let transaction = if let Some(transaction) =
+        get_toss_payments_transaction_by_product_id(&mut tx, &product_id).await?
+    {
+        Some(Transaction::TossPayments(TossPaymentsTransaction::convert(
+            transaction,
+            &timezone_config,
+            &now,
+        )?))
+    } else if let Some(transaction) = get_cash_transaction(&mut tx, &product_id).await? {
+        Some(Transaction::Cash(CashTransaction::convert(
+            transaction,
+            &timezone_config,
+            &now,
+        )?))
+    } else {
+        None
+    };
+
+    let telemetry_files = get_telemetry_files(&mut tx, &booking_id).await?;
+    let audio_recording = get_audio_recording(&mut tx, &booking_id).await?;
+
+    Ok(web::Json(GetBookingResponse {
+        booking: BookingWithPayments {
+            booking: Booking::convert(booking, &timezone_config, &now)?,
+            transaction,
+        },
+        telemetry_entries: telemetry_files
+            .into_iter()
+            .map(|v| TelemetryEntry::convert(v, &timezone_config, &now))
+            .collect::<Result<_, _>>()?,
+        audio_recording: audio_recording
+            .map(|v| AudioRecording::convert(v, &timezone_config, &now))
+            .transpose()?,
+    }))
+}
 
 pub async fn put(
     now: Now,
-    _session: UserSession,
     booking_id: web::Path<BookingId>,
     body: web::Json<ModifyBookingRequest>,
     database: web::Data<SqlitePool>,

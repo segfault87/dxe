@@ -1,21 +1,14 @@
 use std::time::Duration;
 
+use dxe_s2s_shared::csv::SoundMeterRow;
 use dxe_types::TelemetryType;
 use futures::{FutureExt, StreamExt, select};
-use serde::Serialize;
 use tasi_sound_level_meter::TasiSoundLevelMeter;
 use tokio::sync::mpsc;
 
 use crate::config::telemetry::{SoundMeterConfig, SoundMeterDevice, TableKey};
 
 const POLL_INTERVAL: Duration = Duration::from_secs(10);
-
-pub struct State;
-
-#[derive(Clone, Debug, Serialize)]
-pub struct SoundMeterRow {
-    decibel_level_10: i16,
-}
 
 pub struct SoundMeter {
     config: SoundMeterConfig,
@@ -96,12 +89,12 @@ impl SoundMeterTable {
 }
 
 impl super::TableSpec for SoundMeterTable {
-    type State = State;
+    type State = ();
     type Value = SoundMeterRow;
     type Row = SoundMeterRow;
 
     fn new_state(&self) -> Self::State {
-        State
+        ()
     }
 
     fn table_key(&self) -> TableKey {

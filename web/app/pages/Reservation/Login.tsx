@@ -1,3 +1,5 @@
+import ReactGA from "react-ga4";
+
 import "./Login.css";
 import type { Route } from "./+types/Login";
 import KakaoLoginButton from "../../assets/kakao_login_large_wide.png";
@@ -24,6 +26,7 @@ export default function Login() {
         <a
           className="kakao-login"
           onClick={() => {
+            ReactGA.event("login_kakao");
             kakaoLogin(env, "/reservation");
           }}
         >

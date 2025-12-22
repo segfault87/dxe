@@ -1,3 +1,4 @@
+pub mod csv;
 pub mod entities;
 pub mod handlers;
 

@@ -2,12 +2,20 @@ import type { DateTime, IdentityId, SpaceId, UnitId } from "../models/base";
 import type {
   AdhocParking,
   AdhocReservation,
+  AudioRecording,
   Booking,
   BookingWithPayments,
+  TelemetryEntry,
 } from "../models/booking";
 import type { GroupWithUsers } from "../models/group";
 import type { CashTransaction } from "../models/payment";
 import type { SelfUser } from "../models/user";
+
+export interface GetBookingResponse {
+  booking: BookingWithPayments;
+  telemetryEntries: TelemetryEntry[];
+  audioRecording: AudioRecording | null;
+}
 
 export interface GetBookingsResponse {
   bookings: BookingWithPayments[];

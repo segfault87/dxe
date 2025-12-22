@@ -1,7 +1,8 @@
 use actix_web::web;
+use chrono::{DateTime, TimeDelta};
 use dxe_data::queries::booking::{
     get_bookings_with_pending_cash_payment, get_bookings_with_pending_cash_refunds,
-    get_confirmed_bookings,
+    get_complete_bookings, get_confirmed_bookings,
 };
 use sqlx::SqlitePool;
 
@@ -10,58 +11,88 @@ use crate::middleware::datetime_injector::Now;
 use crate::models::entities::{Booking, BookingWithPayments, CashTransaction, Transaction};
 use crate::models::handlers::admin::{GetBookingsQuery, GetBookingsResponse, GetBookingsType};
 use crate::models::{Error, IntoView};
-use crate::session::UserSession;
 use crate::utils::datetime::is_in_effect;
 
 pub async fn get(
     now: Now,
-    _session: UserSession,
     query: web::Query<GetBookingsQuery>,
     database: web::Data<SqlitePool>,
     booking_config: web::Data<BookingConfig>,
     timezone_config: web::Data<TimeZoneConfig>,
 ) -> Result<web::Json<GetBookingsResponse>, Error> {
-    let date_from = query.date_from.map(|v| v.to_utc());
+    let date_from = query
+        .date_from
+        .map(|v| v.to_utc())
+        .unwrap_or(DateTime::UNIX_EPOCH);
+    let date_to = query
+        .date_to
+        .map(|v| v.to_utc())
+        .unwrap_or(now.to_utc() + TimeDelta::days(365));
+    let offset = query.offset.unwrap_or(0);
+    let limit = query.limit.unwrap_or(30);
 
     let mut connection = database.acquire().await?;
 
     let mut bookings: Vec<_> = match query.r#type {
-        GetBookingsType::Pending => {
-            get_bookings_with_pending_cash_payment(&mut connection, &now, false)
+        GetBookingsType::Complete => {
+            get_complete_bookings(&mut connection, &now, &date_from, &date_to, offset, limit)
                 .await?
                 .into_iter()
-                .map(|(booking, tx)| (booking, Some(tx)))
+                .map(|v| (v, None))
                 .collect()
         }
-        GetBookingsType::RefundPending => get_bookings_with_pending_cash_refunds(&mut connection)
-            .await?
-            .into_iter()
-            .map(|(booking, tx)| (booking, Some(tx)))
-            .collect(),
-        GetBookingsType::Canceled => get_confirmed_bookings(&mut connection, &now, date_from)
-            .await?
-            .into_iter()
-            .filter_map(|booking| {
-                if is_in_effect(&booking.canceled_at, &now) {
-                    Some((booking, None))
-                } else {
-                    None
-                }
-            })
-            .collect(),
-        GetBookingsType::Confirmed => get_confirmed_bookings(&mut connection, &now, date_from)
-            .await?
-            .into_iter()
-            .filter_map(|booking| {
-                if is_in_effect(&booking.confirmed_at, &now)
-                    && !is_in_effect(&booking.canceled_at, &now)
-                {
-                    Some((booking, None))
-                } else {
-                    None
-                }
-            })
-            .collect(),
+        GetBookingsType::Pending => get_bookings_with_pending_cash_payment(
+            &mut connection,
+            &now,
+            false,
+            &date_from,
+            &date_to,
+            offset,
+            limit,
+        )
+        .await?
+        .into_iter()
+        .map(|(booking, tx)| (booking, Some(tx)))
+        .collect(),
+        GetBookingsType::RefundPending => get_bookings_with_pending_cash_refunds(
+            &mut connection,
+            &date_from,
+            &date_to,
+            offset,
+            limit,
+        )
+        .await?
+        .into_iter()
+        .map(|(booking, tx)| (booking, Some(tx)))
+        .collect(),
+        GetBookingsType::Canceled => {
+            get_confirmed_bookings(&mut connection, &now, &date_from, &date_to, offset, limit)
+                .await?
+                .into_iter()
+                .filter_map(|booking| {
+                    if is_in_effect(&booking.canceled_at, &now) {
+                        Some((booking, None))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        }
+        GetBookingsType::Confirmed => {
+            get_confirmed_bookings(&mut connection, &now, &date_from, &date_to, offset, limit)
+                .await?
+                .into_iter()
+                .filter_map(|booking| {
+                    if is_in_effect(&booking.confirmed_at, &now)
+                        && !is_in_effect(&booking.canceled_at, &now)
+                    {
+                        Some((booking, None))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        }
     };
 
     match query.r#type {

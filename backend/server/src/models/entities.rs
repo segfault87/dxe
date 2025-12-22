@@ -1,7 +1,9 @@
 mod converters;
 
 use chrono::{DateTime, FixedOffset};
-use dxe_types::{AdhocParkingId, AdhocReservationId, BookingId, GroupId, SpaceId, UnitId, UserId};
+use dxe_types::{
+    AdhocParkingId, AdhocReservationId, BookingId, GroupId, SpaceId, TelemetryType, UnitId, UserId,
+};
 use serde::Serialize;
 
 pub use converters::IntoView;
@@ -171,4 +173,10 @@ pub struct AdhocParking {
     pub time_to: DateTime<FixedOffset>,
     pub license_plate_number: String,
     pub created_at: DateTime<FixedOffset>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TelemetryEntry {
+    pub r#type: TelemetryType,
 }

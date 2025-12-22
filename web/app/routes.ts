@@ -34,6 +34,8 @@ export default [
   ...prefix("/admin", [
     layout("./components/AdminScaffold.tsx", [
       index("./pages/Admin/ConfirmedBookings.tsx"),
+      route("past-bookings/", "./pages/Admin/PastBookings.tsx"),
+      route("booking/:bookingId", "./pages/Admin/BookingDetails.tsx"),
       route("pending-bookings/", "./pages/Admin/PendingBookings.tsx"),
       route("pending-refunds/", "./pages/Admin/RefundPendingBookings.tsx"),
       route("groups/", "./pages/Admin/Groups.tsx"),

@@ -1,22 +1,17 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use dxe_s2s_shared::csv::Z2mPowerMeterRow;
 use dxe_types::TelemetryType;
 use parking_lot::Mutex;
-use serde::Serialize;
 
-use crate::{config::telemetry::TableKey, tasks::z2m_controller::DeviceName};
+use crate::config::telemetry::TableKey;
+use crate::tasks::z2m_controller::DeviceName;
 
 pub const PUBLISH_DURATION: Duration = Duration::from_secs(10);
 
 pub struct State {
     initial_power_usage_kwh: f64,
-}
-
-#[derive(Clone, Debug, Serialize)]
-pub struct Z2mPowerMeterRow {
-    pub instantaneous_wattage: f64,
-    pub power_usage_kwh: f64,
 }
 
 pub struct Z2mPowerMeterTable {

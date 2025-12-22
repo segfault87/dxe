@@ -6,6 +6,7 @@ import type {
   CreateAdhocReservationResponse,
   GetAdhocParkingsResponse,
   GetAdhocReservationsResponse,
+  GetBookingResponse,
   GetBookingsResponse,
   ModifyBookingResponse,
   ModifyBookingRequest,
@@ -20,13 +21,29 @@ import type {
   UnitId,
 } from "../types/models/base";
 
+const getBooking = (bookingId: BookingId) => {
+  return API.get<GetBookingResponse>(`/admin/booking/${bookingId}`);
+};
+
 const getBookings = (
-  type: "confirmed" | "pending" | "refund_pending" | "canceled",
+  type: "complete" | "confirmed" | "pending" | "refund_pending" | "canceled",
   dateFrom?: Date,
+  dateTo?: Date,
+  limit?: number,
+  offset?: number,
 ) => {
   let query = `type=${type}`;
   if (dateFrom) {
     query += `&date_from=${encodeURIComponent(toUtcIso8601(dateFrom))}`;
+  }
+  if (dateTo) {
+    query += `&date_to=${encodeURIComponent(toUtcIso8601(dateTo))}`;
+  }
+  if (limit) {
+    query += `&limit=${limit}`;
+  }
+  if (offset) {
+    query += `&offset=${offset}`;
   }
 
   return API.get<GetBookingsResponse>(`/admin/bookings?${query}`);
@@ -76,6 +93,7 @@ const deleteAdhocParking = (id: AdhocParkingId) => {
 };
 
 const AdminService = {
+  getBooking,
   getBookings,
   getUsers,
   getGroups,

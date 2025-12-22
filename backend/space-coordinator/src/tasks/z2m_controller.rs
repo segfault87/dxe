@@ -4,6 +4,7 @@ use std::fmt::Display;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use dxe_s2s_shared::csv::Z2mPowerMeterRow;
 use dxe_s2s_shared::entities::BookingWithUsers;
 use dxe_types::{BookingId, UnitId};
 use parking_lot::Mutex;
@@ -20,9 +21,7 @@ use crate::config::telemetry::TableKey;
 use crate::config::z2m::{self, SwitchPolicy};
 use crate::services::mqtt::{Error as MqttError, MqttService, MqttTopicPrefix};
 use crate::services::notification::NotificationService;
-use crate::tasks::telemetry_manager::z2m_power_meter::{
-    PUBLISH_DURATION, Z2mPowerMeterRow, Z2mPowerMeterTable,
-};
+use crate::tasks::telemetry_manager::z2m_power_meter::{PUBLISH_DURATION, Z2mPowerMeterTable};
 
 const MQTT_TOPIC_PREFIX_Z2M: MqttTopicPrefix = MqttTopicPrefix::new_const("zigbee2mqtt");
 

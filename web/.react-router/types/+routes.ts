@@ -70,6 +70,14 @@ type Pages = {
   "/admin": {
     params: {};
   };
+  "/admin/past-bookings": {
+    params: {};
+  };
+  "/admin/booking/:bookingId": {
+    params: {
+      "bookingId": string;
+    };
+  };
   "/admin/pending-bookings": {
     params: {};
   };
@@ -93,7 +101,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/guide" | "/inquiries" | "/reservation" | "/reservation/login" | "/reservation/payment/toss/success" | "/reservation/payment/toss/fail" | "/reservation/:bookingId" | "/reservation/:bookingId/amend" | "/login" | "/temp-login" | "/register" | "/my" | "/terms-of-service" | "/booking/:bookingId/recording" | "/join/:groupId" | "/admin" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/adhoc-reservations" | "/admin/adhoc-parkings";
+    page: "/" | "/guide" | "/inquiries" | "/reservation" | "/reservation/login" | "/reservation/payment/toss/success" | "/reservation/payment/toss/fail" | "/reservation/:bookingId" | "/reservation/:bookingId/amend" | "/login" | "/temp-login" | "/register" | "/my" | "/terms-of-service" | "/booking/:bookingId/recording" | "/join/:groupId" | "/admin" | "/admin/past-bookings" | "/admin/booking/:bookingId" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/adhoc-reservations" | "/admin/adhoc-parkings";
   };
   "./components/Scaffold.tsx": {
     id: "components/Scaffold";
@@ -165,11 +173,19 @@ type RouteFiles = {
   };
   "./components/AdminScaffold.tsx": {
     id: "components/AdminScaffold";
-    page: "/admin" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/adhoc-reservations" | "/admin/adhoc-parkings";
+    page: "/admin" | "/admin/past-bookings" | "/admin/booking/:bookingId" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/adhoc-reservations" | "/admin/adhoc-parkings";
   };
   "./pages/Admin/ConfirmedBookings.tsx": {
     id: "pages/Admin/ConfirmedBookings";
     page: "/admin";
+  };
+  "./pages/Admin/PastBookings.tsx": {
+    id: "pages/Admin/PastBookings";
+    page: "/admin/past-bookings";
+  };
+  "./pages/Admin/BookingDetails.tsx": {
+    id: "pages/Admin/BookingDetails";
+    page: "/admin/booking/:bookingId";
   };
   "./pages/Admin/PendingBookings.tsx": {
     id: "pages/Admin/PendingBookings";
@@ -218,6 +234,8 @@ type RouteModules = {
   "pages/JoinGroup": typeof import("./app/./pages/JoinGroup.tsx");
   "components/AdminScaffold": typeof import("./app/./components/AdminScaffold.tsx");
   "pages/Admin/ConfirmedBookings": typeof import("./app/./pages/Admin/ConfirmedBookings.tsx");
+  "pages/Admin/PastBookings": typeof import("./app/./pages/Admin/PastBookings.tsx");
+  "pages/Admin/BookingDetails": typeof import("./app/./pages/Admin/BookingDetails.tsx");
   "pages/Admin/PendingBookings": typeof import("./app/./pages/Admin/PendingBookings.tsx");
   "pages/Admin/RefundPendingBookings": typeof import("./app/./pages/Admin/RefundPendingBookings.tsx");
   "pages/Admin/Groups": typeof import("./app/./pages/Admin/Groups.tsx");

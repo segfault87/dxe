@@ -3,13 +3,21 @@ mod adhoc_reservations;
 mod booking;
 mod bookings;
 mod groups;
+mod telemetry;
 mod users;
 
 use actix_web::web;
 
 pub fn scope() -> actix_web::Scope {
     web::scope("/admin")
-        .service(web::resource("/booking/{booking_id}").route(web::put().to(booking::put)))
+        .service(
+            web::resource("/booking/{booking_id}")
+                .route(web::get().to(booking::get))
+                .route(web::put().to(booking::put)),
+        )
+        .service(
+            web::resource("/booking/{booking_id}/telemetry").route(web::get().to(telemetry::get)),
+        )
         .service(web::resource("/bookings").route(web::get().to(bookings::get)))
         .service(
             web::resource("/adhoc-reservations")

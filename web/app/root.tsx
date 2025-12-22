@@ -1,8 +1,8 @@
 import React, { useEffect } from "react";
+import ReactGA from "react-ga4";
+import TagManager from "react-gtm-module";
 import Modal from "react-modal";
 import { Outlet, Links, Meta, Scripts, ScrollRestoration } from "react-router";
-import TagManager from "react-gtm-module";
-import ReactGA from "react-ga4";
 
 import GitHubRibbon from "./assets/GitHubRibbon.svg";
 import { AuthProvider } from "./context/AuthContext";
@@ -47,7 +47,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <body id="root">
         {children}
         <div className="bottom-left-ribbon">
-          <a href="https://github.com/segfault87/dxe">
+          <a
+            onClick={() => ReactGA.event("open_github")}
+            href="https://github.com/segfault87/dxe"
+          >
             <img src={GitHubRibbon} alt="Fork me at GitHub" />
           </a>
         </div>

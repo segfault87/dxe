@@ -1,3 +1,4 @@
+import ReactGA from "react-ga4";
 import { useSearchParams } from "react-router";
 
 import "./Login.css";
@@ -30,6 +31,7 @@ export default function Login() {
       <a
         className="kakao-login"
         onClick={() => {
+          ReactGA.event("login_kakao");
           kakaoLogin(env, redirectTo);
         }}
       >

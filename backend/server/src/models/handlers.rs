@@ -2,13 +2,14 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, FixedOffset};
 use dxe_types::{
-    AdhocReservationId, BookingId, ForeignPaymentId, IdentityId, SpaceId, UnitId, UserId,
+    AdhocReservationId, BookingId, ForeignPaymentId, IdentityId, SpaceId, TelemetryType, UnitId,
+    UserId,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::models::entities::{
     AdhocParking, AdhocReservation, AudioRecording, Booking, BookingWithPayments, CashTransaction,
-    Group, GroupWithUsers, OccupiedSlot, ProductType, SelfUser, Transaction,
+    Group, GroupWithUsers, OccupiedSlot, ProductType, SelfUser, TelemetryEntry, Transaction,
 };
 
 pub mod admin {
@@ -17,6 +18,7 @@ pub mod admin {
     #[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq)]
     #[serde(rename_all = "snake_case")]
     pub enum GetBookingsType {
+        Complete,
         Confirmed,
         Pending,
         RefundPending,
@@ -28,12 +30,28 @@ pub mod admin {
     pub struct GetBookingsQuery {
         pub r#type: GetBookingsType,
         pub date_from: Option<DateTime<FixedOffset>>,
+        pub date_to: Option<DateTime<FixedOffset>>,
+        pub limit: Option<i64>,
+        pub offset: Option<i64>,
     }
 
     #[derive(Debug, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct GetBookingsResponse {
         pub bookings: Vec<BookingWithPayments>,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct GetBookingResponse {
+        pub booking: BookingWithPayments,
+        pub telemetry_entries: Vec<TelemetryEntry>,
+        pub audio_recording: Option<AudioRecording>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct GetBookingTelemetryQuery {
+        pub r#type: TelemetryType,
     }
 
     #[derive(Debug, Deserialize)]

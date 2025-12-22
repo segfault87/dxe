@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n        SELECT\n            b.id AS \"b_id: BookingId\",\n            b.unit_id AS \"b_unit_id: UnitId\",\n            hu.id AS \"hu_id: UserId\",\n            hu.provider AS \"hu_provider: IdentityProvider\",\n            hu.foreign_id AS \"hu_foreign_id\",\n            hu.name AS \"hu_name\",\n            hu.created_at AS \"hu_created_at: DateTime<Utc>\",\n            hu.deactivated_at AS \"hu_deactivated_at: DateTime<Utc>\",\n            hu.license_plate_number AS \"hu_license_plate_number\",\n            ci.id AS \"ci_id: IdentityId\",\n            ci.discriminator AS \"ci_discriminator: IdentityDiscriminator\",\n            cu.id AS \"cu_id: UserId\",\n            cu.provider AS \"cu_provider: IdentityProvider\",\n            cu.foreign_id AS \"cu_foreign_id: String\",\n            cu.name AS \"cu_name: String\",\n            cu.created_at AS \"cu_created_at: DateTime<Utc>\",\n            cu.deactivated_at AS \"cu_deactivated_at: DateTime<Utc>\",\n            cu.license_plate_number AS \"cu_license_plate_number\",\n            cg.id AS \"cg_id: GroupId\",\n            cg.name AS \"cg_name: String\",\n            cg.owner_id AS \"cg_owner_id: UserId\",\n            cg.is_open AS \"cg_is_open: bool\",\n            cg.created_at AS \"cg_created_at: DateTime<Utc>\",\n            cg.deleted_at AS \"cg_deleted_at: DateTime<Utc>\",\n            b.time_from AS \"b_time_from: DateTime<Utc>\",\n            b.time_to AS \"b_time_to: DateTime<Utc>\",\n            b.created_at AS \"b_created_at: DateTime<Utc>\",\n            b.confirmed_at AS \"b_confirmed_at: DateTime<Utc>\",\n            b.canceled_at AS \"b_canceled_at: DateTime<Utc>\"\n        FROM booking \"b\"\n        JOIN user \"hu\" ON b.holder_id = hu.id\n        JOIN identity \"ci\" ON b.customer_id = ci.id\n        LEFT OUTER JOIN user \"cu\" ON ci.discriminator = 'user' AND ci.id = cu.id\n        LEFT OUTER JOIN \"group\" \"cg\" ON ci.discriminator = 'group' AND ci.id = cg.id\n        WHERE\n            b.confirmed_at < ?1 AND\n            b.time_to >= ?2\n        ORDER BY b.time_from DESC\n        ",
+  "query": "\n        SELECT\n            b.id AS \"b_id: BookingId\",\n            b.unit_id AS \"b_unit_id: UnitId\",\n            hu.id AS \"hu_id: UserId\",\n            hu.provider AS \"hu_provider: IdentityProvider\",\n            hu.foreign_id AS \"hu_foreign_id\",\n            hu.name AS \"hu_name\",\n            hu.created_at AS \"hu_created_at: DateTime<Utc>\",\n            hu.deactivated_at AS \"hu_deactivated_at: DateTime<Utc>\",\n            hu.license_plate_number AS \"hu_license_plate_number\",\n            ci.id AS \"ci_id: IdentityId\",\n            ci.discriminator AS \"ci_discriminator: IdentityDiscriminator\",\n            cu.id AS \"cu_id: Option<UserId>\",\n            cu.provider AS \"cu_provider: Option<IdentityProvider>\",\n            cu.foreign_id AS \"cu_foreign_id: Option<String>\",\n            cu.name AS \"cu_name: Option<String>\",\n            cu.created_at AS \"cu_created_at: Option<DateTime<Utc>>\",\n            cu.deactivated_at AS \"cu_deactivated_at: DateTime<Utc>\",\n            cu.license_plate_number AS \"cu_license_plate_number\",\n            cg.id AS \"cg_id: Option<GroupId>\",\n            cg.name AS \"cg_name: Option<String>\",\n            cg.owner_id AS \"cg_owner_id: Option<UserId>\",\n            cg.is_open AS \"cg_is_open: Option<bool>\",\n            cg.created_at AS \"cg_created_at: Option<DateTime<Utc>>\",\n            cg.deleted_at AS \"cg_deleted_at: DateTime<Utc>\",\n            b.time_from AS \"b_time_from: DateTime<Utc>\",\n            b.time_to AS \"b_time_to: DateTime<Utc>\",\n            b.created_at AS \"b_created_at: DateTime<Utc>\",\n            b.confirmed_at AS \"b_confirmed_at: DateTime<Utc>\",\n            b.canceled_at AS \"b_canceled_at: DateTime<Utc>\"\n        FROM booking \"b\"\n        JOIN user \"hu\" ON b.holder_id = hu.id\n        JOIN identity \"ci\" ON b.customer_id = ci.id\n        LEFT OUTER JOIN user \"cu\" ON ci.discriminator = 'user' AND ci.id = cu.id\n        LEFT OUTER JOIN \"group\" \"cg\" ON ci.discriminator = 'group' AND ci.id = cg.id\n        WHERE\n            b.confirmed_at < ?1 AND\n            b.time_to >= ?2 AND b.time_from < ?3\n        ORDER BY b.time_from DESC\n        LIMIT ?4 OFFSET ?5\n        ",
   "describe": {
     "columns": [
       {
@@ -59,27 +59,27 @@
         "type_info": "Text"
       },
       {
-        "name": "cu_id: UserId",
+        "name": "cu_id: Option<UserId>",
         "ordinal": 11,
         "type_info": "Blob"
       },
       {
-        "name": "cu_provider: IdentityProvider",
+        "name": "cu_provider: Option<IdentityProvider>",
         "ordinal": 12,
         "type_info": "Text"
       },
       {
-        "name": "cu_foreign_id: String",
+        "name": "cu_foreign_id: Option<String>",
         "ordinal": 13,
         "type_info": "Text"
       },
       {
-        "name": "cu_name: String",
+        "name": "cu_name: Option<String>",
         "ordinal": 14,
         "type_info": "Text"
       },
       {
-        "name": "cu_created_at: DateTime<Utc>",
+        "name": "cu_created_at: Option<DateTime<Utc>>",
         "ordinal": 15,
         "type_info": "Datetime"
       },
@@ -94,27 +94,27 @@
         "type_info": "Text"
       },
       {
-        "name": "cg_id: GroupId",
+        "name": "cg_id: Option<GroupId>",
         "ordinal": 18,
         "type_info": "Blob"
       },
       {
-        "name": "cg_name: String",
+        "name": "cg_name: Option<String>",
         "ordinal": 19,
         "type_info": "Text"
       },
       {
-        "name": "cg_owner_id: UserId",
+        "name": "cg_owner_id: Option<UserId>",
         "ordinal": 20,
         "type_info": "Blob"
       },
       {
-        "name": "cg_is_open: bool",
+        "name": "cg_is_open: Option<bool>",
         "ordinal": 21,
         "type_info": "Bool"
       },
       {
-        "name": "cg_created_at: DateTime<Utc>",
+        "name": "cg_created_at: Option<DateTime<Utc>>",
         "ordinal": 22,
         "type_info": "Datetime"
       },
@@ -150,7 +150,7 @@
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 5
     },
     "nullable": [
       false,
@@ -164,18 +164,18 @@
       true,
       false,
       false,
+      false,
+      false,
+      false,
+      false,
+      false,
       true,
       true,
-      true,
-      true,
-      true,
-      true,
-      true,
-      true,
-      true,
-      true,
-      true,
-      true,
+      false,
+      false,
+      false,
+      false,
+      false,
       true,
       false,
       false,
@@ -184,5 +184,5 @@
       true
     ]
   },
-  "hash": "02d637e274d6aad7aef4ffa6b18ca48cdea40f58c3d88e51d2a733b0a20498d1"
+  "hash": "48bb5994d40e854eb9e93db4386cb1909a25da1829065192ba5d9e7d4acb055c"
 }

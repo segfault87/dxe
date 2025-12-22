@@ -3,6 +3,7 @@ import type {
   AdhocReservationId,
   BookingId,
   DateTime,
+  TelemetryType,
   UnitId,
 } from "./base";
 import type { Identity } from "./identity";
@@ -70,4 +71,8 @@ export interface AdhocParking {
   timeTo: DateTime;
   licensePlateNumber: string;
   createdAt: DateTime;
+}
+
+export interface TelemetryEntry {
+  type: TelemetryType;
 }

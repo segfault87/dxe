@@ -11,15 +11,18 @@ actix-state-guards = "0.1.0"
 actix-web = { version = "4.11", features = ["cookies"] }
 aes-gcm = "0.10"
 argon2 = "0.5"
+async-compression = { version = "0.4", features = ["brotli", "tokio"] }
 async-trait = { workspace = true }
 base64 = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
+csv-async = { workspace = true }
 ed25519-compact = "2"
 env_logger = "0.11"
 futures = "0.3"
 jwt-compact = { version = "0.8", features = ["ed25519-compact"] }
 log = { workspace = true }
+plotters = { version = "0.3", features = ["chrono", "svg_backend"]}
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

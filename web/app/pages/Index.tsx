@@ -193,6 +193,9 @@ export default function Index() {
         <a className="cta" href="https://kko.kakao.com/g9cAKvMpgq">
           카카오맵
         </a>
+        <a className="cta" href="https://tmap.life/0fbed987">
+          티맵
+        </a>
         <a className="cta" href="https://maps.app.goo.gl/MRiauyo4mNgGQfK47">
           Google Maps
         </a>

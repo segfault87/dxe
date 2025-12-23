@@ -202,6 +202,10 @@ impl ResponseError for Error {
             _ => None,
         };
 
+        if self.status_code() == StatusCode::INTERNAL_SERVER_ERROR {
+            log::error!("Internal error occurred: {self}");
+        }
+
         let payload = serde_json::json!({
             "type": r#type,
             "message": format!("{self}"),

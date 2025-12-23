@@ -1,6 +1,8 @@
 import { useLocation } from "react-router";
 
 import { useAuth } from "../context/AuthContext";
+import { useEnv } from "../context/EnvContext";
+import { isKakaoWebView, kakaoInAppLogin } from "./KakaoSDK";
 
 export default function RequiresAuth<P extends object>(
   WrappedComponent: (props: P) => React.ReactElement | null | undefined,
@@ -8,6 +10,7 @@ export default function RequiresAuth<P extends object>(
 ) {
   return function RequiresAuth(props: P) {
     const auth = useAuth();
+    const env = useEnv();
     const location = useLocation();
 
     if (auth === null) {
@@ -16,8 +19,12 @@ export default function RequiresAuth<P extends object>(
         redirectTo += location.search;
       }
 
-      const path = redirectPath ?? `/login/?redirect_to=${redirectTo}`;
-      window.location.href = path;
+      if (isKakaoWebView()) {
+        kakaoInAppLogin(env, redirectTo);
+      } else {
+        const path = redirectPath ?? `/login/?redirect_to=${redirectTo}`;
+        window.location.href = path;
+      }
 
       return <></>;
     } else {

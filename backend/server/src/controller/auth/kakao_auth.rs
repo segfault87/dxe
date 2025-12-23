@@ -164,6 +164,8 @@ impl ResponseError for Error {
         let message = format!("{self}");
         let url = format!("/error?message={}", urlencoding::encode(message.as_str()));
 
+        log::error!("Could not authenticate with Kakao: {self}");
+
         HttpResponse::TemporaryRedirect()
             .insert_header((LOCATION, url))
             .finish()

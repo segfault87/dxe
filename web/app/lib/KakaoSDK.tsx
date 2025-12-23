@@ -29,6 +29,20 @@ declare global {
   }
 }
 
+export function isKakaoWebView() {
+  return window.navigator.userAgent.indexOf("KAKAOTALK") >= 0;
+}
+
+export function kakaoInAppLogin(env: Environment, redirectTo: string | null) {
+  window.Kakao.Auth.authorize({
+    redirectUri: `${env.urlBase}/api/auth/kakao/redirect`,
+    scope: "profile_nickname,talk_calendar",
+    state: JSON.stringify({ redirectTo, transparent: true }),
+    nonce: generateRandomString(16),
+    prompt: "none",
+  });
+}
+
 export function kakaoLogin(env: Environment, redirectTo: string | null) {
   window.Kakao.Auth.authorize({
     redirectUri: `${env.urlBase}/api/auth/kakao/redirect`,

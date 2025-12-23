@@ -21,10 +21,12 @@ use crate::models::handlers::auth;
 use crate::session::UserSession;
 use crate::utils::aes::{AesCrypto, Error as AesError};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct KakaoAuthState {
     redirect_to: Option<String>,
+    #[serde(default)]
+    transparent: bool,
 }
 
 pub async fn redirect(
@@ -36,16 +38,21 @@ pub async fn redirect(
     aes_crypto: web::Data<AesCrypto>,
     url_config: web::Data<UrlConfig>,
 ) -> Result<HttpResponse<BoxBody>, Error> {
-    if let Some(code) = &query.code {
-        let redirect_to = if let Some(state) = query.state.as_ref()
-            && let Ok(state) = serde_json::from_str::<KakaoAuthState>(state.as_str())
-        {
-            state.redirect_to
-        } else {
-            None
-        }
-        .unwrap_or("/".to_owned());
+    let state = query
+        .state
+        .as_ref()
+        .and_then(|v| serde_json::from_str::<KakaoAuthState>(v).ok())
+        .unwrap_or_default();
 
+    let redirect_to = state.redirect_to.clone().unwrap_or("/".to_owned());
+
+    if state.transparent && query.error.as_deref() == Some("consent_required") {
+        let redirect_to = format!("/login?redirect_to={}", urlencoding::encode(&redirect_to));
+
+        Ok(HttpResponse::Found()
+            .insert_header((LOCATION, redirect_to))
+            .finish())
+    } else if let Some(code) = &query.code {
         let mut redirect_url = url_config.base_url.clone();
         redirect_url.set_path("/api/auth/kakao/redirect");
 

@@ -6,6 +6,7 @@ use dxe_types::IdentityProvider;
 use jwt_compact::alg::Ed25519;
 use sqlx::SqlitePool;
 
+use crate::config::UrlConfig;
 use crate::middleware::datetime_injector::Now;
 use crate::models::Error;
 use crate::models::handlers::auth;
@@ -29,6 +30,7 @@ pub async fn post(
     token_signer: web::Data<TokenSigner<UserSession, Ed25519>>,
     aes_crypto: web::Data<AesCrypto>,
     notification_sender: web::Data<NotificationSender>,
+    url_config: web::Data<UrlConfig>,
 ) -> Result<impl Responder, Error> {
     let cookie = request
         .cookie("kakao_bearer_token")
@@ -78,8 +80,15 @@ pub async fn post(
     let mut access_cookie = token_signer.create_access_cookie(&session)?;
     let mut refresh_cookie = token_signer.create_refresh_cookie(&session)?;
 
+    access_cookie.set_http_only(true);
     access_cookie.set_path("/");
+    refresh_cookie.set_http_only(true);
     refresh_cookie.set_path("/");
+
+    if let Some(domain) = url_config.base_url.domain() {
+        access_cookie.set_domain(domain);
+        refresh_cookie.set_domain(domain);
+    }
 
     Ok(HttpResponse::Ok()
         .cookie(access_cookie)

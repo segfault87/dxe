@@ -87,7 +87,7 @@ export default function Register({ loaderData }: { loaderData: LoaderData }) {
         setLoading(false);
       }
     },
-    [name, licensePlateNumber, redirectTo, disabled, navigate],
+    [authRefresh, name, licensePlateNumber, redirectTo, disabled, navigate],
   );
 
   return (

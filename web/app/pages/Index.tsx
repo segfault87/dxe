@@ -12,6 +12,7 @@ import Image4 from "../assets/interior4.jpg";
 import Image5 from "../assets/interior5.jpg";
 import Section from "../components/Section";
 import { useAuth } from "../context/AuthContext";
+import LocationInformation from "../components/LocationInformation";
 
 // @ts-expect-error Workaround for SSR
 const SliderComponent = typeof window === "undefined" ? Slider.default : Slider;
@@ -137,10 +138,10 @@ export default function Index() {
       <div className="introduction">
         <Introduction />
       </div>
-      <Section id="equipments" title="장비 소개">
+      <Section id="equipments" title="시설 소개">
         <ul>
           <li>
-            기타 앰프
+            기타 앰프:
             <ul>
               <li>Blackstar Series One 200W Head × Blackstar 4x12 Cabinet</li>
               <li>Fender '65 Twin Reverb</li>
@@ -154,7 +155,7 @@ export default function Index() {
             대체중입니다.)
           </li>
           <li>
-            드럼세트
+            드럼세트:
             <ul>
               <li>Pearl PMX Professional Series</li>
               <li>
@@ -166,7 +167,7 @@ export default function Index() {
           </li>
           <li>키보드: Yamaha MX88</li>
           <li>
-            마이크
+            마이크:
             <ul>
               <li>유선: Shure SM58 ×3</li>
               <li>무선: Kanals KB-9700 ×2</li>
@@ -176,6 +177,9 @@ export default function Index() {
           <li>모니터링 스피커: Behringer Eurolive F1220D</li>
           <li>믹서: Roland VM-3100Pro</li>
         </ul>
+        <small>
+          적정 정원은 7명이며, 그 이상 입장이 가능하지만 다소 좁을 수 있습니다.
+        </small>
       </Section>
       <Section id="pricing" title="이용 요금">
         <ul>
@@ -187,31 +191,7 @@ export default function Index() {
         </ul>
       </Section>
       <Section id="location" title="오시는 길">
-        <a className="cta" href="https://naver.me/5u9yYPi2">
-          네이버 지도
-        </a>
-        <a className="cta" href="https://kko.kakao.com/g9cAKvMpgq">
-          카카오맵
-        </a>
-        <a className="cta" href="https://tmap.life/0fbed987">
-          티맵
-        </a>
-        <a className="cta" href="https://maps.app.goo.gl/MRiauyo4mNgGQfK47">
-          Google Maps
-        </a>
-        <ul>
-          <li>상가 내 합주실 위치는 솔섬식품 왼쪽에 있습니다.</li>
-          <li>
-            도보 이동 시: 대로변에서 진입시 씨유 오른쪽편 아래로 내려가는 계단을
-            통해 지하상가 진입 후 직진
-          </li>
-          <li>
-            자동차로 이동 시: 상가 지하주차장에 주차 후 지하 3층에 있는 상가
-            엘리베이터를 타고 진입
-            <br />
-            <em>주의</em>: 상가 엘리베이터는 지하 3층에만 있습니다.
-          </li>
-        </ul>
+        <LocationInformation buttonClassName="cta" />
       </Section>
     </>
   );

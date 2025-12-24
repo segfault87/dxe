@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import ReactGA from "react-ga4";
-import { useSearchParams } from "react-router";
+import { useAuth } from "../context/AuthContext";
+import { useNavigate, useSearchParams } from "react-router";
 
 import "./Login.css";
 import type { Route } from "./+types/Login";
@@ -13,11 +15,18 @@ export function meta({}: Route.MetaArgs) {
 
 export default function Login() {
   const env = useEnv();
+  const auth = useAuth();
+  const navigate = useNavigate();
   const [searchParams, _] = useSearchParams();
-  let redirectTo: string | null = searchParams.get("redirect_to");
-  if (redirectTo) {
-    redirectTo = encodeURI(redirectTo);
-  }
+  const redirectTo: string | null = searchParams.get("redirect_to");
+
+  useEffect(() => {
+    if (auth) {
+      navigate(redirectTo ?? "/");
+    }
+  }, [auth, navigate, redirectTo]);
+
+  const quotedRedirectTo = redirectTo ? encodeURI(redirectTo) : null;
 
   return (
     <div className="login-panel">
@@ -31,8 +40,8 @@ export default function Login() {
       <a
         className="kakao-login"
         onClick={() => {
-          ReactGA.event("login_kakao");
-          kakaoLogin(env, redirectTo);
+          ReactGA.event("login_kakao", { from: "else" });
+          kakaoLogin(env, quotedRedirectTo);
         }}
       >
         <img src={KakaoLoginButton} alt="카카오 로그인" />

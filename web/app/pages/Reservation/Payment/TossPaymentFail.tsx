@@ -1,17 +1,39 @@
 import { useEffect } from "react";
-import { useSearchParams } from "react-router";
+import ReactGA from "react-ga4";
 
 import "./TossPayment.css";
+import type { Route } from "./+types/TossPaymentFail";
 import BookingService from "../../../api/booking";
 import RequiresAuth from "../../../lib/RequiresAuth";
 import { Link } from "react-router";
 
-function TossPaymentFail() {
-  const [searchParams, _] = useSearchParams();
+interface LoaderData {
+  orderId: string | null;
+  code: string | null;
+  message: string | null;
+}
+
+export async function clientLoader({
+  request,
+}: Route.ClientLoaderArgs): Promise<LoaderData> {
+  const url = new URL(request.url);
+  const searchParams = url.searchParams;
 
   const orderId = searchParams.get("orderId");
   const code = searchParams.get("code");
   const message = searchParams.get("message");
+
+  return { orderId, code, message };
+}
+
+function TossPaymentFail({ loaderData }: { loaderData: LoaderData }) {
+  const { orderId, code, message } = loaderData;
+
+  useEffect(() => {
+    if (code && message) {
+      ReactGA.event("payment_failure", { code: code, message: message });
+    }
+  }, [code, message]);
 
   useEffect(() => {
     const cancel = async () => {

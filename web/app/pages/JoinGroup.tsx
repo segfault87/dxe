@@ -14,15 +14,22 @@ import { isAxiosError } from "axios";
 
 interface LoaderData {
   groupId: GroupId;
+  redirectTo: string | null;
 }
 
 export async function clientLoader({
   params,
+  request,
 }: Route.ClientLoaderArgs): Promise<LoaderData> {
   if (!params.groupId) {
     throw new Error("groupId is not supplied");
   }
-  return { groupId: params.groupId };
+
+  const url = new URL(request.url);
+  const searchParams = url.searchParams;
+  const redirectTo = searchParams.get("redirect_to");
+
+  return { groupId: params.groupId, redirectTo };
 }
 
 export function meta({}: Route.MetaArgs) {
@@ -36,6 +43,8 @@ export function JoinGroup({ loaderData }: { loaderData: LoaderData }) {
   const [error, setError] = useState<string | null>(null);
   const [requestInProgress, setRequestInProgress] = useState(false);
   const [isDone, setDone] = useState(false);
+
+  const redirectTo = loaderData.redirectTo ?? "/my";
 
   const fetchGroup = async () => {
     if (!auth || isDone) {
@@ -105,7 +114,7 @@ export function JoinGroup({ loaderData }: { loaderData: LoaderData }) {
               가입
             </button>
           ) : (
-            <Link to="/my/" className="cta" replace>
+            <Link to={redirectTo} className="cta" replace>
               확인
             </Link>
           )}

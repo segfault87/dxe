@@ -1,3 +1,5 @@
+import ReactGA from "react-ga4";
+
 import Modal from "./Modal";
 import type { ModalProps } from "./Modal";
 import { useEnv } from "../context/EnvContext";
@@ -5,15 +7,20 @@ import type { GroupWithUsers } from "../types/models/group";
 
 export interface GroupInvitationProps extends ModalProps {
   group: GroupWithUsers;
+  redirectTo?: string;
 }
 
 export default function GroupInvitation(props: GroupInvitationProps) {
   const env = useEnv();
   const group = props.group;
 
-  const invitationUrl = `${env.urlBase}/api/join/${group.id}`;
+  let invitationUrl = `${env.urlBase}/api/join/${group.id}`;
+  if (props.redirectTo) {
+    invitationUrl += `?redirect_to=${encodeURIComponent(props.redirectTo)}`;
+  }
 
   const copy = async () => {
+    ReactGA.event("copy_group_invitation_link", { from: "my" });
     await navigator.clipboard.writeText(invitationUrl);
   };
 

@@ -1,15 +1,18 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router";
+import ReactGA from "react-ga4";
+import { useLocation, useNavigate, Link } from "react-router";
 
 import "./Show.css";
 import type { Route } from "./+types/Show";
 import BookingService from "../../api/booking";
+import UserService from "../../api/user";
 import { useAuth } from "../../context/AuthContext";
 import RequiresAuth from "../../lib/RequiresAuth";
 import type { Booking } from "../../types/models/booking";
 import type { Transaction } from "../../types/models/payment";
 import ExtendReservation from "../../components/ExtendReservation";
-import GroupSelection from "../../components/GroupSelection";
+import GroupInvitationModal from "../../components/GroupInvitation";
+import GroupSelectionModal from "../../components/GroupSelection";
 import Section from "../../components/Section";
 import { defaultErrorHandler } from "../../lib/error";
 import type { GroupWithUsers } from "../../types/models/group";
@@ -23,6 +26,7 @@ interface LoaderData {
   transaction: Transaction | null;
   amendable: boolean;
   extendableHours: number;
+  group: GroupWithUsers | null;
 }
 
 export async function clientLoader({
@@ -33,13 +37,23 @@ export async function clientLoader({
   }
 
   try {
-    const result = await BookingService.get(params.bookingId);
+    const bookingResult = await BookingService.get(params.bookingId);
+    let group: GroupWithUsers | null;
+    if (bookingResult.data.booking.customer.type === "group") {
+      const groupResult = await UserService.getGroup(
+        bookingResult.data.booking.customer.id,
+      );
+      group = groupResult.data.group;
+    } else {
+      group = null;
+    }
 
     return {
-      booking: result.data.booking,
-      transaction: result.data.transaction,
-      amendable: result.data.amendable,
-      extendableHours: result.data.extendableHours,
+      booking: bookingResult.data.booking,
+      transaction: bookingResult.data.transaction,
+      amendable: bookingResult.data.amendable,
+      extendableHours: bookingResult.data.extendableHours,
+      group: group,
     };
   } catch (error) {
     defaultErrorHandler(error);
@@ -48,6 +62,7 @@ export async function clientLoader({
       transaction: null,
       amendable: false,
       extendableHours: 0,
+      group: null,
     };
   }
 }
@@ -57,17 +72,23 @@ function ShowReservationInner({
   transaction,
   amendable,
   extendableHours,
+  group,
 }: {
   booking: Booking;
   transaction: Transaction | null;
   amendable: boolean;
   extendableHours: number;
+  group: GroupWithUsers | null;
 }) {
   const auth = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const bookingStart = new Date(booking.bookingStart);
   const bookingEnd = new Date(booking.bookingEnd);
+
+  const [currentGroup, setGroup] = useState<GroupWithUsers | null>(group);
+  const [groupInvitationModal, setGroupInvitationModal] = useState(false);
 
   const cancelReservation = async () => {
     let refundAccount: string | null = null;
@@ -138,6 +159,7 @@ function ShowReservationInner({
       await BookingService.amend(booking.id, {
         newIdentityId: group.id,
       });
+      ReactGA.event("group_transfer");
       setGroupTransferModal(false);
       navigate(0);
     } catch (error) {
@@ -182,7 +204,14 @@ function ShowReservationInner({
           </button>
           <br />
           <p>
-            문이 안 열리시면 <Link to="/inquiries/">연락</Link> 바랍니다.
+            문이 열리지 않는다면 <Link to="/inquiries/">연락</Link> 바랍니다.
+            {booking.customer.type === "group" &&
+            currentGroup?.isOpen === true ? (
+              <>
+                <br />이 페이지를 다른 멤버들에게 공유하시려면 아래{" "}
+                <em>초대</em> 버튼으로 멤버들을 초대해 주세요.
+              </>
+            ) : null}
           </p>
         </div>
       ) : null}
@@ -194,16 +223,35 @@ function ShowReservationInner({
           </li>
           <li>
             예약자: {booking.customer.name}{" "}
-            {booking.customer.type === "user" &&
-            booking.status !== "OVERDUE" &&
-            booking.status !== "COMPLETE" ? (
-              <button
-                style={{ marginLeft: "8px" }}
-                className="primary"
-                onClick={() => setGroupTransferModal(true)}
-              >
-                그룹으로 전환
-              </button>
+            {booking.status !== "OVERDUE" && booking.status !== "COMPLETE" ? (
+              <>
+                {booking.customer.type === "user" ? (
+                  <button
+                    style={{ marginLeft: "8px" }}
+                    className="primary"
+                    onClick={() => {
+                      ReactGA.event("click_group_transfer");
+                      setGroupTransferModal(true);
+                    }}
+                  >
+                    그룹으로 전환
+                  </button>
+                ) : null}
+                {booking.customer.type === "group" &&
+                currentGroup?.id === booking.customer.id &&
+                currentGroup?.isOpen === true ? (
+                  <button
+                    style={{ marginLeft: "8px" }}
+                    className="primary"
+                    onClick={() => {
+                      ReactGA.event("click_group_invitation");
+                      setGroupInvitationModal(true);
+                    }}
+                  >
+                    초대
+                  </button>
+                ) : null}
+              </>
             ) : null}
           </li>
           <li>예약 상태: {status}</li>
@@ -345,10 +393,21 @@ function ShowReservationInner({
           ) : null}
         </Section>
       ) : null}
-      <GroupSelection
+      {currentGroup ? (
+        <GroupInvitationModal
+          group={currentGroup}
+          redirectTo={location.pathname}
+          isOpen={groupInvitationModal}
+          close={() => setGroupInvitationModal(false)}
+        />
+      ) : null}
+      <GroupSelectionModal
         title="이전할 그룹 선택"
         bookingId={booking.id}
-        onSelectGroup={transferIdentity}
+        onSelectGroup={(group) => {
+          setGroup(group);
+          transferIdentity(group);
+        }}
         isOpen={groupTransferModal}
         close={() => setGroupTransferModal(false)}
       />
@@ -373,6 +432,7 @@ function ShowReservation({ loaderData }: Route.ComponentProps) {
         transaction={loaderData.transaction}
         amendable={loaderData.amendable}
         extendableHours={loaderData.extendableHours}
+        group={loaderData.group}
       />
     );
   } else {

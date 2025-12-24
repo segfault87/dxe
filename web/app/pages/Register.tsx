@@ -1,9 +1,11 @@
-import { useCallback, useState, type FormEvent } from "react";
-import { useSearchParams } from "react-router";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import ReactGA from "react-ga4";
+import { useNavigate } from "react-router";
 
 import "./Register.css";
 import type { Route } from "./+types/Register";
 import AuthService from "../api/auth";
+import { useAuth, useAuthRefresh } from "../context/AuthContext";
 import checkPlateNumber from "../lib/PlateNumber";
 import { defaultErrorHandler } from "../lib/error";
 
@@ -11,13 +13,43 @@ export function meta({}: Route.MetaArgs) {
   return [{ title: "등록 | 드림하우스 합주실" }];
 }
 
-export default function Register() {
-  const [searchParams, _] = useSearchParams();
-  const [name, setName] = useState(searchParams.get("name") ?? "");
+interface LoaderData {
+  name: string;
+  redirectTo: string;
+}
+
+export async function clientLoader({
+  request,
+}: Route.ClientLoaderArgs): Promise<LoaderData> {
+  const url = new URL(request.url);
+  const searchParams = url.searchParams;
+
+  const name = searchParams.get("name") ?? "";
+  const redirectTo = searchParams.get("redirect_to") ?? "/";
+
+  return { name, redirectTo };
+}
+
+export default function Register({ loaderData }: { loaderData: LoaderData }) {
+  const auth = useAuth();
+  const authRefresh = useAuthRefresh();
+  const navigate = useNavigate();
+
+  const [name, setName] = useState(loaderData.name);
   const [licensePlateNumber, setLicensePlateNumber] = useState("");
   const [isLoading, setLoading] = useState(false);
 
-  const redirectTo = searchParams.get("redirect_to") ?? "/";
+  const redirectTo = loaderData.redirectTo;
+
+  useEffect(() => {
+    if (auth) {
+      navigate(redirectTo);
+    }
+  }, [auth, navigate, redirectTo]);
+
+  useEffect(() => {
+    ReactGA.event("sign_up");
+  }, []);
 
   const disabled =
     isLoading ||
@@ -43,7 +75,9 @@ export default function Register() {
         const response = await AuthService.kakaoRegister(formData);
 
         if (response.status === 200) {
-          document.location.href = redirectTo;
+          ReactGA.event("signed_up");
+          await authRefresh();
+          navigate(redirectTo);
         } else {
           alert("등록에 실패했습니다.");
         }
@@ -53,7 +87,7 @@ export default function Register() {
         setLoading(false);
       }
     },
-    [name, licensePlateNumber, redirectTo, disabled],
+    [name, licensePlateNumber, redirectTo, disabled, navigate],
   );
 
   return (

@@ -1,8 +1,11 @@
+import { useEffect } from "react";
 import ReactGA from "react-ga4";
+import { useNavigate } from "react-router";
 
 import "./Login.css";
 import type { Route } from "./+types/Login";
 import KakaoLoginButton from "../../assets/kakao_login_large_wide.png";
+import { useAuth } from "../../context/AuthContext";
 import { useEnv } from "../../context/EnvContext";
 import { kakaoLogin } from "../../lib/KakaoSDK";
 
@@ -12,6 +15,14 @@ export function meta({}: Route.MetaArgs) {
 
 export default function Login() {
   const env = useEnv();
+  const auth = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (auth) {
+      navigate("/reservation/");
+    }
+  }, [auth, navigate]);
 
   return (
     <div className="content-wrapper">
@@ -26,7 +37,7 @@ export default function Login() {
         <a
           className="kakao-login"
           onClick={() => {
-            ReactGA.event("login_kakao");
+            ReactGA.event("login_kakao", { from: "reservation" });
             kakaoLogin(env, "/reservation");
           }}
         >

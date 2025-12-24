@@ -12,6 +12,8 @@ export interface AuthContextData {
   pendingBookings: Record<UnitId, Booking[]>;
 }
 
+const AuthRefreshContext = createContext<() => Promise<void>>(async () => {});
+
 const AuthContext = createContext<AuthContextData | null | undefined>(
   undefined,
 );
@@ -21,24 +23,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     undefined,
   );
 
-  useEffect(() => {
-    const fetchMe = async () => {
-      try {
-        const result = await UserService.me();
-        setData({
-          user: result.data.user,
-          activeBookings: result.data.activeBookings,
-          pendingBookings: result.data.pendingBookings,
-        });
-      } catch (error) {
-        if (isAxiosError(error)) {
-          if (error.status === 401) {
-            setData(null);
-          }
+  const fetchMe = async () => {
+    try {
+      const result = await UserService.me();
+      setData({
+        user: result.data.user,
+        activeBookings: result.data.activeBookings,
+        pendingBookings: result.data.pendingBookings,
+      });
+    } catch (error) {
+      if (isAxiosError(error)) {
+        if (error.status === 401) {
+          setData(null);
         }
       }
-    };
+    }
+  };
 
+  useEffect(() => {
     window.addEventListener("focus", fetchMe);
     fetchMe();
 
@@ -47,7 +49,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  return <AuthContext.Provider value={data}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={data}>
+      <AuthRefreshContext.Provider value={fetchMe}>
+        {children}
+      </AuthRefreshContext.Provider>
+    </AuthContext.Provider>
+  );
 }
 
+export const useAuthRefresh = () => useContext(AuthRefreshContext);
 export const useAuth = () => useContext(AuthContext);

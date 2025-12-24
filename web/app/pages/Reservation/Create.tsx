@@ -1,5 +1,6 @@
 import { isAxiosError } from "axios";
 import { useEffect, useState } from "react";
+import ReactGA from "react-ga4";
 import { useNavigate } from "react-router";
 import { loadTossPayments } from "@tosspayments/tosspayments-sdk";
 import type { TossPaymentsWidgets } from "@tosspayments/tosspayments-sdk";
@@ -154,6 +155,7 @@ function CustomerSelection({
       setGroups([...groups, group]);
       setNewGroupName("");
       onSelectIdentityId(group.id);
+      ReactGA.event("create_new_group", { from: "reservation" });
     } catch (error) {
       defaultErrorHandler(error);
     } finally {
@@ -499,6 +501,8 @@ function Reservation() {
   };
 
   const proceedPayment = async () => {
+    ReactGA.event("payment_initiate");
+
     if (env.enableTossPayments && tossPaymentsWidgets !== null) {
       await proceedTossPayment(tossPaymentsWidgets);
     } else if (!env.enableTossPayments) {

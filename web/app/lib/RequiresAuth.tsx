@@ -22,7 +22,9 @@ export default function RequiresAuth<P extends object>(
       if (isKakaoWebView()) {
         kakaoInAppLogin(env, redirectTo);
       } else {
-        const path = redirectPath ?? `/login/?redirect_to=${redirectTo}`;
+        const path =
+          redirectPath ??
+          `/login/?redirect_to=${encodeURIComponent(redirectTo)}`;
         window.location.href = path;
       }
 

@@ -1,5 +1,6 @@
 import { isAxiosError } from "axios";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import ReactGA from "react-ga4";
 import { Link, useNavigate } from "react-router";
 
 import "./TossPayment.css";
@@ -65,6 +66,10 @@ function TossPaymentSuccess({ loaderData }: { loaderData: LoaderData }) {
   const [bookingId, setBookingId] = useState<BookingId | null>(null);
   const [isRequestInProgress, setRequestInProgress] = useState(false);
 
+  useEffect(() => {
+    ReactGA.event("payment_confirm");
+  }, []);
+
   const cancelPayment = async () => {
     setRequestInProgress(true);
 
@@ -90,6 +95,7 @@ function TossPaymentSuccess({ loaderData }: { loaderData: LoaderData }) {
       });
 
       setBookingId(result.data.bookingId);
+      ReactGA.event("payment_success");
     } catch (error) {
       if (isAxiosError(error)) {
         const data = error.response?.data;

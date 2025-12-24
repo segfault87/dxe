@@ -59,6 +59,10 @@ pub async fn post(
         .flush()
         .await
         .map_err(|e| Error::Internal(Box::new(e)))?;
+    writer
+        .shutdown()
+        .await
+        .map_err(|e| Error::Internal(Box::new(e)))?;
 
     let mut tx = database.begin().await?;
 

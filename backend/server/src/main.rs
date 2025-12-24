@@ -92,8 +92,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .token_signer(Some(
             TokenSigner::new()
                 .signing_key(key_pair.sk.clone())
-                .access_token_name("dxe_access_token")
-                .refresh_token_name("dxe_refresh_token")
+                .access_token_name("_dxe_access_token")
+                .refresh_token_name("_dxe_refresh_token")
                 .algorithm(Ed25519)
                 .refresh_token_lifetime(Duration::from_secs(60 * 60 * 24 * 30))
                 .build()

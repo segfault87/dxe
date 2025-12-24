@@ -32,7 +32,7 @@ use crate::services::telemetry::{NotificationSender, Priority};
 use crate::session::UserSession;
 use crate::utils::datetime::{is_in_effect, truncate_time};
 
-const TEMPORARY_RESERVATION_LIFE: TimeDelta = TimeDelta::minutes(10);
+const TEMPORARY_RESERVATION_LIFE: TimeDelta = TimeDelta::minutes(5);
 
 pub async fn post(
     now: Now,

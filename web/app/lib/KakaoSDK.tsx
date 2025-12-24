@@ -31,19 +31,9 @@ export function isKakaoWebView() {
   return window.navigator.userAgent.indexOf("KAKAOTALK") >= 0;
 }
 
-export function kakaoInAppLogin(
-  config: Environment | string,
-  redirectTo: string | null,
-) {
-  let urlBase: string;
-  if (typeof config === "string") {
-    urlBase = config;
-  } else {
-    urlBase = config.urlBase;
-  }
-
+export function kakaoInAppLogin(env: Environment, redirectTo: string | null) {
   window.Kakao.Auth.authorize({
-    redirectUri: `${urlBase}/api/auth/kakao/redirect`,
+    redirectUri: `${env.urlBase}/api/auth/kakao/redirect`,
     scope: "profile_nickname,talk_calendar",
     state: JSON.stringify({ redirectTo, transparent: true }),
     nonce: generateRandomString(16),

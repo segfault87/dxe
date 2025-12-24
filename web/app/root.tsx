@@ -1,13 +1,21 @@
 import React, { useEffect } from "react";
 import ReactGA from "react-ga4";
 import Modal from "react-modal";
-import { Outlet, Links, Meta, Scripts, ScrollRestoration } from "react-router";
+import {
+  Outlet,
+  Links,
+  Meta,
+  Scripts,
+  ScrollRestoration,
+  useNavigate,
+} from "react-router";
 
+import type { Route } from "./+types/root";
 import GitHubRibbon from "./assets/GitHubRibbon.svg";
 import { AuthProvider } from "./context/AuthContext";
 import { EnvProvider, useEnv } from "./context/EnvContext";
-import KakaoSDK from "./lib/KakaoSDK";
-import type { Route } from "./+types/root";
+import { ErrorObject } from "./lib/error";
+import KakaoSDK, { isKakaoWebView, kakaoInAppLogin } from "./lib/KakaoSDK";
 import "./index.css";
 
 export const links: Route.LinksFunction = () => [
@@ -22,6 +30,52 @@ export const links: Route.LinksFunction = () => [
     href: "https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap",
   },
 ];
+
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  const env = useEnv();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (error instanceof ErrorObject) {
+      if (error.data.type === "unauthorized") {
+        if (isKakaoWebView()) {
+          kakaoInAppLogin(env, error.data.redirectTo);
+        } else {
+          const path = `/login/?redirect_to=${encodeURIComponent(error.data.redirectTo)}`;
+          navigate(path);
+        }
+      }
+    }
+  }, [env, navigate, error]);
+
+  if (error instanceof ErrorObject) {
+    if (error.data.type === "unauthorized") {
+      return <></>;
+    }
+    if (error.data.type === "unknown") {
+      return (
+        <>
+          <h1>알 수 없는 에러가 발생했습니다.</h1>
+          <p>{error.data.error?.message ?? "-"}</p>
+        </>
+      );
+    } else if (error.data.type === "remote") {
+      return (
+        <>
+          <h1>에러가 발생했습니다.</h1>
+          <p>{error.data.message}</p>
+        </>
+      );
+    }
+  } else if (error instanceof Error) {
+    <>
+      <h1>에러가 발생했습니다.</h1>
+      <p>{error.message}</p>
+    </>;
+  } else {
+    return <h1>알 수 없는 에러가 발생했습니다.</h1>;
+  }
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const env = useEnv();

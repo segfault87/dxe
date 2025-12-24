@@ -1,9 +1,8 @@
 import { useEffect } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useLocation } from "react-router";
 
 import { useAuth, type AuthContextData } from "../context/AuthContext";
-import { useEnv } from "../context/EnvContext";
-import { isKakaoWebView, kakaoInAppLogin } from "./KakaoSDK";
+import { ErrorObject } from "../lib/error";
 
 export interface AuthProps {
   auth: AuthContextData;
@@ -17,25 +16,14 @@ export default function RequiresAuth<P extends object>(
 ) {
   return function RequiresAuth(props: P) {
     const auth = useAuth();
-    const env = useEnv();
     const location = useLocation();
-    const navigate = useNavigate();
 
     useEffect(() => {
       if (auth === null) {
-        const redirectTo = location.pathname + location.search;
-
-        if (isKakaoWebView()) {
-          kakaoInAppLogin(env, redirectTo);
-        } else {
-          const path =
-            redirectPath ??
-            `/login/?redirect_to=${encodeURIComponent(redirectTo)}`;
-          navigate(path);
-        }
+        const redirectTo = redirectPath ?? location.pathname + location.search;
+        throw new ErrorObject({ type: "unauthorized", redirectTo: redirectTo });
       }
-    }, [auth, env, location, navigate]);
-
+    }, [auth, location]);
     if (auth) {
       return <WrappedComponent auth={auth} {...props} />;
     }

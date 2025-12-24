@@ -1,13 +1,34 @@
 import { AxiosError, isAxiosError } from "axios";
-import { data, redirect } from "react-router";
-import { isKakaoWebView, kakaoInAppLogin } from "./KakaoSDK";
+import { redirect } from "react-router";
 
-interface Error {
-  type: string;
+interface RemoteError {
+  type: "remote";
+  remoteType: string;
   message: string;
 }
 
-function getErrorMessage(error: AxiosError<Error>) {
+interface AuthError {
+  type: "unauthorized";
+  redirectTo: string;
+}
+
+interface UnknownError {
+  type: "unknown";
+  error?: Error;
+}
+
+type ErrorPayload = RemoteError | AuthError | UnknownError;
+
+export class ErrorObject extends Error {
+  data: ErrorPayload;
+
+  constructor(data: ErrorPayload) {
+    super();
+    this.data = data;
+  }
+}
+
+function getErrorMessage(error: AxiosError<RemoteError>) {
   if (error.response?.data?.message) {
     return error.response?.data?.message ?? error.message;
   } else {
@@ -23,21 +44,30 @@ export function defaultErrorHandler(error: unknown) {
   }
 }
 
-export function loaderErrorHandler(error: unknown, url: string) {
+export function loaderErrorHandler(error: unknown, urlString: string) {
   if (isAxiosError(error)) {
     if (error.status === 401) {
-      const encodedUrl = new URL(url);
-      const redirectTo = encodedUrl.pathname + encodedUrl.search;
-      if (isKakaoWebView()) {
-        kakaoInAppLogin(import.meta.env.VITE_URL_BASE, redirectTo);
-        return data(null, { status: 302 });
-      } else {
-        return redirect(`/login?redirect_to=${encodeURIComponent(redirectTo)}`);
-      }
+      const url = new URL(urlString);
+      return new ErrorObject({
+        type: "unauthorized",
+        redirectTo: url.pathname + url.search,
+      });
+    } else if (error.response?.data?.type && error.response?.data?.message) {
+      return new ErrorObject({
+        type: "remote",
+        remoteType: error.response?.data?.type,
+        message: error.response?.data?.message,
+      });
     }
-    return data(getErrorMessage(error));
+  } else if (error instanceof Error) {
+    return new ErrorObject({
+      type: "unknown",
+      error: error,
+    });
   } else {
-    return data("일시적인 오류가 발생했습니다. 다시 시도해 주세요.");
+    return new ErrorObject({
+      type: "unknown",
+    });
   }
 }
 

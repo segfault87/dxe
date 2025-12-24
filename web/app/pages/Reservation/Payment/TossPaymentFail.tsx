@@ -26,7 +26,7 @@ export async function clientLoader({
   return { orderId, code, message };
 }
 
-function TossPaymentFail({ loaderData }: { loaderData: LoaderData }) {
+function TossPaymentFail({ loaderData }: Route.ComponentProps) {
   const { orderId, code, message } = loaderData;
 
   useEffect(() => {

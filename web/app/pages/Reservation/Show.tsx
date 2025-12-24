@@ -6,8 +6,7 @@ import "./Show.css";
 import type { Route } from "./+types/Show";
 import BookingService from "../../api/booking";
 import UserService from "../../api/user";
-import { useAuth } from "../../context/AuthContext";
-import RequiresAuth from "../../lib/RequiresAuth";
+import RequiresAuth, { type AuthProps } from "../../lib/RequiresAuth";
 import type { Booking } from "../../types/models/booking";
 import type { Transaction } from "../../types/models/payment";
 import ExtendReservation from "../../components/ExtendReservation";
@@ -15,15 +14,15 @@ import GroupInvitationModal from "../../components/GroupInvitation";
 import GroupSelectionModal from "../../components/GroupSelection";
 import LocationInformation from "../../components/LocationInformation";
 import Section from "../../components/Section";
-import { defaultErrorHandler } from "../../lib/error";
+import { defaultErrorHandler, loaderErrorHandler } from "../../lib/error";
 import type { GroupWithUsers } from "../../types/models/group";
 
-export function meta({}: Route.MetaArgs) {
+export function meta(): Route.MetaDescriptors {
   return [{ title: "예약 조회 | 드림하우스 합주실" }];
 }
 
 interface LoaderData {
-  booking: Booking | null;
+  booking: Booking;
   transaction: Transaction | null;
   amendable: boolean;
   extendableHours: number;
@@ -32,6 +31,7 @@ interface LoaderData {
 
 export async function clientLoader({
   params,
+  request,
 }: Route.ClientLoaderArgs): Promise<LoaderData> {
   if (!params.bookingId) {
     throw new Error("bookingId is not supplied");
@@ -57,31 +57,17 @@ export async function clientLoader({
       group: group,
     };
   } catch (error) {
-    defaultErrorHandler(error);
-    return {
-      booking: null,
-      transaction: null,
-      amendable: false,
-      extendableHours: 0,
-      group: null,
-    };
+    throw loaderErrorHandler(error, request.url);
   }
 }
 
-function ShowReservationInner({
-  booking,
-  transaction,
-  amendable,
-  extendableHours,
-  group,
-}: {
-  booking: Booking;
-  transaction: Transaction | null;
-  amendable: boolean;
-  extendableHours: number;
-  group: GroupWithUsers | null;
-}) {
-  const auth = useAuth();
+function ShowReservation({
+  loaderData,
+  auth,
+}: Route.ComponentProps & AuthProps) {
+  const { booking, transaction, amendable, extendableHours, group } =
+    loaderData;
+
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -98,7 +84,7 @@ function ShowReservationInner({
       if (bookingStart.toDateString() !== new Date().toDateString()) {
         refundAccount = prompt(
           "환불받으실 계좌번호를 입력해 주세요.",
-          auth?.user.refundAccount ?? undefined,
+          auth.user.refundAccount ?? undefined,
         );
         if (refundAccount === null) {
           return;
@@ -334,7 +320,7 @@ function ShowReservationInner({
           </ul>
         </Section>
       ) : null}
-      {auth?.user.id === booking.holder.id &&
+      {auth.user.id === booking.holder.id &&
       (booking.status === "PENDING" || booking.status === "CONFIRMED") ? (
         <Section id="modify-reservation" title="예약 변경">
           <button className="primary" onClick={cancelReservation}>
@@ -379,33 +365,15 @@ function ShowReservationInner({
         isOpen={groupTransferModal}
         close={() => setGroupTransferModal(false)}
       />
-      {auth ? (
-        <ExtendReservation
-          userId={auth.user.id}
-          booking={booking}
-          extendableHours={extendableHours}
-          isOpen={extendReservationModal}
-          close={() => setExtendReservationModal(false)}
-        />
-      ) : null}
+      <ExtendReservation
+        userId={auth.user.id}
+        booking={booking}
+        extendableHours={extendableHours}
+        isOpen={extendReservationModal}
+        close={() => setExtendReservationModal(false)}
+      />
     </>
   );
-}
-
-function ShowReservation({ loaderData }: Route.ComponentProps) {
-  if (loaderData.booking) {
-    return (
-      <ShowReservationInner
-        booking={loaderData.booking}
-        transaction={loaderData.transaction}
-        amendable={loaderData.amendable}
-        extendableHours={loaderData.extendableHours}
-        group={loaderData.group}
-      />
-    );
-  } else {
-    return <></>;
-  }
 }
 
 export default RequiresAuth(ShowReservation);

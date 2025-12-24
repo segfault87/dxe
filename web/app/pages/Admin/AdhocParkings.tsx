@@ -6,7 +6,7 @@ import AdminService from "../../api/admin";
 import { DEFAULT_SPACE_ID } from "../../constants";
 import { toUtcIso8601 } from "../../lib/datetime";
 import checkPlateNumber from "../../lib/PlateNumber";
-import { defaultErrorHandler, handleUnauthorizedError } from "../../lib/error";
+import { defaultErrorHandler, loaderErrorHandler } from "../../lib/error";
 import type { AdhocParkingId } from "../../types/models/base";
 import type { AdhocParking } from "../../types/models/booking";
 
@@ -14,7 +14,9 @@ interface LoaderData {
   parkings: AdhocParking[];
 }
 
-export async function clientLoader({}: Route.ClientActionArgs): Promise<LoaderData> {
+export async function clientLoader({
+  request,
+}: Route.ClientLoaderArgs): Promise<LoaderData> {
   try {
     const result = await AdminService.getAdhocParkings(DEFAULT_SPACE_ID);
 
@@ -22,9 +24,7 @@ export async function clientLoader({}: Route.ClientActionArgs): Promise<LoaderDa
       parkings: result.data.parkings,
     };
   } catch (error) {
-    handleUnauthorizedError(error);
-
-    return { parkings: [] };
+    throw loaderErrorHandler(error, request.url);
   }
 }
 

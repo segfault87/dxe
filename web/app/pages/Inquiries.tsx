@@ -2,7 +2,7 @@ import "./Inquiries.css";
 import type { Route } from "./+types/Inquiries";
 import Section from "../components/Section";
 
-export function meta({}: Route.MetaArgs) {
+export function meta(): Route.MetaDescriptors {
   return [{ title: "문의 | 드림하우스 합주실" }];
 }
 

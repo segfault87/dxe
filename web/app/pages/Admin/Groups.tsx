@@ -1,13 +1,15 @@
 import type { Route } from "./+types/Groups";
 import AdminService from "../../api/admin";
-import { handleUnauthorizedError } from "../../lib/error";
+import { loaderErrorHandler } from "../../lib/error";
 import type { GroupWithUsers } from "../../types/models/group";
 
 interface LoaderData {
   groups: GroupWithUsers[];
 }
 
-export async function clientLoader({}: Route.ClientLoaderArgs): Promise<LoaderData> {
+export async function clientLoader({
+  request,
+}: Route.ClientLoaderArgs): Promise<LoaderData> {
   try {
     const result = await AdminService.getGroups();
 
@@ -15,9 +17,7 @@ export async function clientLoader({}: Route.ClientLoaderArgs): Promise<LoaderDa
       groups: result.data.groups,
     };
   } catch (error) {
-    handleUnauthorizedError(error);
-
-    return { groups: [] };
+    throw loaderErrorHandler(error, request.url);
   }
 }
 

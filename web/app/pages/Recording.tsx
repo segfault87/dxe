@@ -5,7 +5,7 @@ import "./Recording.css";
 import type { Route } from "./+types/Recording";
 import BookingService from "../api/booking";
 import LogoType from "../assets/logotype.svg";
-import { defaultErrorHandler } from "../lib/error";
+import { loaderErrorHandler } from "../lib/error";
 import RequiresAuth from "../lib/RequiresAuth";
 import type { AudioRecording } from "../types/models/booking";
 
@@ -15,6 +15,7 @@ interface LoaderData {
 
 export async function clientLoader({
   params,
+  request,
 }: Route.ClientLoaderArgs): Promise<LoaderData> {
   if (!params.bookingId) {
     throw new Error("bookingId is not supplied");
@@ -24,16 +25,15 @@ export async function clientLoader({
     const result = await BookingService.getAudioRecording(params.bookingId);
     return { audioRecording: result.data.audioRecording };
   } catch (error) {
-    defaultErrorHandler(error);
-    return { audioRecording: null };
+    throw loaderErrorHandler(error, request.url);
   }
 }
 
-export function meta({}: Route.MetaArgs) {
+export function meta(): Route.MetaDescriptors {
   return [{ title: "레코딩 음원 다운로드 | 드림하우스 합주실" }];
 }
 
-export function Recording({ loaderData }: { loaderData: LoaderData }) {
+export function Recording({ loaderData }: Route.ComponentProps) {
   const { audioRecording } = loaderData;
 
   return (

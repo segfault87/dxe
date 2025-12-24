@@ -1,8 +1,9 @@
 import { Link } from "react-router";
-import Section from "../components/Section";
-import type { Route } from "./+types/Guide";
 
-export function meta({}: Route.MetaArgs) {
+import type { Route } from "./+types/Guide";
+import Section from "../components/Section";
+
+export function meta(): Route.MetaDescriptors {
   return [{ title: "이용 안내 | 드림하우스 합주실" }];
 }
 

@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
 import ReactGA from "react-ga4";
-import TagManager from "react-gtm-module";
 import Modal from "react-modal";
 import { Outlet, Links, Meta, Scripts, ScrollRestoration } from "react-router";
 
@@ -28,7 +27,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const env = useEnv();
 
   useEffect(() => {
-    TagManager.initialize({ gtmId: env.gtmId });
     ReactGA.initialize(env.gaMeasurementId);
     Modal.setAppElement(document.getElementById("root")!);
   }, [env]);

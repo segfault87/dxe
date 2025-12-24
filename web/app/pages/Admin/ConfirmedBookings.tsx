@@ -1,13 +1,19 @@
 import type { Route } from "./+types/ConfirmedBookings";
 import AdminService from "../../api/admin";
-import { handleUnauthorizedError } from "../../lib/error";
+import { loaderErrorHandler } from "../../lib/error";
 import type { BookingWithPayments } from "../../types/models/booking";
 
 interface LoaderData {
   bookings: BookingWithPayments[];
 }
 
-export async function clientLoader({}: Route.ClientLoaderArgs): Promise<LoaderData> {
+export function meta(): Route.MetaDescriptors {
+  return [{ title: "드림하우스 합주실 관리자" }];
+}
+
+export async function clientLoader({
+  request,
+}: Route.ClientLoaderArgs): Promise<LoaderData> {
   try {
     const result = await AdminService.getBookings("confirmed", new Date());
 
@@ -15,9 +21,7 @@ export async function clientLoader({}: Route.ClientLoaderArgs): Promise<LoaderDa
       bookings: result.data.bookings,
     };
   } catch (error) {
-    handleUnauthorizedError(error);
-
-    return { bookings: [] };
+    throw loaderErrorHandler(error, request.url);
   }
 }
 

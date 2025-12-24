@@ -1,7 +1,7 @@
-import Section from "../../components/Section";
 import type { Route } from "./+types/TermsOfService.tsx";
+import Section from "../../components/Section";
 
-export function meta({}: Route.MetaArgs) {
+export function meta(): Route.MetaDescriptors {
   return [{ title: "이용 약관 | 드림하우스 합주실" }];
 }
 

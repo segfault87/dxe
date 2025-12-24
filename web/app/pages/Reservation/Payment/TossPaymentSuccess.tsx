@@ -11,7 +11,7 @@ import type { BookingId, ProductType } from "../../../types/models/base";
 import { defaultErrorHandler } from "../../../lib/error";
 import { redirect } from "react-router";
 
-export function meta({}: Route.MetaArgs) {
+export function meta(): Route.MetaDescriptors {
   return [{ title: "결제 확인 | 드림하우스 합주실" }];
 }
 
@@ -57,7 +57,7 @@ export async function clientLoader({
   };
 }
 
-function TossPaymentSuccess({ loaderData }: { loaderData: LoaderData }) {
+function TossPaymentSuccess({ loaderData }: Route.ComponentProps) {
   const { productType, orderId, paymentKey, amount, timeFrom, timeTo } =
     loaderData;
 

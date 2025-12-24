@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { loadTossPayments } from "@tosspayments/tosspayments-sdk";
 import type { TossPaymentsWidgets } from "@tosspayments/tosspayments-sdk";
 
@@ -56,8 +56,8 @@ export default function ExtendReservation(props: ExtendReservationProps) {
     }
   };
 
-  useEffect(() => {
-    const checkPrice = async (hours: number) => {
+  const checkPrice = useCallback(
+    async (hours: number) => {
       setRequestInProgress(true);
       try {
         const result = await BookingService.check({
@@ -78,10 +78,13 @@ export default function ExtendReservation(props: ExtendReservationProps) {
       } finally {
         setRequestInProgress(false);
       }
-    };
+    },
+    [booking, tossPaymentsWidgets],
+  );
 
+  useEffect(() => {
     checkPrice(selectedHours);
-  }, [selectedHours]);
+  }, [checkPrice, selectedHours]);
 
   useEffect(() => {
     const initializeTossPayments = async () => {
@@ -98,16 +101,14 @@ export default function ExtendReservation(props: ExtendReservationProps) {
       });
 
       try {
-        const [_, agreementWidget] = await Promise.all([
-          widgets.renderPaymentMethods({
-            selector: "#toss-payment-method",
-            variantKey: "DEFAULT",
-          }),
-          widgets.renderAgreement({
-            selector: "#toss-payment-agreement",
-            variantKey: "AGREEMENT",
-          }),
-        ]);
+        await widgets.renderPaymentMethods({
+          selector: "#toss-payment-method",
+          variantKey: "DEFAULT",
+        });
+        const agreementWidget = await widgets.renderAgreement({
+          selector: "#toss-payment-agreement",
+          variantKey: "AGREEMENT",
+        });
 
         agreementWidget.on("agreementStatusChange", (agreementStatus) => {
           setAgreedRequiredTerms(agreementStatus.agreedRequiredTerms);

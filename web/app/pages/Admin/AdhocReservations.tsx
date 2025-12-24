@@ -5,7 +5,7 @@ import type { Route } from "./+types/AdhocReservations";
 import AdminService from "../../api/admin";
 import { DEFAULT_UNIT_ID } from "../../constants";
 import { toUtcIso8601 } from "../../lib/datetime";
-import { defaultErrorHandler, handleUnauthorizedError } from "../../lib/error";
+import { defaultErrorHandler, loaderErrorHandler } from "../../lib/error";
 import type { AdhocReservationId } from "../../types/models/base";
 import type { AdhocReservation } from "../../types/models/booking";
 
@@ -13,7 +13,9 @@ interface LoaderData {
   reservations: AdhocReservation[];
 }
 
-export async function clientLoader({}: Route.ClientActionArgs): Promise<LoaderData> {
+export async function clientLoader({
+  request,
+}: Route.ClientLoaderArgs): Promise<LoaderData> {
   try {
     const result = await AdminService.getAdhocReservations(DEFAULT_UNIT_ID);
 
@@ -21,9 +23,7 @@ export async function clientLoader({}: Route.ClientActionArgs): Promise<LoaderDa
       reservations: result.data.reservations,
     };
   } catch (error) {
-    handleUnauthorizedError(error);
-
-    return { reservations: [] };
+    throw loaderErrorHandler(error, request.url);
   }
 }
 

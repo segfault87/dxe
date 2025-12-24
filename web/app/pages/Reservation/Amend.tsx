@@ -1,5 +1,5 @@
 import { isAxiosError } from "axios";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { redirect, useNavigate } from "react-router";
 import { loadTossPayments } from "@tosspayments/tosspayments-sdk";
 import type { TossPaymentsWidgets } from "@tosspayments/tosspayments-sdk";
@@ -18,7 +18,7 @@ import Section from "../../components/Section";
 import type { UserId } from "../../types/models/base";
 import type { Booking, OccupiedSlot } from "../../types/models/booking";
 
-export function meta({}: Route.MetaArgs) {
+export function meta(): Route.MetaDescriptors {
   return [{ title: "예약 변경 | 드림하우스 합주실" }];
 }
 
@@ -138,44 +138,47 @@ function TossPayment({
 }) {
   const { tossPaymentClientKey } = useEnv();
 
+  const initializeTossPayments = useCallback(async () => {
+    const tossPaymentsSdk = await loadTossPayments(tossPaymentClientKey);
+
+    const customerKey = userId;
+    const widgets = tossPaymentsSdk.widgets({
+      customerKey,
+    });
+
+    await widgets.setAmount({
+      currency: "KRW",
+      value: 0,
+    });
+
+    try {
+      await widgets.renderPaymentMethods({
+        selector: "#toss-payment-method",
+        variantKey: "DEFAULT",
+      });
+      const agreementWidget = await widgets.renderAgreement({
+        selector: "#toss-payment-agreement",
+        variantKey: "AGREEMENT",
+      });
+
+      agreementWidget.on("agreementStatusChange", (agreementStatus) => {
+        setAgreedRequiredTerms(agreementStatus.agreedRequiredTerms);
+      });
+
+      setTossPaymentsWidgets(widgets);
+    } catch {
+      // suppress error
+    }
+  }, [
+    setAgreedRequiredTerms,
+    setTossPaymentsWidgets,
+    userId,
+    tossPaymentClientKey,
+  ]);
+
   useEffect(() => {
-    const initializeTossPayments = async () => {
-      const tossPaymentsSdk = await loadTossPayments(tossPaymentClientKey);
-
-      const customerKey = userId;
-      const widgets = tossPaymentsSdk.widgets({
-        customerKey,
-      });
-
-      await widgets.setAmount({
-        currency: "KRW",
-        value: 0,
-      });
-
-      try {
-        const [_, agreementWidget] = await Promise.all([
-          widgets.renderPaymentMethods({
-            selector: "#toss-payment-method",
-            variantKey: "DEFAULT",
-          }),
-          widgets.renderAgreement({
-            selector: "#toss-payment-agreement",
-            variantKey: "AGREEMENT",
-          }),
-        ]);
-
-        agreementWidget.on("agreementStatusChange", (agreementStatus) => {
-          setAgreedRequiredTerms(agreementStatus.agreedRequiredTerms);
-        });
-
-        setTossPaymentsWidgets(widgets);
-      } catch {
-        // suppress error
-      }
-    };
-
     initializeTossPayments();
-  }, [tossPaymentClientKey]);
+  }, [initializeTossPayments]);
 
   useEffect(() => {
     if (tossPaymentsWidgets !== null && price !== null) {
@@ -225,18 +228,6 @@ function AmendReservation({ loaderData }: Route.ComponentProps) {
     !isRequestInProgress &&
     hasAgreedRequiredTerms;
 
-  const fetchCalendar = async () => {
-    try {
-      const result = await BookingService.calendar(DEFAULT_UNIT_ID, booking.id);
-      setStart(new Date(result.data.start));
-      setEnd(new Date(result.data.end));
-      setMaxBookingHours(result.data.maxBookingHours);
-      setSlots(result.data.slots);
-    } catch (error) {
-      defaultErrorHandler(error);
-    }
-  };
-
   const proceed = async () => {
     if (selectedTime === null || selectedHours === null) {
       return;
@@ -279,6 +270,18 @@ function AmendReservation({ loaderData }: Route.ComponentProps) {
     setPrice(null);
   }, [selectedTime]);
 
+  const fetchCalendar = useCallback(async () => {
+    try {
+      const result = await BookingService.calendar(DEFAULT_UNIT_ID, booking.id);
+      setStart(new Date(result.data.start));
+      setEnd(new Date(result.data.end));
+      setMaxBookingHours(result.data.maxBookingHours);
+      setSlots(result.data.slots);
+    } catch (error) {
+      defaultErrorHandler(error);
+    }
+  }, [booking]);
+
   useEffect(() => {
     fetchCalendar();
 
@@ -287,7 +290,7 @@ function AmendReservation({ loaderData }: Route.ComponentProps) {
     return () => {
       window.removeEventListener("focus", fetchCalendar);
     };
-  }, []);
+  }, [fetchCalendar]);
 
   useEffect(() => {
     setInterval(() => {
@@ -325,7 +328,7 @@ function AmendReservation({ loaderData }: Route.ComponentProps) {
     };
 
     checkAvailability();
-  }, [selectedTime, selectedHours]);
+  }, [booking, selectedTime, selectedHours]);
 
   return (
     <>

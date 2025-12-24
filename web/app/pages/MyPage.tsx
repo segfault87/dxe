@@ -1,25 +1,40 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import ReactGA from "react-ga4";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 import "./MyPage.css";
 import type { Route } from "./+types/MyPage";
 import UserService from "../api/user";
 import GroupInvitation from "../components/GroupInvitation";
 import GroupManagementModal from "../components/GroupManagement";
-import checkPlateNumber from "../lib/PlateNumber";
-import RequiresAuth from "../lib/RequiresAuth";
-import { DEFAULT_UNIT_ID } from "../constants";
-import { useAuth } from "../context/AuthContext";
 import Section from "../components/Section";
-import { defaultErrorHandler } from "../lib/error";
+import { DEFAULT_UNIT_ID } from "../constants";
+import checkPlateNumber from "../lib/PlateNumber";
+import RequiresAuth, { type AuthProps } from "../lib/RequiresAuth";
+import { defaultErrorHandler, loaderErrorHandler } from "../lib/error";
 import type { GroupId } from "../types/models/base";
 import type { Booking } from "../types/models/booking";
 import type { GroupWithUsers } from "../types/models/group";
 import type { SelfUser } from "../types/models/user";
 
-export function meta({}: Route.MetaArgs) {
+export function meta(): Route.MetaDescriptors {
   return [{ title: "예약 및 설정 | 드림하우스 합주실" }];
+}
+
+interface LoaderData {
+  groups: GroupWithUsers[];
+}
+
+export async function clientLoader({
+  request,
+}: Route.ClientLoaderArgs): Promise<LoaderData> {
+  try {
+    const result = await UserService.listGroups();
+
+    return { groups: result.data.groups };
+  } catch (error) {
+    throw loaderErrorHandler(error, request.url);
+  }
 }
 
 function ActiveBookingSection({ booking }: { booking: Booking }) {
@@ -58,8 +73,16 @@ function PendingBookingsSection({ bookings }: { bookings: Booking[] }) {
   }
 }
 
-function GroupManagement({ me }: { me: SelfUser }) {
-  const [groups, setGroups] = useState<GroupWithUsers[]>([]);
+function GroupManagement({
+  me,
+  initGroups,
+}: {
+  me: SelfUser;
+  initGroups: GroupWithUsers[];
+}) {
+  const navigate = useNavigate();
+
+  const [groups, setGroups] = useState<GroupWithUsers[]>(initGroups);
   const [newGroupName, setNewGroupName] = useState("");
 
   const [isRequestInProgress, setRequestInProgress] = useState(false);
@@ -91,26 +114,13 @@ function GroupManagement({ me }: { me: SelfUser }) {
     try {
       setRequestInProgress(true);
       await UserService.leaveGroup(groupId);
-      await fetch();
+      await navigate(0);
     } catch (error) {
       defaultErrorHandler(error);
     } finally {
       setRequestInProgress(false);
     }
   };
-
-  const fetch = async () => {
-    try {
-      const groups = await UserService.listGroups();
-      setGroups(groups.data.groups);
-    } catch (error) {
-      defaultErrorHandler(error);
-    }
-  };
-
-  useEffect(() => {
-    fetch();
-  }, []);
 
   let list = null;
   if (groups.length === 0) {
@@ -189,7 +199,7 @@ function GroupManagement({ me }: { me: SelfUser }) {
           }}
           group={groupManagementModal}
           onUpdate={() => {
-            fetch();
+            navigate(0);
           }}
         />
       ) : null}
@@ -289,13 +299,7 @@ function UserProfile({ me }: { me: SelfUser }) {
   );
 }
 
-function MyPage() {
-  const auth = useAuth();
-
-  if (!auth) {
-    return;
-  }
-
+function MyPage({ auth, loaderData }: Route.ComponentProps & AuthProps) {
   return (
     <>
       {auth.activeBookings[DEFAULT_UNIT_ID] ? (
@@ -311,7 +315,7 @@ function MyPage() {
         />
       </Section>
       <Section id="group-management" title="그룹 관리">
-        <GroupManagement me={auth.user} />
+        <GroupManagement me={auth.user} initGroups={loaderData.groups} />
       </Section>
       <Section id="user-info" title="사용자 정보 변경">
         <UserProfile me={auth.user} />

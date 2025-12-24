@@ -1,5 +1,6 @@
 import { isAxiosError } from "axios";
 import React, { createContext, useContext, useEffect, useState } from "react";
+import ReactGA from "react-ga4";
 
 import UserService from "../api/user";
 import type { SelfUser } from "../types/models/user";
@@ -26,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchMe = async () => {
     try {
       const result = await UserService.me();
+      ReactGA.set({ user_id: result.data.user.id });
       setData({
         user: result.data.user,
         activeBookings: result.data.activeBookings,

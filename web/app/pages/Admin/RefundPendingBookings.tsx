@@ -2,7 +2,7 @@ import { useNavigate } from "react-router";
 
 import type { Route } from "./+types/RefundPendingBookings";
 import AdminService from "../../api/admin";
-import { defaultErrorHandler, handleUnauthorizedError } from "../../lib/error";
+import { defaultErrorHandler, loaderErrorHandler } from "../../lib/error";
 import type { BookingId } from "../../types/models/base";
 import type { BookingWithPayments } from "../../types/models/booking";
 import type { BookingAction } from "../../types/handlers/admin";
@@ -11,7 +11,9 @@ interface LoaderData {
   bookings: BookingWithPayments[];
 }
 
-export async function clientLoader({}: Route.ClientLoaderArgs): Promise<LoaderData> {
+export async function clientLoader({
+  request,
+}: Route.ClientLoaderArgs): Promise<LoaderData> {
   try {
     const result = await AdminService.getBookings("refund_pending");
 
@@ -19,9 +21,7 @@ export async function clientLoader({}: Route.ClientLoaderArgs): Promise<LoaderDa
       bookings: result.data.bookings,
     };
   } catch (error) {
-    handleUnauthorizedError(error);
-
-    return { bookings: [] };
+    throw loaderErrorHandler(error, request.url);
   }
 }
 

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import ReactGA from "react-ga4";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate, useSearchParams } from "react-router";
+import { useNavigate } from "react-router";
 
 import "./Login.css";
 import type { Route } from "./+types/Login";
@@ -9,16 +9,27 @@ import KakaoLoginButton from "../assets/kakao_login_large_wide.png";
 import { useEnv } from "../context/EnvContext";
 import { kakaoLogin } from "../lib/KakaoSDK";
 
-export function meta({}: Route.MetaArgs) {
+export function meta(): Route.MetaDescriptors {
   return [{ title: "로그인 | 드림하우스 합주실" }];
 }
 
-export default function Login() {
+interface LoaderData {
+  redirectTo: string | null;
+}
+
+export async function clientLoader({
+  request,
+}: Route.ClientLoaderArgs): Promise<LoaderData> {
+  const url = new URL(request.url);
+
+  return { redirectTo: url.searchParams.get("redirect_to") };
+}
+
+export default function Login({ loaderData }: { loaderData: LoaderData }) {
   const env = useEnv();
   const auth = useAuth();
   const navigate = useNavigate();
-  const [searchParams, _] = useSearchParams();
-  const redirectTo: string | null = searchParams.get("redirect_to");
+  const redirectTo = loaderData.redirectTo;
 
   useEffect(() => {
     if (auth) {

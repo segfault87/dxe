@@ -1,5 +1,5 @@
 import { isAxiosError } from "axios";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import ReactGA from "react-ga4";
 import { useNavigate } from "react-router";
 import { loadTossPayments } from "@tosspayments/tosspayments-sdk";
@@ -10,11 +10,11 @@ import type { Route } from "./+types/Create";
 import BookingService from "../../api/booking";
 import UserService from "../../api/user";
 import { DEFAULT_UNIT_ID } from "../../constants";
-import { useAuth } from "../../context/AuthContext";
+import type { AuthContextData } from "../../context/AuthContext";
 import { useEnv } from "../../context/EnvContext";
 import { checkSlots, toUtcIso8601 } from "../../lib/datetime";
 import { defaultErrorHandler } from "../../lib/error";
-import RequiresAuth from "../../lib/RequiresAuth";
+import RequiresAuth, { type AuthProps } from "../../lib/RequiresAuth";
 import Calendar from "../../components/Calendar";
 import GroupInvitationModal from "../../components/GroupInvitation";
 import Section from "../../components/Section";
@@ -26,7 +26,7 @@ import type {
 import type { OccupiedSlot } from "../../types/models/booking";
 import type { GroupWithUsers } from "../../types/models/group";
 
-export function meta({}: Route.MetaArgs) {
+export function meta(): Route.MetaDescriptors {
   return [{ title: "예약 | 드림하우스 합주실" }];
 }
 
@@ -105,6 +105,7 @@ function HoursPicker(props: HoursPickerProps) {
 }
 
 interface CustomerSelectionProps {
+  auth: AuthContextData;
   selectedIdentityId: IdentityId | null;
   onSelectIdentityId: (identityId: IdentityId) => void;
 }
@@ -114,11 +115,11 @@ interface GroupWithCreationTag extends GroupWithUsers {
 }
 
 function CustomerSelection({
+  auth,
   selectedIdentityId,
   onSelectIdentityId,
 }: CustomerSelectionProps) {
-  const auth = useAuth();
-  const user = auth?.user;
+  const user = auth.user;
 
   const [groups, setGroups] = useState<GroupWithCreationTag[] | null>(null);
   const [groupInvitationModal, setGroupInvitationModal] =
@@ -314,44 +315,47 @@ function TossPayment({
 }) {
   const { tossPaymentClientKey } = useEnv();
 
+  const initializeTossPayments = useCallback(async () => {
+    const tossPaymentsSdk = await loadTossPayments(tossPaymentClientKey);
+
+    const customerKey = userId;
+    const widgets = tossPaymentsSdk.widgets({
+      customerKey,
+    });
+
+    await widgets.setAmount({
+      currency: "KRW",
+      value: 0,
+    });
+
+    try {
+      await widgets.renderPaymentMethods({
+        selector: "#toss-payment-method",
+        variantKey: "DEFAULT",
+      });
+      const agreementWidget = await widgets.renderAgreement({
+        selector: "#toss-payment-agreement",
+        variantKey: "AGREEMENT",
+      });
+
+      agreementWidget.on("agreementStatusChange", (agreementStatus) => {
+        setAgreedRequiredTerms(agreementStatus.agreedRequiredTerms);
+      });
+
+      setTossPaymentsWidgets(widgets);
+    } catch {
+      // suppress error
+    }
+  }, [
+    setAgreedRequiredTerms,
+    setTossPaymentsWidgets,
+    userId,
+    tossPaymentClientKey,
+  ]);
+
   useEffect(() => {
-    const initializeTossPayments = async () => {
-      const tossPaymentsSdk = await loadTossPayments(tossPaymentClientKey);
-
-      const customerKey = userId;
-      const widgets = tossPaymentsSdk.widgets({
-        customerKey,
-      });
-
-      await widgets.setAmount({
-        currency: "KRW",
-        value: 0,
-      });
-
-      try {
-        const [_, agreementWidget] = await Promise.all([
-          widgets.renderPaymentMethods({
-            selector: "#toss-payment-method",
-            variantKey: "DEFAULT",
-          }),
-          widgets.renderAgreement({
-            selector: "#toss-payment-agreement",
-            variantKey: "AGREEMENT",
-          }),
-        ]);
-
-        agreementWidget.on("agreementStatusChange", (agreementStatus) => {
-          setAgreedRequiredTerms(agreementStatus.agreedRequiredTerms);
-        });
-
-        setTossPaymentsWidgets(widgets);
-      } catch {
-        // suppress error
-      }
-    };
-
     initializeTossPayments();
-  }, [tossPaymentClientKey]);
+  }, [initializeTossPayments]);
 
   useEffect(() => {
     if (tossPaymentsWidgets !== null && price !== null) {
@@ -368,8 +372,7 @@ function TossPayment({
   );
 }
 
-function Reservation() {
-  const auth = useAuth();
+function Reservation({ auth }: AuthProps) {
   const env = useEnv();
 
   const [start, setStart] = useState(new Date());
@@ -589,6 +592,7 @@ function Reservation() {
       </Section>
       <Section id="customer" title="예약자 선택">
         <CustomerSelection
+          auth={auth}
           selectedIdentityId={selectedIdentityId}
           onSelectIdentityId={setSelectedIdentityId}
         />

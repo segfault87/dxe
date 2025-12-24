@@ -9,7 +9,7 @@ import { useAuth, useAuthRefresh } from "../context/AuthContext";
 import checkPlateNumber from "../lib/PlateNumber";
 import { defaultErrorHandler } from "../lib/error";
 
-export function meta({}: Route.MetaArgs) {
+export function meta(): Route.MetaDescriptors {
   return [{ title: "등록 | 드림하우스 합주실" }];
 }
 
@@ -30,7 +30,7 @@ export async function clientLoader({
   return { name, redirectTo };
 }
 
-export default function Register({ loaderData }: { loaderData: LoaderData }) {
+export default function Register({ loaderData }: Route.ComponentProps) {
   const auth = useAuth();
   const authRefresh = useAuthRefresh();
   const navigate = useNavigate();

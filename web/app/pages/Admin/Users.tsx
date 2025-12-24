@@ -1,13 +1,15 @@
 import type { Route } from "./+types/Users";
 import AdminService from "../../api/admin";
 import type { SelfUser } from "../../types/models/user";
-import { handleUnauthorizedError } from "../../lib/error";
+import { loaderErrorHandler } from "../../lib/error";
 
 interface LoaderData {
   users: SelfUser[];
 }
 
-export async function clientLoader({}: Route.ClientLoaderArgs): Promise<LoaderData> {
+export async function clientLoader({
+  request,
+}: Route.ClientLoaderArgs): Promise<LoaderData> {
   try {
     const result = await AdminService.getUsers();
 
@@ -15,9 +17,7 @@ export async function clientLoader({}: Route.ClientLoaderArgs): Promise<LoaderDa
       users: result.data.users,
     };
   } catch (error) {
-    handleUnauthorizedError(error);
-
-    return { users: [] };
+    throw loaderErrorHandler(error, request.url);
   }
 }
 

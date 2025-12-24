@@ -14,10 +14,7 @@ import Section from "../components/Section";
 import { useAuth } from "../context/AuthContext";
 import LocationInformation from "../components/LocationInformation";
 
-// @ts-expect-error Workaround for SSR
-const SliderComponent = typeof window === "undefined" ? Slider.default : Slider;
-
-export function meta({}: Route.MetaArgs) {
+export function meta(): Route.MetaDescriptors {
   return [
     { title: "드림하우스 합주실" },
     {
@@ -31,6 +28,22 @@ export function meta({}: Route.MetaArgs) {
     { property: "og:locale", content: "ko_KR" },
   ];
 }
+
+// @ts-expect-error Workaround for SSR
+const SliderComponent = typeof window === "undefined" ? Slider.default : Slider;
+
+interface CarouselImage {
+  src: string;
+  alt: string;
+}
+
+const CAROUSEL_IMAGES: CarouselImage[] = [
+  { src: Image1, alt: "합주실 내부" },
+  { src: Image2, alt: "대기실" },
+  { src: Image3, alt: "합주실 측면" },
+  { src: Image4, alt: "합주실 측면" },
+  { src: Image5, alt: "대기실" },
+];
 
 function Carousel() {
   const settings: SliderSettings = {
@@ -47,21 +60,11 @@ function Carousel() {
 
   return (
     <SliderComponent {...settings}>
-      <div className="container">
-        <img src={Image1} alt="합주실 내부" />
-      </div>
-      <div className="container">
-        <img src={Image2} alt="대기실" />
-      </div>
-      <div className="container">
-        <img src={Image3} alt="합주실 측면" />
-      </div>
-      <div className="container">
-        <img src={Image4} alt="합주실 측면" />
-      </div>
-      <div className="container">
-        <img src={Image5} alt="대기실" />
-      </div>
+      {CAROUSEL_IMAGES.map(({ src, alt }) => (
+        <div className="container" id={src}>
+          <img src={src} alt={alt} />
+        </div>
+      ))}
     </SliderComponent>
   );
 }

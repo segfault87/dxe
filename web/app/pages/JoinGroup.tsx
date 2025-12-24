@@ -1,3 +1,4 @@
+import { isAxiosError } from "axios";
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
 
@@ -5,15 +6,16 @@ import "./JoinGroup.css";
 import type { Route } from "./+types/JoinGroup";
 import UserService from "../api/user";
 import LogoType from "../assets/logotype.svg";
-import { useAuth } from "../context/AuthContext";
-import { defaultErrorHandler } from "../lib/error";
-import RequiresAuth from "../lib/RequiresAuth";
-import type { GroupId } from "../types/models/base";
+import { defaultErrorHandler, loaderErrorHandler } from "../lib/error";
+import RequiresAuth, { type AuthProps } from "../lib/RequiresAuth";
 import type { GroupWithUsers } from "../types/models/group";
-import { isAxiosError } from "axios";
+
+export function meta(): Route.MetaDescriptors {
+  return [{ title: "그룹 가입 | 드림하우스 합주실" }];
+}
 
 interface LoaderData {
-  groupId: GroupId;
+  group: GroupWithUsers;
   redirectTo: string | null;
 }
 
@@ -29,48 +31,41 @@ export async function clientLoader({
   const searchParams = url.searchParams;
   const redirectTo = searchParams.get("redirect_to");
 
-  return { groupId: params.groupId, redirectTo };
+  try {
+    const result = await UserService.getGroup(params.groupId);
+
+    return { group: result.data.group, redirectTo };
+  } catch (error) {
+    throw loaderErrorHandler(error, request.url);
+  }
 }
 
-export function meta({}: Route.MetaArgs) {
-  return [{ title: "그룹 가입 | 드림하우스 합주실" }];
-}
-
-export function JoinGroup({ loaderData }: { loaderData: LoaderData }) {
-  const auth = useAuth();
-
-  const [group, setGroup] = useState<GroupWithUsers | null>(null);
+export function JoinGroup({
+  loaderData,
+  auth,
+}: Route.ComponentProps & AuthProps) {
+  const group = loaderData.group;
   const [error, setError] = useState<string | null>(null);
   const [requestInProgress, setRequestInProgress] = useState(false);
   const [isDone, setDone] = useState(false);
 
-  const redirectTo = loaderData.redirectTo ?? "/my";
+  const redirectTo = loaderData.redirectTo ?? "/my/";
 
-  const fetchGroup = async () => {
-    if (!auth || isDone) {
-      return;
+  useEffect(() => {
+    if (
+      group.users.find((v) => {
+        return v.id === auth.user.id;
+      }) !== undefined
+    ) {
+      setError(`이미 ${group.name} 그룹에 가입되어 있습니다.`);
     }
-    try {
-      const result = await UserService.getGroup(loaderData.groupId);
-      if (
-        result.data.group.users.find((v) => {
-          return v.id === auth?.user.id;
-        }) !== undefined
-      ) {
-        setError(`이미 ${result.data.group.name} 그룹에 가입되어 있습니다.`);
-      } else {
-        setGroup(result.data.group);
-      }
-    } catch (error) {
-      defaultErrorHandler(error);
-    }
-  };
+  }, [auth, group]);
 
   const joinGroup = async () => {
     setRequestInProgress(true);
 
     try {
-      await UserService.joinGroup(loaderData.groupId);
+      await UserService.joinGroup(group.id);
       setDone(true);
     } catch (error) {
       if (isAxiosError(error)) {
@@ -85,16 +80,14 @@ export function JoinGroup({ loaderData }: { loaderData: LoaderData }) {
     }
   };
 
-  useEffect(() => {
-    fetchGroup();
-  }, [auth]);
-
   return (
     <div className="join-group">
       <Link to="/">
         <img className="logo" src={LogoType} alt="드림하우스 합주실" />
       </Link>
-      {group ? (
+      {error ? (
+        <p className="message">{error}</p>
+      ) : (
         <>
           <p className="message">
             {!isDone && !error ? (
@@ -119,8 +112,7 @@ export function JoinGroup({ loaderData }: { loaderData: LoaderData }) {
             </Link>
           )}
         </>
-      ) : null}
-      {error ? <p className="message">{error}</p> : null}
+      )}
     </div>
   );
 }

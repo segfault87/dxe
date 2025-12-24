@@ -9,7 +9,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useEnv } from "../../context/EnvContext";
 import { kakaoLogin } from "../../lib/KakaoSDK";
 
-export function meta({}: Route.MetaArgs) {
+export function meta(): Route.MetaDescriptors {
   return [{ title: "로그인 | 드림하우스 합주실" }];
 }
 

@@ -38,9 +38,6 @@ importers:
       react-ga4:
         specifier: ^2.1.0
         version: 2.1.0
-      react-gtm-module:
-        specifier: ^2.0.11
-        version: 2.0.11
       react-modal:
         specifier: ^3.16.3
         version: 3.16.3(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
@@ -66,9 +63,6 @@ importers:
       '@types/react-dom':
         specifier: ^19.1.7
         version: 19.1.7(@types/react@19.1.10)
-      '@types/react-gtm-module':
-        specifier: ^2.0.4
-        version: 2.0.4
       '@types/react-modal':
         specifier: ^3.16.3
         version: 3.16.3
@@ -832,9 +826,6 @@ packages:
     resolution: {integrity: sha512-i5ZzwYpqjmrKenzkoLM2Ibzt6mAsM7pxB6BCIouEVVmgiqaMj1TjaK7hnA36hbW5aZv20kx7Lw6hWzPWg0Rurw==}
     peerDependencies:
       '@types/react': ^19.0.0
-
-  '@types/react-gtm-module@2.0.4':
-    resolution: {integrity: sha512-5wPMWsUE5AI6O0B0K1/zbs0rFHBKu+7NWXQwDXhqvA12ooLD6W1AYiWZqR4UiOd7ixZDV1H5Ys301zEsqyIfNg==}
 
   '@types/react-modal@3.16.3':
     resolution: {integrity: sha512-xXuGavyEGaFQDgBv4UVm8/ZsG+qxeQ7f77yNrW3n+1J6XAstUy5rYHeIHPh1KzsGc6IkCIdu6lQ2xWzu1jBTLg==}
@@ -1864,9 +1855,6 @@ packages:
 
   react-ga4@2.1.0:
     resolution: {integrity: sha512-ZKS7PGNFqqMd3PJ6+C2Jtz/o1iU9ggiy8Y8nUeksgVuvNISbmrQtJiZNvC/TjDsqD0QlU5Wkgs7i+w9+OjHhhQ==}
-
-  react-gtm-module@2.0.11:
-    resolution: {integrity: sha512-8gyj4TTxeP7eEyc2QKawEuQoAZdjKvMY4pgWfycGmqGByhs17fR+zEBs0JUDq4US/l+vbTl+6zvUIx27iDo/Vw==}
 
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
@@ -2919,8 +2907,6 @@ snapshots:
     dependencies:
       '@types/react': 19.1.10
 
-  '@types/react-gtm-module@2.0.4': {}
-
   '@types/react-modal@3.16.3':
     dependencies:
       '@types/react': 19.1.10
@@ -3972,8 +3958,6 @@ snapshots:
       scheduler: 0.26.0
 
   react-ga4@2.1.0: {}
-
-  react-gtm-module@2.0.11: {}
 
   react-is@16.13.1: {}
 

@@ -525,7 +525,6 @@ pub async fn delete(
     session: UserSession,
     foreign_payment_id: web::Path<ForeignPaymentId>,
     database: web::Data<SqlitePool>,
-    calendar_service: web::Data<Option<CalendarService>>,
 ) -> Result<web::Json<serde_json::Value>, Error> {
     let mut tx = database.begin().await?;
 
@@ -543,17 +542,8 @@ pub async fn delete(
             return Err(Error::Forbidden);
         }
 
-        if !is_in_effect(&temporary_reservation.deleted_at, &now)
-            && expire_adhoc_reservation(&mut tx, &now, &temporary_reservation.id).await?
-            && let Some(calendar_service) = calendar_service.as_ref()
-            && let Err(e) = calendar_service
-                .delete_adhoc_reservation(&temporary_reservation.id)
-                .await
-        {
-            log::error!(
-                "Error while deleting temporary reservation: {}: {e}",
-                temporary_reservation.id
-            );
+        if !is_in_effect(&temporary_reservation.deleted_at, &now) {
+            let _ = expire_adhoc_reservation(&mut tx, &now, &temporary_reservation.id).await?;
         }
     } else if let Some(product_id) = toss_tx.product_id {
         let Some(Product::Amendment(amendment)) = get_product(&mut tx, &product_id).await? else {

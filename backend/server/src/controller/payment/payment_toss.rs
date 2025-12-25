@@ -565,5 +565,7 @@ pub async fn delete(
         }
     }
 
+    tx.commit().await?;
+
     Ok(web::Json(serde_json::json!({})))
 }

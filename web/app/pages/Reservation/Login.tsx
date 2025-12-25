@@ -5,6 +5,7 @@ import { useNavigate } from "react-router";
 import "./Login.css";
 import type { Route } from "./+types/Login";
 import KakaoLoginButton from "../../assets/kakao_login_large_wide.png";
+import ReservationCalendar from "../../components/ReservationCalendar";
 import { useAuth } from "../../context/AuthContext";
 import { useEnv } from "../../context/EnvContext";
 import { kakaoLogin } from "../../lib/KakaoSDK";
@@ -46,7 +47,7 @@ export default function Login() {
       </div>
       <div className="calendar">
         <h2>현재 예약 현황</h2>
-        <iframe src="https://calendar.google.com/calendar/embed?src=c_c3419e5a4642a663fd9b60d901e46127c105c664e86fe90dbf43a4b20bbca8f3%40group.calendar.google.com&ctz=Asia%2FSeoul"></iframe>
+        <ReservationCalendar />
       </div>
     </div>
   );

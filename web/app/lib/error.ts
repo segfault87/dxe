@@ -9,6 +9,7 @@ interface RemoteError {
 
 interface AuthError {
   type: "unauthorized";
+  loginPath?: string;
   redirectTo: string;
 }
 

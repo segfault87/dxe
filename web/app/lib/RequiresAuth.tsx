@@ -12,7 +12,7 @@ export default function RequiresAuth<P extends object>(
   WrappedComponent: (
     props: P & AuthProps,
   ) => React.ReactElement | null | undefined,
-  redirectPath?: string,
+  loginPath?: string,
 ) {
   return function RequiresAuth(props: P) {
     const auth = useAuth();
@@ -20,8 +20,12 @@ export default function RequiresAuth<P extends object>(
 
     useEffect(() => {
       if (auth === null) {
-        const redirectTo = redirectPath ?? location.pathname + location.search;
-        throw new ErrorObject({ type: "unauthorized", redirectTo: redirectTo });
+        const redirectTo = location.pathname + location.search;
+        throw new ErrorObject({
+          type: "unauthorized",
+          loginPath: loginPath,
+          redirectTo: redirectTo,
+        });
       }
     }, [auth, location]);
     if (auth) {

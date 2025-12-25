@@ -25,6 +25,7 @@ import type {
 } from "../../types/models/base";
 import type { OccupiedSlot } from "../../types/models/booking";
 import type { GroupWithUsers } from "../../types/models/group";
+import ReservationCalendar from "../../components/ReservationCalendar";
 
 export function meta(): Route.MetaDescriptors {
   return [{ title: "예약 | 드림하우스 합주실" }];
@@ -568,7 +569,12 @@ function Reservation({ auth }: AuthProps) {
 
   return (
     <>
-      <Section id="calendar" title="일시 선택">
+      <Section id="calendar" title="예약 현황">
+        <div className="reservation-calendar">
+          <ReservationCalendar />
+        </div>
+      </Section>
+      <Section id="time-selection" title="일시 선택">
         <Calendar start={start} end={end} onSelect={setSelectedDate} />
         {selectedDate ? (
           <TimePicker

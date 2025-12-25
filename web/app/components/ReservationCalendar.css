@@ -1,0 +1,7 @@
+iframe {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-height: 600px;
+  flex: 1;
+  border: #ebc1ae 1px solid;
+}

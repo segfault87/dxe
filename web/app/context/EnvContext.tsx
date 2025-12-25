@@ -6,6 +6,7 @@ export interface Environment {
   gaMeasurementId: string;
   enableTossPayments: boolean;
   tossPaymentClientKey: string;
+  googleCalendarId: string;
 }
 
 const EnvContext = createContext<Environment>({
@@ -14,6 +15,7 @@ const EnvContext = createContext<Environment>({
   gaMeasurementId: import.meta.env.VITE_GA_MEASUREMENT_ID,
   enableTossPayments: import.meta.env.VITE_ENABLE_TOSS_PAYMENTS === "true",
   tossPaymentClientKey: import.meta.env.VITE_TOSS_PAYMENT_CLIENT_KEY,
+  googleCalendarId: import.meta.env.VITE_GOOGLE_CALENDAR_ID,
 });
 
 export function EnvProvider({ children }: { children: React.ReactNode }) {
@@ -23,6 +25,7 @@ export function EnvProvider({ children }: { children: React.ReactNode }) {
     gaMeasurementId: import.meta.env.VITE_GA_MEASUREMENT_ID,
     enableTossPayments: import.meta.env.VITE_ENABLE_TOSS_PAYMENTS === "true",
     tossPaymentClientKey: import.meta.env.VITE_TOSS_PAYMENT_CLIENT_KEY,
+    googleCalendarId: import.meta.env.VITE_GOOGLE_CALENDAR_ID,
   };
 
   return <EnvContext.Provider value={value}>{children}</EnvContext.Provider>;

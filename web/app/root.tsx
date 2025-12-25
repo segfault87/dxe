@@ -41,7 +41,8 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
         if (isKakaoWebView()) {
           kakaoInAppLogin(env, error.data.redirectTo);
         } else {
-          const path = `/login/?redirect_to=${encodeURIComponent(error.data.redirectTo)}`;
+          const loginPath = error.data.loginPath ?? "/login/";
+          const path = `${loginPath}?redirect_to=${encodeURIComponent(error.data.redirectTo)}`;
           navigate(path);
         }
       }

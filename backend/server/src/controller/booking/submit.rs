@@ -15,7 +15,7 @@ use crate::models::entities::{Booking, CashTransaction};
 use crate::models::handlers::booking::{SubmitBookingRequest, SubmitBookingResponse};
 use crate::models::{Error, IntoView};
 use crate::services::calendar::CalendarService;
-use crate::services::telemetry::{NotificationSender, Priority};
+use crate::services::notification::{NotificationSender, Priority};
 use crate::session::UserSession;
 use crate::utils::datetime::truncate_time;
 

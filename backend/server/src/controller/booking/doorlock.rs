@@ -10,7 +10,7 @@ use crate::config::BookingConfig;
 use crate::middleware::datetime_injector::Now;
 use crate::models::Error;
 use crate::services::doorlock::{DoorLockService, Error as DoorLockError};
-use crate::services::telemetry::{NotificationSender, Priority};
+use crate::services::notification::{NotificationSender, Priority};
 use crate::session::UserSession;
 
 pub async fn post(

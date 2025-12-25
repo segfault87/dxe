@@ -28,7 +28,7 @@ use crate::models::handlers::booking::{
 };
 use crate::services::calendar::CalendarService;
 use crate::services::messaging::MessagingService;
-use crate::services::telemetry::{NotificationSender, Priority};
+use crate::services::notification::{NotificationSender, Priority};
 use crate::session::UserSession;
 use crate::utils::datetime::{is_in_effect, truncate_time};
 

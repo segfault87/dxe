@@ -10,7 +10,7 @@ use crate::config::UrlConfig;
 use crate::middleware::datetime_injector::Now;
 use crate::models::Error;
 use crate::models::handlers::auth;
-use crate::services::telemetry::{NotificationSender, Priority};
+use crate::services::notification::{NotificationSender, Priority};
 use crate::session::UserSession;
 use crate::utils::aes::AesCrypto;
 

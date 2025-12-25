@@ -18,7 +18,7 @@ use crate::models::handlers::booking::{AmendBookingRequest, AmendBookingResponse
 use crate::models::{Error, IntoView};
 use crate::services::calendar::CalendarService;
 use crate::services::messaging::MessagingService;
-use crate::services::telemetry::{NotificationSender, Priority};
+use crate::services::notification::{NotificationSender, Priority};
 use crate::session::UserSession;
 
 pub async fn put(

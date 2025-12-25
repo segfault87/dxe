@@ -22,7 +22,7 @@ use crate::middleware::coordinator_verifier::PublicKeyBundle;
 use crate::services::calendar::CalendarService;
 use crate::services::doorlock::DoorLockService;
 use crate::services::messaging::MessagingService;
-use crate::services::telemetry::spawn_notification_service_task;
+use crate::services::notification::spawn_notification_service_task;
 use crate::session::UserSession;
 use crate::utils::aes::AesCrypto;
 

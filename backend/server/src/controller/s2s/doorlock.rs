@@ -4,7 +4,7 @@ use dxe_extern::itsokey::Error as ItsokeyError;
 use crate::middleware::coordinator_verifier::CoordinatorContext;
 use crate::models::Error;
 use crate::services::doorlock::{DoorLockService, Error as DoorLockError};
-use crate::services::telemetry::{NotificationSender, Priority};
+use crate::services::notification::{NotificationSender, Priority};
 
 pub async fn post(
     context: CoordinatorContext,

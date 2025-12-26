@@ -1,0 +1,22 @@
+.single-page {
+  display: flex;
+  flex-direction: column;
+  margin-top: 96px;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+
+  .logo {
+    width: 320px;
+    height: auto;
+  }
+
+  .contents {
+    margin-top: 48px;
+    font-size: 24px;
+
+    .actions {
+      margin-top: 16px;
+    }
+  }
+}

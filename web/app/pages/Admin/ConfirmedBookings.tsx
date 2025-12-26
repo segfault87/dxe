@@ -7,10 +7,6 @@ interface LoaderData {
   bookings: BookingWithPayments[];
 }
 
-export function meta(): Route.MetaDescriptors {
-  return [{ title: "드림하우스 합주실 관리자" }];
-}
-
 export async function clientLoader({
   request,
 }: Route.ClientLoaderArgs): Promise<LoaderData> {

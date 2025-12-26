@@ -31,6 +31,7 @@ export default [
   ]),
   route("booking/:bookingId/recording/", "./pages/Recording.tsx"),
   route("join/:groupId", "./pages/JoinGroup.tsx"),
+  route("error/", "./pages/Error.tsx"),
   ...prefix("/admin", [
     layout("./components/AdminScaffold.tsx", [
       index("./pages/Admin/ConfirmedBookings.tsx"),

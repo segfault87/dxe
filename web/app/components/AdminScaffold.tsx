@@ -1,7 +1,12 @@
 import { NavLink, Outlet } from "react-router";
 
 import "./AdminScaffold.css";
+import type { Route } from "./+types/AdminScaffold";
 import { useAuth } from "../context/AuthContext";
+
+export function meta(): Route.MetaDescriptors {
+  return [{ title: "드림하우스 합주실 관리자" }];
+}
 
 export default function AdminScaffold() {
   const auth = useAuth();

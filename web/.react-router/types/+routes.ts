@@ -67,6 +67,9 @@ type Pages = {
       "groupId": string;
     };
   };
+  "/error": {
+    params: {};
+  };
   "/admin": {
     params: {};
   };
@@ -101,7 +104,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/guide" | "/inquiries" | "/reservation" | "/reservation/login" | "/reservation/payment/toss/success" | "/reservation/payment/toss/fail" | "/reservation/:bookingId" | "/reservation/:bookingId/amend" | "/login" | "/temp-login" | "/register" | "/my" | "/terms-of-service" | "/booking/:bookingId/recording" | "/join/:groupId" | "/admin" | "/admin/past-bookings" | "/admin/booking/:bookingId" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/adhoc-reservations" | "/admin/adhoc-parkings";
+    page: "/" | "/guide" | "/inquiries" | "/reservation" | "/reservation/login" | "/reservation/payment/toss/success" | "/reservation/payment/toss/fail" | "/reservation/:bookingId" | "/reservation/:bookingId/amend" | "/login" | "/temp-login" | "/register" | "/my" | "/terms-of-service" | "/booking/:bookingId/recording" | "/join/:groupId" | "/error" | "/admin" | "/admin/past-bookings" | "/admin/booking/:bookingId" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/adhoc-reservations" | "/admin/adhoc-parkings";
   };
   "./components/Scaffold.tsx": {
     id: "components/Scaffold";
@@ -171,6 +174,10 @@ type RouteFiles = {
     id: "pages/JoinGroup";
     page: "/join/:groupId";
   };
+  "./pages/Error.tsx": {
+    id: "pages/Error";
+    page: "/error";
+  };
   "./components/AdminScaffold.tsx": {
     id: "components/AdminScaffold";
     page: "/admin" | "/admin/past-bookings" | "/admin/booking/:bookingId" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/adhoc-reservations" | "/admin/adhoc-parkings";
@@ -232,6 +239,7 @@ type RouteModules = {
   "pages/legal/TermsOfService": typeof import("./app/./pages/legal/TermsOfService.tsx");
   "pages/Recording": typeof import("./app/./pages/Recording.tsx");
   "pages/JoinGroup": typeof import("./app/./pages/JoinGroup.tsx");
+  "pages/Error": typeof import("./app/./pages/Error.tsx");
   "components/AdminScaffold": typeof import("./app/./components/AdminScaffold.tsx");
   "pages/Admin/ConfirmedBookings": typeof import("./app/./pages/Admin/ConfirmedBookings.tsx");
   "pages/Admin/PastBookings": typeof import("./app/./pages/Admin/PastBookings.tsx");

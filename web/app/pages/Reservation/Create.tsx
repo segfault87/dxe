@@ -280,8 +280,7 @@ function CashPayment({
 }) {
   return (
     <>
-      현재는 계좌입금을 통한 결제만 지원합니다. 아래 계좌로 입금해주시면 확인 후
-      예약이 확정됩니다.
+      아래 계좌로 입금해주시면 확인 후 예약이 확정됩니다.
       <p>
         입금 금액: {price !== null ? <em>₩{price.toLocaleString()}</em> : "-"}
         <br />

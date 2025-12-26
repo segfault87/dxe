@@ -2,10 +2,9 @@ import { isAxiosError } from "axios";
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
 
-import "./JoinGroup.css";
 import type { Route } from "./+types/JoinGroup";
 import UserService from "../api/user";
-import LogoType from "../assets/logotype.svg";
+import SinglePage from "../components/SinglePage";
 import { defaultErrorHandler, loaderErrorHandler } from "../lib/error";
 import RequiresAuth, { type AuthProps } from "../lib/RequiresAuth";
 import type { GroupWithUsers } from "../types/models/group";
@@ -81,39 +80,32 @@ export function JoinGroup({
   };
 
   return (
-    <div className="join-group">
-      <Link to="/">
-        <img className="logo" src={LogoType} alt="드림하우스 합주실" />
-      </Link>
+    <SinglePage>
       {error ? (
-        <p className="message">{error}</p>
+        error
+      ) : isDone ? (
+        <>가입이 완료되었습니다.</>
       ) : (
         <>
-          <p className="message">
-            {!isDone && !error ? (
-              <>
-                <em>{group.name}</em>에 가입하시려면 다음 버튼을 눌러주세요.
-              </>
-            ) : (
-              <>가입이 완료되었습니다.</>
-            )}
-          </p>
-          {!isDone ? (
-            <button
-              onClick={joinGroup}
-              className="cta"
-              disabled={requestInProgress}
-            >
-              가입
-            </button>
-          ) : (
-            <Link to={redirectTo} className="cta" replace>
-              확인
-            </Link>
-          )}
+          <em>{group.name}</em>에 가입하시려면 다음 버튼을 눌러주세요.
         </>
       )}
-    </div>
+      <div className="actions">
+        {!isDone ? (
+          <button
+            onClick={joinGroup}
+            className="cta"
+            disabled={requestInProgress}
+          >
+            가입
+          </button>
+        ) : (
+          <Link to={redirectTo} className="cta" replace>
+            확인
+          </Link>
+        )}
+      </div>
+    </SinglePage>
   );
 }
 

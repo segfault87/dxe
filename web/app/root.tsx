@@ -12,6 +12,7 @@ import {
 
 import type { Route } from "./+types/root";
 import GitHubRibbon from "./assets/GitHubRibbon.svg";
+import SinglePage from "./components/SinglePage";
 import { AuthProvider } from "./context/AuthContext";
 import { EnvProvider, useEnv } from "./context/EnvContext";
 import { ErrorObject } from "./lib/error";
@@ -52,29 +53,28 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   if (error instanceof ErrorObject) {
     if (error.data.type === "unauthorized") {
       return <></>;
-    }
-    if (error.data.type === "unknown") {
+    } else if (error.data.type === "unknown") {
       return (
-        <>
-          <h1>알 수 없는 에러가 발생했습니다.</h1>
+        <SinglePage>
+          <h2>알 수 없는 에러가 발생했습니다.</h2>
           <p>{error.data.error?.message ?? "-"}</p>
-        </>
+        </SinglePage>
       );
     } else if (error.data.type === "remote") {
       return (
-        <>
-          <h1>에러가 발생했습니다.</h1>
+        <SinglePage>
+          <h2>에러가 발생했습니다.</h2>
           <p>{error.data.message}</p>
-        </>
+        </SinglePage>
       );
     }
   } else if (error instanceof Error) {
-    <>
-      <h1>에러가 발생했습니다.</h1>
+    <SinglePage>
+      <h2>에러가 발생했습니다.</h2>
       <p>{error.message}</p>
-    </>;
+    </SinglePage>;
   } else {
-    return <h1>알 수 없는 에러가 발생했습니다.</h1>;
+    return <SinglePage>알 수 없는 에러가 발생했습니다.</SinglePage>;
   }
 }
 

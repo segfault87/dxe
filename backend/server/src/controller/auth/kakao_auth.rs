@@ -137,7 +137,10 @@ pub async fn redirect(
         Ok(HttpResponse::TemporaryRedirect()
             .insert_header((
                 LOCATION,
-                format!("/error?error={error}&message={error_message}"),
+                format!(
+                    "/error/?error_category=kakao_auth&message={}&kakao_error={error}",
+                    urlencoding::encode(&error_message)
+                ),
             ))
             .finish())
     } else {
@@ -162,7 +165,10 @@ pub enum Error {
 impl ResponseError for Error {
     fn error_response(&self) -> HttpResponse<BoxBody> {
         let message = format!("{self}");
-        let url = format!("/error?message={}", urlencoding::encode(message.as_str()));
+        let url = format!(
+            "/error/?error_category=kakao_auth&message={}",
+            urlencoding::encode(message.as_str())
+        );
 
         log::error!("Could not authenticate with Kakao: {self}");
 

@@ -18,6 +18,7 @@ use sqlx::SqlitePool;
 use crate::config::{KakaoAuthConfig, UrlConfig};
 use crate::middleware::datetime_injector::Now;
 use crate::models::handlers::auth;
+use crate::services::notification::{NotificationSender, Priority};
 use crate::session::UserSession;
 use crate::utils::aes::{AesCrypto, Error as AesError};
 
@@ -37,6 +38,7 @@ pub async fn redirect(
     token_signer: web::Data<TokenSigner<UserSession, Ed25519>>,
     aes_crypto: web::Data<AesCrypto>,
     url_config: web::Data<UrlConfig>,
+    notification_sender: web::Data<NotificationSender>,
 ) -> Result<HttpResponse<BoxBody>, Error> {
     let state = query
         .state
@@ -119,6 +121,8 @@ pub async fn redirect(
             if let Some(domain) = url_config.base_url.domain() {
                 cookie_bearer = cookie_bearer.domain(domain);
             }
+
+            notification_sender.enqueue(Priority::Low, format!("Kakao user {name} authenticated."));
 
             Ok(HttpResponse::Found()
                 .insert_header((

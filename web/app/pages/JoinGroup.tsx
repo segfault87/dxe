@@ -58,6 +58,10 @@ export function JoinGroup({
     ) {
       setError(`이미 ${group.name} 그룹에 가입되어 있습니다.`);
     }
+
+    if (!group.isOpen) {
+      setError("현재 그룹이 열려있지 않습니다.");
+    }
   }, [auth, group]);
 
   const joinGroup = async () => {
@@ -91,7 +95,7 @@ export function JoinGroup({
         </>
       )}
       <div className="actions">
-        {!isDone ? (
+        {error ? null : !isDone ? (
           <button
             onClick={joinGroup}
             className="cta"

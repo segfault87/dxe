@@ -82,7 +82,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const env = useEnv();
 
   useEffect(() => {
-    ReactGA.initialize(env.gaMeasurementId);
+    ReactGA.initialize(env.gaMeasurementId, { testMode: import.meta.env.DEV });
     Modal.setAppElement(document.getElementById("root")!);
   }, [env]);
 

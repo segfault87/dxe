@@ -27,7 +27,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchMe = async () => {
     try {
       const result = await UserService.me();
-      ReactGA.set({ user_id: result.data.user.id });
+      ReactGA.set({
+        user_id: result.data.user.id,
+        traffic_type: result.data.user.isAdministrator ? "internal" : undefined,
+      });
       setData({
         user: result.data.user,
         activeBookings: result.data.activeBookings,

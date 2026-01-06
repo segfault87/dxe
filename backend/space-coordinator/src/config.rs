@@ -1,3 +1,6 @@
+pub mod alert;
+pub mod metrics;
+pub mod osd;
 pub mod telemetry;
 pub mod z2m;
 
@@ -5,20 +8,12 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 use std::path::PathBuf;
 
+use chrono::TimeDelta;
 use dxe_types::{SpaceId, UnitId};
 use serde::Deserialize;
 
-use crate::services::mqtt::MqttTopicPrefix;
-use crate::tasks::osd_controller::types::AlertData;
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum AlertPriority {
-    High,
-    #[default]
-    Default,
-    Low,
-}
+use crate::types::{AlertId, DeviceId, PublishKey};
+use crate::utils::deserializers::deserialize_time_delta_seconds;
 
 #[derive(Debug, Deserialize)]
 pub struct AmanoConfig {
@@ -61,7 +56,11 @@ pub struct CarparkExemptionConfig {
 #[derive(Debug, Deserialize)]
 pub struct PresenceMonitorConfig {
     pub scan_ips: Vec<IpAddr>,
-    pub away_interval_secs: i64,
+    #[serde(
+        rename = "away_interval_secs",
+        deserialize_with = "deserialize_time_delta_seconds"
+    )]
+    pub away_interval: TimeDelta,
 }
 
 #[derive(Debug, Deserialize)]
@@ -74,9 +73,9 @@ pub struct MqttConfig {
 }
 
 #[derive(Clone, Deserialize, Debug)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", tag = "backend")]
 pub enum NotificationBackend {
-    Ntfy,
+    Ntfy(NtfyConfig),
 }
 
 #[derive(Clone, Deserialize, Debug)]
@@ -99,10 +98,26 @@ impl dxe_extern::ntfy::NtfyConfig for NtfyConfig {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum NotificationPriority {
+    High,
+    #[default]
+    Default,
+    Low,
+}
+
+#[derive(Clone, Deserialize, Debug)]
+pub struct NotificationAlert {
+    pub alert_id: AlertId,
+    pub message: String,
+    pub priority: NotificationPriority,
+}
+
 #[derive(Deserialize, Clone, Debug)]
 pub struct NotificationConfig {
     pub backend: NotificationBackend,
-    pub ntfy: Option<NtfyConfig>,
+    pub alerts: Vec<NotificationAlert>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -138,31 +153,29 @@ pub struct AudioRecorderConfig {
     pub path_prefix: PathBuf,
 }
 
-#[derive(Deserialize, Clone, Debug, Default)]
-pub struct OsdAlertConfig {
-    pub sign_off_mins: i64,
-    pub on_sign_in: Option<AlertData>,
-    pub on_sign_off: Option<AlertData>,
-}
-
-impl OsdAlertConfig {
-    pub fn sign_off_duration(&self) -> chrono::TimeDelta {
-        chrono::TimeDelta::minutes(self.sign_off_mins)
-    }
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "snake_case", tag = "type")]
+pub enum SoundMeterDevice {
+    Tasi653b { serial_number: Option<String> },
 }
 
 #[derive(Deserialize, Clone, Debug)]
-pub struct OsdConfig {
-    pub topic_prefix: MqttTopicPrefix,
-    #[serde(default)]
-    pub alerts: OsdAlertConfig,
+pub struct SoundMeterConfig {
+    pub id: DeviceId,
+    #[serde(flatten)]
+    pub device: SoundMeterDevice,
+    pub publish_key: PublishKey,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub space_id: SpaceId,
     pub url_base: url::Url,
-    pub request_expires_in_secs: i64,
+    #[serde(
+        rename = "request_expires_in_secs",
+        deserialize_with = "deserialize_time_delta_seconds"
+    )]
+    pub request_expires_in: TimeDelta,
     pub private_key: Vec<u8>,
     pub mqtt: MqttConfig,
     pub notifications: NotificationConfig,
@@ -171,12 +184,9 @@ pub struct Config {
     pub google_apis: GoogleApiConfig,
     pub audio_recorder: HashMap<UnitId, AudioRecorderConfig>,
     pub z2m: z2m::Config,
-    pub osd: OsdConfig,
+    pub sound_meters: Vec<SoundMeterConfig>,
+    pub metrics: Vec<metrics::Metric>,
+    pub alerts: Vec<alert::Alert>,
+    pub osd: osd::Config,
     pub telemetry: telemetry::Config,
-}
-
-impl Config {
-    pub fn request_expires_in(&self) -> chrono::TimeDelta {
-        chrono::TimeDelta::seconds(self.request_expires_in_secs)
-    }
 }

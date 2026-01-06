@@ -17,7 +17,7 @@ const HTML_TEMPLATE: &str = r#"
     <meta property="og:title" content="드림하우스 합주실" />
     <meta property="og:description" content="{group_name} 그룹에 가입해 주세요." />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="/assets/og.png" />
+    <meta property="og:image" content="/og.png" />
     <meta property="og:locale" content="ko_KR" />
     <meta property="og:url" content="https://dream-house.kr" />
   </head>

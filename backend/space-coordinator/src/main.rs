@@ -2,7 +2,10 @@ mod callback;
 mod client;
 mod config;
 mod services;
+mod tables;
 mod tasks;
+mod types;
+mod utils;
 
 use clap::Parser;
 
@@ -11,14 +14,20 @@ use crate::config::Config;
 use crate::services::carpark_exemption::CarparkExemptionService;
 use crate::services::mqtt::MqttService;
 use crate::services::notification::NotificationService;
+use crate::services::table_manager::TableManager;
 use crate::tasks::TaskContext;
+use crate::tasks::alert_publisher::AlertPublisher;
 use crate::tasks::audio_recorder::AudioRecorder;
 use crate::tasks::booking_reminder::BookingReminder;
 use crate::tasks::booking_state_manager::BookingStateManager;
 use crate::tasks::carpark_exempter::CarparkExempter;
+use crate::tasks::metrics_publisher::MetricsPublisher;
+use crate::tasks::notification_publisher::NotificationPublisher;
 use crate::tasks::osd_controller::OsdController;
 use crate::tasks::presence_monitor::PresenceMonitor;
+use crate::tasks::sound_meter_controller::SoundMeterController;
 use crate::tasks::telemetry_manager::TelemetryManager;
+use crate::tasks::unit_fetcher::UnitFetcher;
 use crate::tasks::z2m_controller::Z2mController;
 
 #[derive(clap::Parser, Debug)]
@@ -38,40 +47,55 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client = DxeClient::new(
         config.space_id.clone(),
         config.url_base.clone(),
-        config.request_expires_in(),
+        config.request_expires_in,
         config.private_key.as_slice(),
     )?;
     client.synchronize_clock().await?;
+
+    let unit_fetcher = UnitFetcher::new(client.clone()).await?;
+    let (unit_fetcher, unit_fetcher_task) = unit_fetcher.task();
 
     let notification_service = NotificationService::new(&config.notifications);
 
     let mut task_context = TaskContext::new().await?;
 
-    let (_presence_state, mut presence_monitor) = PresenceMonitor::new(&config.presence_monitor);
-
     let (booking_states, mut booking_state_manager) =
         BookingStateManager::new(client.clone(), task_context.scheduler.clone());
 
+    let (mut presence_monitor, presence_state) =
+        PresenceMonitor::new(&config.presence_monitor).await;
+
+    let mut alert_publisher =
+        AlertPublisher::new(config.alerts.iter(), presence_state.lock().is_present);
+
     let (mqtt_service, mqtt_service_task) = MqttService::new(&config.mqtt);
 
-    let mut z2m_controller = Z2mController::new(
-        &config.z2m,
-        mqtt_service.clone(),
-        notification_service.clone(),
-    );
+    let mut z2m_controller = Z2mController::new(&config.z2m, mqtt_service.clone());
     z2m_controller.start().await;
+
+    let (sound_meter_controller, sound_meter_tasks) =
+        SoundMeterController::new(config.sound_meters.iter())?;
+
+    let mut metrics_publisher = MetricsPublisher::new(config.metrics.iter());
+
+    let table_manager = TableManager::new(
+        z2m_controller.publisher(),
+        sound_meter_controller.publisher(),
+        metrics_publisher.publisher(),
+    );
+
+    metrics_publisher.start(table_manager.clone());
 
     let osd_controller = OsdController::new(
         client.clone(),
         mqtt_service.clone(),
+        unit_fetcher.state(),
         task_context.scheduler.clone(),
         &config.osd,
     );
 
-    let telemetry_manager = TelemetryManager::new(&config.telemetry, client.clone());
-    let telemetry_tasks = telemetry_manager
-        .clone()
-        .register_tables_from_config(&mut z2m_controller, &config.telemetry.tables)?;
+    let telemetry_manager =
+        TelemetryManager::new(&config.telemetry, client.clone(), table_manager.clone())?;
 
     let (z2m_controller, z2m_consumer_task, z2m_controller_task) = z2m_controller.task();
 
@@ -84,6 +108,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (audio_recorder, audio_recorder_task) = audio_recorder.task();
 
     let (osd_controller, osd_message_handler_task, osd_task) = osd_controller.task().await?;
+
+    let notification_publisher = NotificationPublisher::new(
+        notification_service.clone(),
+        config.notifications.alerts.iter(),
+    );
+
+    alert_publisher.add_callback(osd_controller.clone());
+    alert_publisher.add_callback(notification_publisher.clone());
 
     let booking_reminder = BookingReminder::new(client.clone());
 
@@ -113,21 +145,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let presence_monitor_task = presence_monitor.task();
     let booking_state_manager_task = booking_state_manager.task();
 
+    task_context.add_task(unit_fetcher_task).await?;
     task_context.add_task(presence_monitor_task).await?;
     task_context.add_task(z2m_controller_task).await?;
     task_context.add_task(audio_recorder_task).await?;
     task_context.add_task(osd_task).await?;
-
     task_context.add_task(booking_state_manager_task).await?;
+
+    alert_publisher.start(table_manager.clone());
 
     task_context.run().await;
 
-    for task in telemetry_tasks {
-        task.abort();
-    }
-
     telemetry_manager.abort();
 
+    for sound_meter_task in sound_meter_tasks {
+        sound_meter_task.abort();
+    }
     z2m_consumer_task.abort();
     osd_message_handler_task.abort();
     mqtt_service_task.abort();

@@ -13,8 +13,8 @@ use crate::config::PresenceMonitorConfig;
 pub struct PresenceState {
     has_initialized: bool,
     pub is_present: bool,
-    pub last_state: bool,
-    pub last_seen_at: Option<DateTime<Utc>>,
+    last_state: bool,
+    last_seen_at: Option<DateTime<Utc>>,
 }
 
 pub struct PresenceMonitor {
@@ -26,19 +26,20 @@ pub struct PresenceMonitor {
 }
 
 impl PresenceMonitor {
-    pub fn new(config: &PresenceMonitorConfig) -> (Arc<Mutex<PresenceState>>, Self) {
+    pub async fn new(config: &PresenceMonitorConfig) -> (Self, Arc<Mutex<PresenceState>>) {
         let state = Arc::new(Mutex::new(Default::default()));
 
-        (
-            state.clone(),
-            Self {
-                state,
+        let monitor = Self {
+            state: state.clone(),
 
-                scan_ips: config.scan_ips.clone(),
-                away_interval: TimeDelta::seconds(config.away_interval_secs),
-                callbacks: vec![],
-            },
-        )
+            scan_ips: config.scan_ips.clone(),
+            away_interval: config.away_interval,
+            callbacks: vec![],
+        };
+
+        monitor.ping().await;
+
+        (monitor, state.clone())
     }
 
     pub fn add_callback<T>(&mut self, callback: Arc<T>)
@@ -48,7 +49,7 @@ impl PresenceMonitor {
         self.callbacks.push(callback);
     }
 
-    async fn ping(self: Arc<Self>) {
+    async fn ping(&self) {
         for address in self.scan_ips.iter() {
             let address = *address;
             let result = tokio::task::spawn_blocking(move || {

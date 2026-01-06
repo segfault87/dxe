@@ -11,7 +11,7 @@ use tokio_task_scheduler::{Task, TaskBuilder};
 
 use crate::callback::EventStateCallback;
 use crate::client::DxeClient;
-use crate::config::AlertPriority;
+use crate::config::NotificationPriority;
 use crate::services::carpark_exemption::CarparkExemptionService;
 use crate::services::notification::NotificationService;
 use crate::tasks::booking_state_manager::BookingStates;
@@ -123,7 +123,7 @@ impl CarparkExempter {
                     }
 
                     if success {
-                        self.notification_service.notify(AlertPriority::Low, format!("Car parking exempted sucessfully for user {user_name} ({customer_name})")).await
+                        self.notification_service.notify(NotificationPriority::Low, format!("Car parking exempted sucessfully for user {user_name} ({customer_name})")).await
                     } else {
                         continue;
                     }
@@ -131,7 +131,7 @@ impl CarparkExempter {
                 Err(e) => {
                     self.notification_service
                         .notify(
-                            AlertPriority::Low,
+                            NotificationPriority::Low,
                             format!("Car parking exemption error: {e}"),
                         )
                         .await

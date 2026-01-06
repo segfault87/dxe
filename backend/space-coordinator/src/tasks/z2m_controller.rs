@@ -1,27 +1,24 @@
 use std::collections::{HashMap, HashSet};
 use std::error::Error as StdError;
-use std::fmt::Display;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
-use dxe_s2s_shared::csv::Z2mPowerMeterRow;
+use chrono::TimeDelta;
 use dxe_s2s_shared::entities::BookingWithUsers;
 use dxe_types::{BookingId, UnitId};
 use parking_lot::Mutex;
 use rumqttc::Publish;
-use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 use tokio::time::timeout;
 use tokio_task_scheduler::{Task, TaskBuilder};
 
 use crate::callback::{EventStateCallback, PresenceCallback};
-use crate::config::telemetry::TableKey;
 use crate::config::z2m::{self, SwitchPolicy};
 use crate::services::mqtt::{Error as MqttError, MqttService, MqttTopicPrefix};
-use crate::services::notification::NotificationService;
-use crate::tasks::telemetry_manager::z2m_power_meter::{PUBLISH_DURATION, Z2mPowerMeterTable};
+use crate::tables::{QualifiedPath, SingleTable, TablePublisher};
+use crate::types::{DeviceId, DeviceRef, DeviceType, PublishKey, PublishedValues, Z2mDeviceId};
+use crate::utils::boolean::Error as BooleanError;
 
 const MQTT_TOPIC_PREFIX_Z2M: MqttTopicPrefix = MqttTopicPrefix::new_const("zigbee2mqtt");
 
@@ -31,22 +28,12 @@ pub enum Z2mPublishTopic {
     Set,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize)]
-#[serde(transparent)]
-pub struct DeviceName(String);
-
-impl From<String> for DeviceName {
-    fn from(value: String) -> Self {
-        Self(value)
-    }
-}
-
-impl DeviceName {
+impl Z2mDeviceId {
     pub fn topic_name(&self, command: Option<Z2mPublishTopic>) -> String {
         format!(
             "{}/{}{}",
             MQTT_TOPIC_PREFIX_Z2M,
-            self.0,
+            self,
             match command {
                 None => "",
                 Some(Z2mPublishTopic::Get) => "/get",
@@ -58,194 +45,98 @@ impl DeviceName {
     pub fn from_topic_name(topic: &str) -> Option<Self> {
         topic
             .strip_prefix("zigbee2mqtt/")
-            .map(|v| DeviceName(v.to_owned()))
+            .map(|v| v.to_owned().into())
     }
 }
 
-impl Display for DeviceName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+impl From<DeviceId> for Z2mDeviceId {
+    fn from(value: DeviceId) -> Self {
+        value.to_string().into()
     }
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct PowerUsage {
-    pub instant_wattage: f64,
-    pub sum_kwh: f64,
-}
+pub struct Z2mPath;
 
-struct PowerMeterTelemetryContext {
-    devices: HashSet<DeviceName>,
-    usage: HashMap<DeviceName, PowerUsage>,
-    tx: mpsc::UnboundedSender<Z2mPowerMeterRow>,
-    last_sent_at: Instant,
-    table: Arc<Z2mPowerMeterTable>,
-}
+impl QualifiedPath for Z2mPath {
+    type TableKey = DeviceId;
+    type Path = DeviceRef;
 
-impl PowerMeterTelemetryContext {
-    pub fn update(&mut self, device_name: DeviceName, power_usage: &PowerUsage) {
-        self.table
-            .update_power_usage(device_name.clone(), power_usage.sum_kwh);
-        let current = self.usage.entry(device_name).or_default();
-        if current.instant_wattage < power_usage.instant_wattage {
-            current.instant_wattage = power_usage.instant_wattage;
-        }
-        current.sum_kwh = power_usage.sum_kwh;
-
-        if self.last_sent_at.elapsed() > PUBLISH_DURATION {
-            let mut watt_sum = 0.0;
-            let mut usage_sum = 0.0;
-            for usage in self.usage.values_mut() {
-                watt_sum += usage.instant_wattage;
-                usage.instant_wattage = 0.0;
-                usage_sum += usage.sum_kwh;
-            }
-
-            let _ = self.tx.send(Z2mPowerMeterRow {
-                instantaneous_wattage: watt_sum,
-                power_usage_kwh: usage_sum,
-            });
-
-            self.last_sent_at = Instant::now();
+    fn path(table_key: &Self::TableKey) -> Self::Path {
+        DeviceRef {
+            r#type: DeviceType::Z2m,
+            id: table_key.clone(),
         }
     }
 }
 
 pub struct Z2mController {
     mqtt_service: MqttService,
-    notification_service: NotificationService,
 
-    command_timeout: Duration,
+    command_timeout: TimeDelta,
 
-    devices: HashMap<DeviceName, z2m::Device>,
-    device_states: Mutex<HashMap<DeviceName, serde_json::Value>>,
+    devices: HashMap<Z2mDeviceId, z2m::Device>,
     per_unit_hooks: HashMap<UnitId, z2m::PerUnitHooks>,
     presence_hooks: z2m::PresenceHooks,
-    alerts: Vec<z2m::Alert>,
 
     active_bookings: Mutex<Option<HashMap<UnitId, HashSet<BookingId>>>>,
     presence: Mutex<Option<bool>>,
-    alert_flags: Mutex<HashSet<String>>,
-    power_meters: HashMap<TableKey, Mutex<PowerMeterTelemetryContext>>,
-}
 
-fn test_condition(
-    value: &serde_json::Value,
-    conditions: &Vec<z2m::Condition>,
-) -> Result<bool, Error> {
-    let serde_json::Value::Object(value) = value else {
-        return Err(Error::Json);
-    };
-
-    for condition in conditions {
-        let Some(value) = value.get(&condition.state) else {
-            return Err(Error::StateVariableNotFound(condition.state.clone()));
-        };
-
-        let result = match condition.operator {
-            z2m::ConditionOperator::Eq => value == &condition.value,
-            z2m::ConditionOperator::Ne => value != &condition.value,
-            _ => {
-                let serde_json::Value::Number(lhs) = value else {
-                    return Err(Error::Arithmetic(value.clone()));
-                };
-                let serde_json::Value::Number(rhs) = &condition.value else {
-                    return Err(Error::Arithmetic(value.clone()));
-                };
-
-                if let Some(lhs) = lhs.as_i64() {
-                    let rhs = rhs
-                        .as_i64()
-                        .or(rhs.as_f64().map(|v| v as i64))
-                        .ok_or(Error::Arithmetic(condition.value.clone()))?;
-
-                    match condition.operator {
-                        z2m::ConditionOperator::Gt => lhs > rhs,
-                        z2m::ConditionOperator::Ge => lhs >= rhs,
-                        z2m::ConditionOperator::Lt => lhs < rhs,
-                        z2m::ConditionOperator::Le => lhs <= rhs,
-                        _ => unreachable!(),
-                    }
-                } else if let Some(lhs) = lhs.as_f64() {
-                    let rhs = rhs
-                        .as_f64()
-                        .or(rhs.as_i64().map(|v| v as f64))
-                        .ok_or(Error::Arithmetic(condition.value.clone()))?;
-
-                    match condition.operator {
-                        z2m::ConditionOperator::Gt => lhs > rhs,
-                        z2m::ConditionOperator::Ge => lhs >= rhs,
-                        z2m::ConditionOperator::Lt => lhs < rhs,
-                        z2m::ConditionOperator::Le => lhs <= rhs,
-                        _ => unreachable!(),
-                    }
-                } else {
-                    return Err(Error::Arithmetic(value.clone()));
-                }
-            }
-        };
-
-        if !result {
-            return Ok(false);
-        }
-    }
-
-    Ok(true)
+    state_keys: HashMap<Z2mDeviceId, Vec<PublishKey>>,
+    table: TablePublisher<DeviceId, DeviceRef, Z2mPath>,
 }
 
 impl Z2mController {
-    pub fn new(
-        config: &z2m::Config,
-        mqtt_service: MqttService,
-        notification_service: NotificationService,
-    ) -> Self {
+    pub fn new(config: &z2m::Config, mqtt_service: MqttService) -> Self {
         Self {
             mqtt_service,
-            notification_service,
 
-            command_timeout: Duration::from_secs(config.command_timeout_secs),
+            command_timeout: config.command_timeout,
 
             devices: config
                 .devices
                 .iter()
-                .map(|v| (v.name.clone(), v.clone()))
+                .map(|v| (v.id.clone(), v.clone()))
                 .collect(),
-            device_states: Mutex::new(HashMap::new()),
             per_unit_hooks: config.hooks.units.clone(),
             presence_hooks: config.hooks.presence.clone(),
-            alerts: config.alerts.clone(),
 
             active_bookings: Mutex::new(Default::default()),
             presence: Mutex::new(None),
-            alert_flags: Mutex::new(HashSet::new()),
-            power_meters: HashMap::new(),
+
+            state_keys: config
+                .devices
+                .iter()
+                .map(|v| (v.id.clone(), v.state_keys()))
+                .collect(),
+            table: TablePublisher::new(),
         }
     }
 
-    pub fn get_device(&self, device_name: &DeviceName) -> Option<&z2m::Device> {
-        self.devices.get(device_name)
+    pub fn publisher(&self) -> TablePublisher<DeviceId, DeviceRef, Z2mPath> {
+        self.table.clone()
     }
 
     pub async fn start(&mut self) {
         let mut device_count = self.devices.len();
-        for (name, device) in self.devices.iter() {
-            if let Err(e) = self.mqtt_service.subscribe(&name.topic_name(None)).await {
-                log::warn!("Cannot subscribe to {name}: {e}");
+        for id in self.devices.keys() {
+            if let Err(e) = self.mqtt_service.subscribe(&id.topic_name(None)).await {
+                log::warn!("Cannot subscribe to {id}: {e}");
                 continue;
             }
 
-            let value = match self.get_state(device).await {
+            let values = match self.get_states(id).await {
                 Ok(v) => v,
                 Err(e) => {
-                    log::warn!("Could not get state for device {name}: {e}");
+                    log::warn!("Could not get state for device {id}: {e}");
                     continue;
                 }
             };
 
-            log::info!("Got initial state for {name}");
+            log::info!("Got initial state for {id}");
             device_count -= 1;
 
-            self.device_states.lock().insert(name.clone(), value);
+            let device_id = id.clone().into();
+            self.table.replace(device_id, values);
         }
 
         if device_count == 0 {
@@ -255,33 +146,41 @@ impl Z2mController {
         }
     }
 
-    async fn get_state(&self, device: &z2m::Device) -> Result<serde_json::Value, Error> {
-        let state_key = &device.state_key;
-        let state_key = json!({state_key: {}});
+    async fn get_states(&self, device_id: &Z2mDeviceId) -> Result<SingleTable, Error> {
+        let state_keys = self
+            .state_keys
+            .get(device_id)
+            .map(|keys| {
+                keys.iter()
+                    .map(|key| (key.clone(), json!({})))
+                    .collect::<HashMap<_, _>>()
+            })
+            .unwrap_or_default();
+        if state_keys.is_empty() {
+            return Ok(Default::default());
+        }
 
         let mut receiver = self.mqtt_service.receiver(MQTT_TOPIC_PREFIX_Z2M);
 
         let (tx, rx) = oneshot::channel();
 
-        let expected_device_name = device.name.clone();
-
+        let expected_device_id = device_id.clone();
         tokio::task::spawn(async move {
             loop {
                 let Ok(publish) = receiver.recv().await else {
                     break;
                 };
 
-                if let Some(device_name) = DeviceName::from_topic_name(&publish.topic)
-                    && expected_device_name == device_name
+                if let Some(id) = Z2mDeviceId::from_topic_name(&publish.topic)
+                    && expected_device_id == id
                 {
-                    let payload =
-                        match serde_json::from_slice::<serde_json::Value>(&publish.payload) {
-                            Ok(v) => v,
-                            Err(e) => {
-                                log::warn!("Invalid JSON string from topic {}: {e}", publish.topic);
-                                continue;
-                            }
-                        };
+                    let payload = match serde_json::from_slice::<SingleTable>(&publish.payload) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            log::warn!("Invalid JSON string from topic {}: {e}", publish.topic);
+                            continue;
+                        }
+                    };
 
                     let _ = tx.send(payload);
                     break;
@@ -291,13 +190,13 @@ impl Z2mController {
 
         self.mqtt_service
             .publish(
-                &device.name.topic_name(Some(Z2mPublishTopic::Get)),
-                state_key.to_string().as_bytes(),
+                &device_id.topic_name(Some(Z2mPublishTopic::Get)),
+                serde_json::to_string(&state_keys)?.as_bytes(),
             )
             .await
             .map_err(|e| Error::Mqtt(Box::new(e)))?;
 
-        match timeout(self.command_timeout, rx).await {
+        match timeout(self.command_timeout.to_std().unwrap(), rx).await {
             Ok(v) => Ok(v.map_err(|_| Error::Recv)?),
             Err(_) => Err(Error::Timeout),
         }
@@ -305,33 +204,34 @@ impl Z2mController {
 
     pub async fn set_state(
         &self,
-        name: DeviceName,
-        states: &[serde_json::Value],
+        id: Z2mDeviceId,
+        states: &[PublishedValues],
     ) -> Result<(), Error> {
         let mut receiver = self.mqtt_service.receiver(MQTT_TOPIC_PREFIX_Z2M);
 
         let (tx, rx) = oneshot::channel();
 
-        let states_to_inspect: Result<Vec<serde_json::Map<String, serde_json::Value>>, _> = states
-            .iter()
-            .map(|v| {
-                serde_json::from_value::<serde_json::Map<String, serde_json::Value>>(v.clone())
-            })
-            .collect();
-        let mut states_to_inspect = states_to_inspect?;
-        if states_to_inspect.is_empty() {
+        let mut states_to_inspect = states.to_vec();
+        if states.is_empty() {
             return Ok(());
         }
 
         let mqtt_service = self.mqtt_service.clone();
 
         tokio::task::spawn(async move {
+            let mut first = states_to_inspect.first().unwrap();
+
+            let payload = match serde_json::to_string(&first) {
+                Ok(v) => v,
+                Err(e) => {
+                    log::warn!("Could not serialize state {first:?}: {e}");
+                    return;
+                }
+            };
             if let Err(e) = mqtt_service
                 .publish(
-                    &name.topic_name(Some(Z2mPublishTopic::Set)),
-                    serde_json::Value::Object(states_to_inspect.first().unwrap().clone())
-                        .to_string()
-                        .as_bytes(),
+                    &id.topic_name(Some(Z2mPublishTopic::Set)),
+                    payload.as_bytes(),
                 )
                 .await
             {
@@ -339,18 +239,15 @@ impl Z2mController {
                 return;
             }
 
-            let mut first = states_to_inspect.first().unwrap();
             loop {
                 let Ok(publish) = receiver.recv().await else {
                     break;
                 };
 
-                if let Some(device_name) = DeviceName::from_topic_name(&publish.topic)
-                    && name == device_name
+                if let Some(device_id) = Z2mDeviceId::from_topic_name(&publish.topic)
+                    && id == device_id
                 {
-                    let payload = match serde_json::from_slice::<
-                        serde_json::Map<String, serde_json::Value>,
-                    >(&publish.payload)
+                    let payload = match serde_json::from_slice::<PublishedValues>(&publish.payload)
                     {
                         Ok(v) => v,
                         Err(e) => {
@@ -370,14 +267,17 @@ impl Z2mController {
                     states_to_inspect.remove(0);
 
                     first = if let Some(first) = states_to_inspect.first() {
+                        let payload = match serde_json::to_string(&first) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                log::warn!("Could not serialize state {first:?}: {e}");
+                                return;
+                            }
+                        };
                         if let Err(e) = mqtt_service
                             .publish(
-                                &name.topic_name(Some(Z2mPublishTopic::Set)),
-                                serde_json::Value::Object(
-                                    states_to_inspect.first().unwrap().clone(),
-                                )
-                                .to_string()
-                                .as_bytes(),
+                                &id.topic_name(Some(Z2mPublishTopic::Set)),
+                                payload.as_bytes(),
                             )
                             .await
                         {
@@ -393,58 +293,42 @@ impl Z2mController {
             }
         });
 
-        match timeout(self.command_timeout, rx).await {
+        match timeout(self.command_timeout.to_std().unwrap(), rx).await {
             Ok(v) => Ok(v.map_err(|_| Error::Recv)?),
             Err(_) => Err(Error::Timeout),
         }
     }
 
     pub fn handle_publishment(self: Arc<Self>, publish: Publish) {
-        if let Some(device_name) = DeviceName::from_topic_name(&publish.topic)
-            && let Some(device) = self.devices.get(&device_name)
+        if let Some(device_id) = Z2mDeviceId::from_topic_name(&publish.topic)
+            && let Some(device) = self.devices.get(&device_id)
         {
-            let value = match serde_json::from_slice::<serde_json::Value>(&publish.payload) {
+            let values = match serde_json::from_slice::<PublishedValues>(&publish.payload) {
                 Ok(v) => v,
                 Err(e) => {
-                    log::warn!("Failed to serialize payload for {device_name}: {e}");
+                    log::warn!("Failed to serialize payload for {device_id}: {e}");
                     return;
                 }
             };
 
-            self.device_states.lock().insert(device_name.clone(), value);
-
-            if device.classes.power_meter.is_some()
-                && let Ok(power_meter) = self.read_power_meter(device)
-            {
-                for hook in self.power_meters.values() {
-                    let mut guard = hook.lock();
-
-                    if guard.devices.contains(&device_name) {
-                        guard.update(device_name.clone(), &power_meter);
-                    }
-                }
-            }
+            self.table.update(device.id.clone().into(), values);
         }
     }
 
     fn get_switch_state(
         &self,
-        device_name: &DeviceName,
+        device_id: Z2mDeviceId,
         switch: &z2m::DeviceClassSwitch,
     ) -> Result<z2m::SwitchState, Error> {
-        let device_states = self.device_states.lock();
-
-        let Some(state) = device_states.get(device_name) else {
-            return Err(Error::StateNotFound(device_name.clone()));
+        let Some(state) = self.table.get_values(&device_id.clone().into()) else {
+            return Err(Error::StateNotFound(device_id));
         };
 
-        test_condition(state, &switch.is_on).map(|v| {
-            if v {
-                z2m::SwitchState::On
-            } else {
-                z2m::SwitchState::Off
-            }
-        })
+        if switch.is_on.test(&state)? {
+            Ok(z2m::SwitchState::On)
+        } else {
+            Ok(z2m::SwitchState::Off)
+        }
     }
 
     fn is_active_bookings(&self) -> Option<bool> {
@@ -469,19 +353,19 @@ impl Z2mController {
 
     async fn set_switch(
         &self,
-        device_name: &DeviceName,
+        device_id: Z2mDeviceId,
         switch: &z2m::DeviceClassSwitch,
         state: z2m::SwitchState,
     ) -> Result<bool, Error> {
-        let current_state = self.get_switch_state(device_name, switch)?;
+        let current_state = self.get_switch_state(device_id.clone(), switch)?;
 
         if current_state == state {
             Ok(false)
         } else {
-            log::info!("Setting switch {device_name} to {state}");
+            log::info!("Setting switch {device_id} to {state}");
 
             self.set_state(
-                device_name.clone(),
+                device_id.clone(),
                 match state {
                     z2m::SwitchState::On => &switch.states.on,
                     z2m::SwitchState::Off => &switch.states.off,
@@ -494,10 +378,10 @@ impl Z2mController {
 
     async fn sync_switch_state(
         &self,
-        device_name: &DeviceName,
+        device_id: Z2mDeviceId,
         switch: &z2m::DeviceClassSwitch,
     ) -> Result<bool, Error> {
-        let current_state = self.get_switch_state(device_name, switch)?;
+        let current_state = self.get_switch_state(device_id.clone(), switch)?;
 
         let Some(is_present) = *self.presence.lock() else {
             return Err(Error::NotInitialized);
@@ -529,10 +413,10 @@ impl Z2mController {
         if current_state == desired_state {
             Ok(false)
         } else {
-            log::info!("Setting switch {device_name} to {desired_state}");
+            log::info!("Setting switch {device_id} to {desired_state}");
 
             self.set_state(
-                device_name.clone(),
+                device_id.clone(),
                 match desired_state {
                     z2m::SwitchState::On => &switch.states.on,
                     z2m::SwitchState::Off => &switch.states.off,
@@ -546,16 +430,16 @@ impl Z2mController {
     async fn sync_switch_states(&self) {
         for device in self.devices.values() {
             if let Some(switch) = &device.classes.switch
-                && let Err(e) = self.sync_switch_state(&device.name, switch).await
+                && let Err(e) = self.sync_switch_state(device.id.clone(), switch).await
             {
-                log::warn!("Failed to sync switch state for {}: {e}", device.name);
+                log::warn!("Failed to sync switch state for {}: {e}", device.id);
             }
         }
     }
 
     fn aggregate_switch_states(
-        states: &mut HashMap<DeviceName, z2m::SwitchState>,
-        existing_states: &HashMap<DeviceName, z2m::SwitchState>,
+        states: &mut HashMap<Z2mDeviceId, z2m::SwitchState>,
+        existing_states: &HashMap<Z2mDeviceId, z2m::SwitchState>,
     ) {
         for (k, unit_state) in existing_states.iter() {
             if let Some(new_state) = states.get_mut(k) {
@@ -588,18 +472,18 @@ impl Z2mController {
             Self::aggregate_switch_states(&mut switches, per_unit_switches);
         }
 
-        for (device_name, state) in switches {
+        for (device_id, state) in switches {
             let Some(switch) = self
                 .devices
-                .get(&device_name)
+                .get(&device_id)
                 .and_then(|v| v.classes.switch.as_ref())
             else {
-                log::warn!("Device {device_name} is not a switch.");
+                log::warn!("Device {device_id} is not a switch.");
                 continue;
             };
 
-            if let Err(e) = self.set_switch(&device_name, switch, state).await {
-                log::warn!("Could not change switch state of {device_name} to {state}: {e}");
+            if let Err(e) = self.set_switch(device_id.clone(), switch, state).await {
+                log::warn!("Could not change switch state of {device_id} to {state}: {e}");
             }
         }
     }
@@ -641,129 +525,24 @@ impl Z2mController {
             Self::aggregate_switch_states(&mut switches, presence_switches);
         }
 
-        for (device_name, state) in switches {
+        for (device_id, state) in switches {
             let Some(switch) = self
                 .devices
-                .get(&device_name)
+                .get(&device_id)
                 .and_then(|v| v.classes.switch.as_ref())
             else {
-                log::warn!("Device {device_name} is not a switch.");
+                log::warn!("Device {device_id} is not a switch.");
                 continue;
             };
 
-            if let Err(e) = self.set_switch(&device_name, switch, state).await {
-                log::warn!("Could not change switch state of {device_name} to {state}: {e}");
-            }
-        }
-    }
-
-    pub fn read_power_meter(&self, device: &z2m::Device) -> Result<PowerUsage, Error> {
-        let Some(_power_meter) = &device.classes.power_meter else {
-            return Err(Error::ClassMismatch("power_meter", device.name.clone()));
-        };
-
-        let device_states = self.device_states.lock();
-        let Some(state) = device_states.get(&device.name) else {
-            return Err(Error::StateNotFound(device.name.clone()));
-        };
-
-        let state = state.as_object().ok_or(Error::Json)?;
-
-        let energy = state
-            .get("energy")
-            .and_then(|v| v.as_f64())
-            .unwrap_or_default();
-        let power = state
-            .get("power")
-            .and_then(|v| v.as_f64())
-            .unwrap_or_default();
-
-        Ok(PowerUsage {
-            instant_wattage: power,
-            sum_kwh: energy,
-        })
-    }
-
-    async fn handle_alert_tasks(&self) {
-        let Some(presence) = *self.presence.lock() else {
-            return;
-        };
-
-        let Some(booking_status) = self.is_active_bookings() else {
-            return;
-        };
-
-        for alert in self.alerts.iter() {
-            if self.alert_flags.lock().contains(&alert.name) {
-                continue;
-            }
-
-            if let Some(alert_presence) = alert.presence
-                && alert_presence != presence
-            {
-                continue;
-            }
-            if let Some(booking) = alert.booking
-                && booking_status != booking
-            {
-                continue;
-            }
-
-            let Some(device) = self.devices.get(&alert.device) else {
-                log::warn!(
-                    "Device {} not found for alert condition \"{}\"",
-                    alert.device,
-                    alert.name
-                );
-                continue;
-            };
-
-            let Some(state) = self.device_states.lock().get(&device.name).cloned() else {
-                log::warn!("Device state not found for {}", device.name);
-                continue;
-            };
-
-            match test_condition(&state, &alert.conditions) {
-                Ok(true) => {
-                    self.alert_flags.lock().insert(alert.name.clone());
-                    if let Err(e) = self
-                        .notification_service
-                        .notify(alert.priority, alert.name.clone())
-                        .await
-                    {
-                        log::warn!("Could not send alert for \"{}\": {e}", alert.name);
-                    }
-                }
-                Ok(false) => {}
-                Err(e) => {
-                    log::warn!("Could not test alert condition for \"{}\": {e}", alert.name);
-                }
+            if let Err(e) = self.set_switch(device_id.clone(), switch, state).await {
+                log::warn!("Could not change switch state of {device_id} to {state}: {e}");
             }
         }
     }
 
     async fn update(self: Arc<Self>) {
-        self.handle_alert_tasks().await;
         self.sync_switch_states().await;
-    }
-
-    pub fn register_power_meter_telemetry_hook(
-        &mut self,
-        key: TableKey,
-        devices: HashSet<DeviceName>,
-        tx: mpsc::UnboundedSender<Z2mPowerMeterRow>,
-        table: Arc<Z2mPowerMeterTable>,
-    ) {
-        self.power_meters.insert(
-            key,
-            Mutex::new(PowerMeterTelemetryContext {
-                devices,
-                usage: Default::default(),
-                tx,
-                last_sent_at: Instant::now(),
-                table,
-            }),
-        );
     }
 
     pub fn task(self) -> (Arc<Self>, JoinHandle<()>, Task) {
@@ -853,8 +632,6 @@ impl PresenceCallback for Z2mController {
     async fn on_enter(&self) -> Result<(), Box<dyn StdError>> {
         *self.presence.lock() = Some(true);
 
-        self.alert_flags.lock().clear();
-
         self.trigger_presence_switch_event(true).await;
 
         Ok(())
@@ -877,18 +654,12 @@ pub enum Error {
     Mqtt(#[from] Box<MqttError>),
     #[error("Channel dropped unexpectedly")]
     Recv,
-    #[error("Invalid JSON data.")]
-    Json,
     #[error("Invalid JSON data: {0}")]
     SerdeJson(#[from] serde_json::Error),
-    #[error("Z2m state variable {0} not found.")]
-    StateVariableNotFound(String),
-    #[error("Arithmetic operator is applicable on numerals. value: {0}")]
-    Arithmetic(serde_json::Value),
-    #[error("No device class {0} for device: {1}")]
-    ClassMismatch(&'static str, DeviceName),
     #[error("State not found for device {0}")]
-    StateNotFound(DeviceName),
+    StateNotFound(Z2mDeviceId),
     #[error("Not initialized")]
     NotInitialized,
+    #[error("Cannot perform boolean operation: {0}")]
+    Boolean(#[from] BooleanError),
 }

@@ -1,5 +1,7 @@
 use std::{error::Error, sync::Arc};
 
+use crate::types::AlertId;
+
 #[async_trait::async_trait]
 #[allow(unused_variables)]
 pub trait EventStateCallback<T> {
@@ -31,4 +33,9 @@ pub trait PresenceCallback {
     async fn on_leave(&self) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
+}
+
+#[async_trait::async_trait]
+pub trait AlertCallback {
+    async fn on_alert(&self, alert_id: AlertId) -> Result<(), Box<dyn Error>>;
 }

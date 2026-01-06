@@ -19,17 +19,17 @@ impl CarparkExemptionService {
     pub async fn exempt(
         &self,
         license_plate_number: &str,
-    ) -> Result<(bool, Option<DateTime<Utc>>), Error> {
+    ) -> Result<(bool, Option<DateTime<Utc>>, bool), Error> {
         match self {
             Self::Amano(client) => match client.exempt(license_plate_number).await? {
-                CarParkExemptionResult::Success { entry_date } => {
+                CarParkExemptionResult::Success { entry_date, fuzzy } => {
                     log::info!("Parking exemption for {license_plate_number} applied successfully");
-                    Ok((true, Some(entry_date)))
+                    Ok((true, Some(entry_date), fuzzy))
                 }
-                CarParkExemptionResult::AlreadyApplied { entry_date } => {
-                    Ok((false, Some(entry_date)))
+                CarParkExemptionResult::AlreadyApplied { entry_date, fuzzy } => {
+                    Ok((false, Some(entry_date), fuzzy))
                 }
-                CarParkExemptionResult::NotFound => Ok((false, None)),
+                CarParkExemptionResult::NotFound => Ok((false, None, false)),
             },
         }
     }

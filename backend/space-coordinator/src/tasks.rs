@@ -1,10 +1,15 @@
+pub mod alert_publisher;
 pub mod audio_recorder;
 pub mod booking_reminder;
 pub mod booking_state_manager;
 pub mod carpark_exempter;
+pub mod metrics_publisher;
+pub mod notification_publisher;
 pub mod osd_controller;
 pub mod presence_monitor;
+pub mod sound_meter_controller;
 pub mod telemetry_manager;
+pub mod unit_fetcher;
 pub mod z2m_controller;
 
 use std::collections::HashMap;

@@ -13,11 +13,13 @@ use serde::Serialize;
 use tokio::task::JoinHandle;
 use tokio_task_scheduler::{Scheduler, Task, TaskBuilder, TaskStatus};
 
-use crate::callback::EventStateCallback;
+use crate::callback::{AlertCallback, EventStateCallback};
 use crate::client::DxeClient;
-use crate::config::{OsdAlertConfig, OsdConfig};
+use crate::config::osd::{AlertConfig, AlertKind, Config as OsdConfig};
 use crate::services::mqtt::{Error as MqttError, MqttService, MqttTopicPrefix};
 use crate::tasks::osd_controller::topics::DoorLockOpenResult;
+use crate::tasks::unit_fetcher::UnitsState;
+use crate::types::AlertId;
 
 type BookingEntry = (Option<types::Booking>, HashSet<BookingId>);
 
@@ -32,8 +34,9 @@ pub struct OsdController {
     mqtt_service: MqttService,
 
     topic_prefix: MqttTopicPrefix,
-    alerts: OsdAlertConfig,
+    alerts: Vec<AlertConfig>,
 
+    units: UnitsState,
     current_bookings: Mutex<HashMap<UnitId, BookingEntry>>,
     sign_off_tasks: Mutex<Vec<String>>,
 }
@@ -42,6 +45,7 @@ impl OsdController {
     pub fn new(
         client: DxeClient,
         mqtt_service: MqttService,
+        units: UnitsState,
         scheduler: Scheduler,
         config: &OsdConfig,
     ) -> Self {
@@ -53,6 +57,7 @@ impl OsdController {
             topic_prefix: config.topic_prefix.clone(),
             alerts: config.alerts.clone(),
 
+            units,
             current_bookings: Mutex::new(HashMap::new()),
             sign_off_tasks: Mutex::new(Vec::new()),
         }
@@ -162,6 +167,38 @@ impl OsdController {
 }
 
 #[async_trait::async_trait]
+impl AlertCallback for OsdController {
+    async fn on_alert(&self, alert_id: AlertId, started: bool) -> Result<(), Box<dyn StdError>> {
+        for (alert, unit_id) in self.alerts.iter().filter_map(|v| {
+            if let AlertKind::Alert { alert_id: id } = &v.kind
+                && &alert_id == id
+            {
+                Some((v.data.clone(), v.unit_id.clone()))
+            } else {
+                None
+            }
+        }) {
+            for available_unit_id in self.units.get() {
+                let alert = if started { Some(alert.clone()) } else { None };
+
+                if unit_id.as_ref().is_none_or(|v| v == &available_unit_id)
+                    && let Err(e) = self
+                        .publish(&topics::Alert {
+                            unit_id: available_unit_id.clone(),
+                            alert,
+                        })
+                        .await
+                {
+                    log::warn!("Could not publish alert {alert_id} on {available_unit_id}: {e}");
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[async_trait::async_trait]
 impl EventStateCallback<BookingWithUsers> for OsdController {
     async fn on_event_start(
         self: Arc<Self>,
@@ -179,18 +216,22 @@ impl EventStateCallback<BookingWithUsers> for OsdController {
                 log::warn!("Could not send SetScreenState to OSD: {e}");
             }
 
-            if let Some(on_sign_in) = &self.alerts.on_sign_in
-                && self
-                    .current_bookings
-                    .lock()
-                    .entry(event.booking.unit_id.clone())
-                    .or_default()
-                    .1
-                    .is_empty()
+            if let Some(on_sign_in) = self.alerts.iter().find(|v| {
+                matches!(v.kind, AlertKind::OnSignOn)
+                    && v.unit_id
+                        .as_ref()
+                        .is_none_or(|unit_id| unit_id == &event.booking.unit_id)
+            }) && self
+                .current_bookings
+                .lock()
+                .entry(event.booking.unit_id.clone())
+                .or_default()
+                .1
+                .is_empty()
                 && let Err(e) = self
                     .publish(&topics::Alert {
                         unit_id: event.booking.unit_id.clone(),
-                        alert: Some(on_sign_in.clone()),
+                        alert: Some(on_sign_in.data.clone()),
                     })
                     .await
             {
@@ -211,19 +252,23 @@ impl EventStateCallback<BookingWithUsers> for OsdController {
                 time_to: event.booking.date_end.to_utc(),
             };
 
-            if let Some(on_sign_in) = &self.alerts.on_sign_in
-                && self
-                    .current_bookings
-                    .lock()
-                    .entry(event.booking.unit_id.clone())
-                    .or_default()
-                    .1
-                    .len()
-                    > 1
+            if let Some(on_sign_in) = self.alerts.iter().find(|v| {
+                matches!(v.kind, AlertKind::OnSignOn)
+                    && v.unit_id
+                        .as_ref()
+                        .is_none_or(|unit_id| unit_id == &event.booking.unit_id)
+            }) && self
+                .current_bookings
+                .lock()
+                .entry(event.booking.unit_id.clone())
+                .or_default()
+                .1
+                .len()
+                > 1
                 && let Err(e) = self
                     .publish(&topics::Alert {
                         unit_id: event.booking.unit_id.clone(),
-                        alert: Some(on_sign_in.clone()),
+                        alert: Some(on_sign_in.data.clone()),
                     })
                     .await
             {
@@ -246,11 +291,22 @@ impl EventStateCallback<BookingWithUsers> for OsdController {
                 .or_default()
                 .0 = Some(booking);
 
-            if let Some(on_sign_off) = self.alerts.on_sign_off.clone() {
+            if let Some((on_sign_off, before)) = self.alerts.iter().find_map(|v| {
+                if let AlertKind::OnSignOff { before } = v.kind
+                    && v.unit_id
+                        .as_ref()
+                        .is_none_or(|unit_id| unit_id == &event.booking.unit_id)
+                {
+                    Some((v, before))
+                } else {
+                    None
+                }
+            }) {
                 let arc_self = self.clone();
                 let unit_id = event.booking.unit_id.clone();
-                let time = event.booking.date_end.to_utc() - self.alerts.sign_off_duration();
+                let time = event.booking.date_end.to_utc() - before;
                 let task_name = format!("osd_sign_off_notification_{unit_id}");
+                let on_sign_off = on_sign_off.data.clone();
                 let task = move || {
                     let arc_self = self.clone();
                     let unit_id = unit_id.clone();
@@ -318,6 +374,12 @@ impl EventStateCallback<BookingWithUsers> for OsdController {
                     .publish(&topics::SetScreenState {
                         unit_id: event.booking.unit_id.clone(),
                         is_active: false,
+                    })
+                    .await;
+                let _ = self
+                    .publish(&topics::ParkingStates {
+                        unit_id: event.booking.unit_id.clone(),
+                        states: vec![],
                     })
                     .await;
                 self.current_bookings

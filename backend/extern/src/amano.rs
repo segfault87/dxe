@@ -25,8 +25,14 @@ pub struct AmanoClient {
 #[derive(Clone, Debug)]
 pub enum CarParkExemptionResult {
     NotFound,
-    AlreadyApplied { entry_date: DateTime<Utc> },
-    Success { entry_date: DateTime<Utc> },
+    AlreadyApplied {
+        entry_date: DateTime<Utc>,
+        fuzzy: bool,
+    },
+    Success {
+        entry_date: DateTime<Utc>,
+        fuzzy: bool,
+    },
 }
 
 impl AmanoClient {
@@ -81,30 +87,45 @@ impl AmanoClient {
         let mut list_url = self.url_base.clone();
         list_url.set_path(PATH_LIST);
 
+        let last_number = license_plate_number
+            .chars()
+            .rev()
+            .take(4)
+            .collect::<String>();
+
         let mut request = self
             .client
             .post(list_url.clone())
             .form(&HashMap::from([
                 ("iLotArea", self.lot_id.clone()),
                 ("entryDate", search_from.clone()),
-                ("carNo", license_plate_number.to_owned()),
+                ("carNo", last_number),
             ]))
             .build()?;
         *request.headers_mut().get_mut(CONTENT_TYPE).unwrap() =
             HeaderValue::from_static("application/x-www-form-urlencoded; charset=UTF-8");
         let result = self.client.execute(request).await?;
 
-        let json_body: Vec<serde_json::Value> = result.json().await?;
-        if json_body.len() > 1 {
-            return Err(Error::MultipleOccurrencesFound);
+        let json_body: Vec<serde_json::Map<String, serde_json::Value>> = result.json().await?;
+        let mut found_entry: Option<&serde_json::Map<String, serde_json::Value>> = None;
+        let mut fuzzy = true;
+        for entry in json_body.iter() {
+            if let Some(car_no) = entry.get("carNo")
+                && let Some(car_no) = car_no.as_str()
+            {
+                found_entry = Some(entry);
+                if car_no == license_plate_number {
+                    fuzzy = false;
+                    break;
+                }
+            }
         }
 
-        let Some(entry) = json_body.first() else {
+        let Some(entry) = found_entry else {
             return Ok(CarParkExemptionResult::NotFound);
         };
-        let entry_object = entry.as_object().ok_or(Error::InvalidJsonType("0"))?;
 
-        let entry_date = entry_object
+        let entry_date = entry
             .get("entryDate")
             .ok_or(Error::MissingField("entryDate", list_url.clone()))?
             .as_i64()
@@ -113,7 +134,7 @@ impl AmanoClient {
             return Err(Error::InvalidEntryDate(entry_date));
         };
 
-        let discount_count = entry_object
+        let discount_count = entry
             .get("dscnt_cnt")
             .ok_or(Error::MissingField("dscnt_cnt", list_url.clone()))?
             .as_str()
@@ -122,16 +143,16 @@ impl AmanoClient {
             .map_err(|_| Error::InvalidJsonType("dscnt_cnt"))?;
 
         if discount_count > 0 {
-            return Ok(CarParkExemptionResult::AlreadyApplied { entry_date });
+            return Ok(CarParkExemptionResult::AlreadyApplied { entry_date, fuzzy });
         }
 
-        let pe_id = entry_object
+        let pe_id = entry
             .get("id")
             .ok_or(Error::MissingField("id", list_url.clone()))?
             .as_i64()
             .ok_or(Error::InvalidJsonType("id"))?
             .to_string();
-        let card_type = entry_object
+        let card_type = entry
             .get("iCardType")
             .ok_or(Error::MissingField("iCardType", list_url.clone()))?
             .as_str()
@@ -226,7 +247,7 @@ impl AmanoClient {
         if exemption_result.status() != StatusCode::OK {
             Err(Error::ExemptionFailed(exemption_result.status()))
         } else {
-            Ok(CarParkExemptionResult::Success { entry_date })
+            Ok(CarParkExemptionResult::Success { entry_date, fuzzy })
         }
     }
 }

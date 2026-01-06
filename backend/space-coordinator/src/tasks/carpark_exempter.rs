@@ -11,13 +11,14 @@ use tokio_task_scheduler::{Task, TaskBuilder};
 
 use crate::callback::EventStateCallback;
 use crate::client::DxeClient;
-use crate::config::AlertPriority;
+use crate::config::NotificationPriority;
 use crate::services::carpark_exemption::CarparkExemptionService;
 use crate::services::notification::NotificationService;
 use crate::tasks::booking_state_manager::BookingStates;
 use crate::tasks::osd_controller::OsdController;
 use crate::tasks::osd_controller::topics::ParkingStates;
 use crate::tasks::osd_controller::types::ParkingState;
+use crate::tasks::unit_fetcher::UnitsState;
 
 pub struct CarparkExempter {
     client: DxeClient,
@@ -26,6 +27,7 @@ pub struct CarparkExempter {
     notification_service: NotificationService,
     osd_controller: Arc<OsdController>,
 
+    units_state: UnitsState,
     active_bookings: Mutex<HashSet<BookingId>>,
 }
 
@@ -36,6 +38,7 @@ impl CarparkExempter {
         service: CarparkExemptionService,
         osd_controller: Arc<OsdController>,
         notification_service: NotificationService,
+        units_state: UnitsState,
     ) -> Self {
         Self {
             client,
@@ -44,6 +47,7 @@ impl CarparkExempter {
             notification_service,
             osd_controller,
 
+            units_state,
             active_bookings: Mutex::new(HashSet::new()),
         }
     }
@@ -106,7 +110,7 @@ impl CarparkExempter {
             license_plate_numbers
         {
             if let Err(e) = match self.service.exempt(&license_plate_number).await {
-                Ok((success, entry_date)) => {
+                Ok((success, entry_date, fuzzy)) => {
                     if let Some(unit_id) = unit_id
                         && let Some(entry_date) = entry_date
                         && is_current_booking
@@ -119,11 +123,12 @@ impl CarparkExempter {
                                 user_name: user_name.clone(),
                                 entry_date,
                                 exempted: success,
+                                fuzzy,
                             });
                     }
 
                     if success {
-                        self.notification_service.notify(AlertPriority::Low, format!("Car parking exempted sucessfully for user {user_name} ({customer_name})")).await
+                        self.notification_service.notify(NotificationPriority::Low, format!("Car parking exempted sucessfully for user {user_name} ({customer_name}){}", if fuzzy { " (fuzzy)" } else { "" })).await
                     } else {
                         continue;
                     }
@@ -131,13 +136,25 @@ impl CarparkExempter {
                 Err(e) => {
                     self.notification_service
                         .notify(
-                            AlertPriority::Low,
+                            NotificationPriority::Low,
                             format!("Car parking exemption error: {e}"),
                         )
                         .await
                 }
             } {
                 log::error!("Could not send notification while processing parking exemption: {e}");
+            }
+        }
+
+        if parking_results.is_empty() {
+            for unit_id in self.units_state.get() {
+                let _ = self
+                    .osd_controller
+                    .publish(&ParkingStates {
+                        unit_id,
+                        states: vec![],
+                    })
+                    .await;
             }
         }
 

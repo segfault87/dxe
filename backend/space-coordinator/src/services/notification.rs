@@ -1,13 +1,13 @@
 use dxe_extern::ntfy::{Channel, NtfyClient};
 
-use crate::config::{AlertPriority, NotificationBackend, NotificationConfig};
+use crate::config::{NotificationBackend, NotificationConfig, NotificationPriority};
 
-impl From<AlertPriority> for Channel {
-    fn from(value: AlertPriority) -> Self {
+impl From<NotificationPriority> for Channel {
+    fn from(value: NotificationPriority) -> Self {
         match value {
-            AlertPriority::Default => Channel::General,
-            AlertPriority::High => Channel::Important,
-            AlertPriority::Low => Channel::Minor,
+            NotificationPriority::Default => Channel::General,
+            NotificationPriority::High => Channel::Important,
+            NotificationPriority::Low => Channel::Minor,
         }
     }
 }
@@ -20,13 +20,15 @@ pub enum NotificationService {
 impl NotificationService {
     pub fn new(config: &NotificationConfig) -> Self {
         match &config.backend {
-            NotificationBackend::Ntfy => {
-                Self::Ntfy(NtfyClient::new(config.ntfy.as_ref().expect("ntfy config")))
-            }
+            NotificationBackend::Ntfy(config) => Self::Ntfy(NtfyClient::new(config)),
         }
     }
 
-    pub async fn notify(&self, priority: AlertPriority, message: String) -> Result<(), Error> {
+    pub async fn notify(
+        &self,
+        priority: NotificationPriority,
+        message: String,
+    ) -> Result<(), Error> {
         match &self {
             Self::Ntfy(client) => Ok(client.send(priority.into(), message).await?),
         }

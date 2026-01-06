@@ -16,14 +16,17 @@ futures = "0.3"
 libc = "0.2"
 log = { workspace = true }
 parking_lot = { workspace = true }
+pin-project = "1"
 ping = "0.7"
 reqwest = { workspace = true, features = ["multipart"] }
 rustls = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_with = "3.16"
 thiserror = { workspace = true }
 tasi-sound-level-meter = { git = "https://github.com/segfault87/tasi653b-rs.git" }
 tokio = { workspace = true }
+tokio-stream = { version = "0.1", features = ["sync"] }
 tokio-task-scheduler = "1"
 toml = "0.9"
 url = { workspace = true }

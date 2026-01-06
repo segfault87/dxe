@@ -1,64 +1,94 @@
-use std::collections::HashMap;
-use std::time::Duration;
-
+use chrono::{DateTime, TimeDelta, Utc};
 use dxe_s2s_shared::csv::Z2mPowerMeterRow;
 use dxe_types::TelemetryType;
-use parking_lot::Mutex;
 
-use crate::config::telemetry::TableKey;
-use crate::tasks::z2m_controller::DeviceName;
+use crate::types::{Endpoint, PublishKey, PublishedValues};
 
-pub const PUBLISH_DURATION: Duration = Duration::from_secs(10);
+pub const PUBLISH_DURATION: TimeDelta = TimeDelta::seconds(10);
+pub const KEY_ENERGY: PublishKey = PublishKey::new_const("energy");
+pub const KEY_POWER: PublishKey = PublishKey::new_const("power");
 
 pub struct State {
-    initial_power_usage_kwh: f64,
+    initial_energy_usage_kwh: Option<f64>,
+    last_published_at: DateTime<Utc>,
+    current_wattage: f64,
+    current_energy_usage_kwh: f64,
 }
 
 pub struct Z2mPowerMeterTable {
-    table_key: TableKey,
+    name: String,
+    endpoint: Endpoint,
     remote_type: Option<TelemetryType>,
-    current_power_usage_kwh: Mutex<HashMap<DeviceName, f64>>,
 }
 
 impl Z2mPowerMeterTable {
-    pub fn new(name: TableKey, remote_type: Option<TelemetryType>) -> Self {
+    pub fn new(name: String, endpoint: Endpoint, remote_type: Option<TelemetryType>) -> Self {
         Self {
-            table_key: name,
+            name,
+            endpoint,
             remote_type,
-            current_power_usage_kwh: Default::default(),
         }
-    }
-
-    pub fn update_power_usage(&self, device_name: DeviceName, usage: f64) {
-        self.current_power_usage_kwh
-            .lock()
-            .insert(device_name.clone(), usage);
     }
 }
 
 impl super::TableSpec for Z2mPowerMeterTable {
     type State = State;
-    type Value = Z2mPowerMeterRow;
     type Row = Z2mPowerMeterRow;
 
     fn new_state(&self) -> Self::State {
         Self::State {
-            initial_power_usage_kwh: self.current_power_usage_kwh.lock().values().sum(),
+            initial_energy_usage_kwh: None,
+            last_published_at: DateTime::<Utc>::MIN_UTC,
+            current_energy_usage_kwh: 0.0,
+            current_wattage: 0.0,
         }
     }
 
-    fn table_key(&self) -> TableKey {
-        self.table_key.clone()
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn endpoint(&self) -> Endpoint {
+        self.endpoint.clone()
     }
 
     fn remote_type(&self) -> Option<TelemetryType> {
         self.remote_type
     }
 
-    fn create_row(&self, state: &mut Self::State, value: Self::Value) -> Self::Row {
-        Self::Row {
-            instantaneous_wattage: value.instantaneous_wattage,
-            power_usage_kwh: value.power_usage_kwh - state.initial_power_usage_kwh,
+    fn create_row(&self, state: &mut Self::State, values: PublishedValues) -> Option<Self::Row> {
+        if let Some(energy) = values.get(&KEY_ENERGY)
+            && let Some(energy) = energy.as_f64()
+        {
+            let initial = if let Some(initial) = state.initial_energy_usage_kwh {
+                initial
+            } else {
+                state.initial_energy_usage_kwh = Some(energy);
+                energy
+            };
+
+            state.current_energy_usage_kwh = energy - initial;
+        }
+
+        if let Some(power) = values.get(&KEY_POWER)
+            && let Some(power) = power.as_f64()
+        {
+            state.current_wattage = state.current_wattage.max(power);
+        }
+
+        let now = Utc::now();
+
+        if now - state.last_published_at > PUBLISH_DURATION {
+            let row = Self::Row {
+                instantaneous_wattage: state.current_wattage,
+                power_usage_kwh: state.current_energy_usage_kwh,
+            };
+
+            state.current_wattage = 0.0;
+            state.last_published_at = now;
+            Some(row)
+        } else {
+            None
         }
     }
 }

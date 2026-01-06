@@ -138,7 +138,11 @@ pub async fn get(
             let min = 30.0;
             let mut max = 30.0;
             for (_, row) in rows.iter() {
-                let level = row.decibel_level_10 as f64 / 10.0;
+                let level = if let Some(decibel_level_10) = row.decibel_level_10 {
+                    decibel_level_10 as f64 / 10.0
+                } else {
+                    row.decibel_level.unwrap_or_default()
+                };
                 if level > max {
                     max = level;
                 }
@@ -161,8 +165,16 @@ pub async fn get(
 
             chart
                 .draw_series(LineSeries::new(
-                    rows.iter()
-                        .map(|(time, row)| (*time, row.decibel_level_10 as f64 / 10.0)),
+                    rows.iter().map(|(time, row)| {
+                        (
+                            *time,
+                            if let Some(decibel_level_10) = row.decibel_level_10 {
+                                decibel_level_10 as f64 / 10.0
+                            } else {
+                                row.decibel_level.unwrap_or_default()
+                            },
+                        )
+                    }),
                     BLACK,
                 ))
                 .map_err(|e| Error::Internal(Box::new(e)))?;

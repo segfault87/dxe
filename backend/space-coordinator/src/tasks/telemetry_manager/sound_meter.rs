@@ -1,109 +1,74 @@
-use std::time::Duration;
-
+use chrono::{DateTime, TimeDelta, Utc};
 use dxe_s2s_shared::csv::SoundMeterRow;
 use dxe_types::TelemetryType;
-use futures::{FutureExt, StreamExt, select};
-use tasi_sound_level_meter::TasiSoundLevelMeter;
-use tokio::sync::mpsc;
 
-use crate::config::telemetry::{SoundMeterConfig, SoundMeterDevice, TableKey};
+use crate::types::{Endpoint, PublishKey, PublishedValues};
 
-const POLL_INTERVAL: Duration = Duration::from_secs(10);
+const POLL_INTERVAL: TimeDelta = TimeDelta::seconds(10);
+const KEY_SOUND_LEVEL: PublishKey = PublishKey::new_const("sound_level");
 
-pub struct SoundMeter {
-    config: SoundMeterConfig,
-    tx: mpsc::UnboundedSender<SoundMeterRow>,
-}
-
-impl SoundMeter {
-    pub fn new(config: SoundMeterConfig, tx: mpsc::UnboundedSender<SoundMeterRow>) -> Self {
-        Self { config, tx }
-    }
-
-    pub fn start(self) -> tokio::task::JoinHandle<()> {
-        tokio::task::spawn(async move {
-            let mut subsequent = false;
-            loop {
-                if !subsequent {
-                    subsequent = true;
-                } else {
-                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                }
-
-                match &self.config.device {
-                    SoundMeterDevice::Tasi653b(device) => {
-                        let mut meter = match TasiSoundLevelMeter::new(device.serial_number.clone())
-                        {
-                            Ok(v) => v,
-                            Err(e) => {
-                                log::error!("Cannot open TASI sound meter: {e}");
-                                continue;
-                            }
-                        };
-
-                        let mut current_level = 0;
-
-                        let mut interval = tokio::time::interval(POLL_INTERVAL);
-
-                        loop {
-                            select! {
-                                _ = interval.tick().fuse() => {
-                                    if current_level > 0 {
-                                        let _ = self.tx.send(SoundMeterRow {
-                                            decibel_level_10: current_level,
-                                        });
-                                        current_level = 0;
-                                    }
-                                }
-                                meter = meter.next().fuse() => {
-                                    if let Some(level) = meter {
-                                        if level > current_level {
-                                            current_level = level;
-                                        }
-                                    } else {
-                                        log::warn!("Sound meter disconnected. retrying...");
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                };
-            }
-        })
-    }
+pub struct State {
+    last_published_at: DateTime<Utc>,
+    max_decibel_level: f64,
 }
 
 pub struct SoundMeterTable {
-    table_key: TableKey,
+    name: String,
+    endpoint: Endpoint,
     remote_type: Option<TelemetryType>,
 }
 
 impl SoundMeterTable {
-    pub fn new(table_key: TableKey, remote_type: Option<TelemetryType>) -> Self {
+    pub fn new(name: String, endpoint: Endpoint, remote_type: Option<TelemetryType>) -> Self {
         Self {
-            table_key,
+            name,
+            endpoint,
             remote_type,
         }
     }
 }
 
 impl super::TableSpec for SoundMeterTable {
-    type State = ();
-    type Value = SoundMeterRow;
+    type State = State;
     type Row = SoundMeterRow;
 
-    fn new_state(&self) -> Self::State {}
+    fn new_state(&self) -> Self::State {
+        State {
+            last_published_at: DateTime::<Utc>::MIN_UTC,
+            max_decibel_level: 0.0,
+        }
+    }
 
-    fn table_key(&self) -> TableKey {
-        self.table_key.clone()
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn endpoint(&self) -> Endpoint {
+        self.endpoint.clone()
     }
 
     fn remote_type(&self) -> Option<TelemetryType> {
         self.remote_type
     }
 
-    fn create_row(&self, _state: &mut Self::State, value: Self::Value) -> Self::Row {
-        value
+    fn create_row(&self, state: &mut Self::State, values: PublishedValues) -> Option<Self::Row> {
+        let now = Utc::now();
+
+        if let Some(value) = values.get(&KEY_SOUND_LEVEL).and_then(|v| v.as_f64()) {
+            if now - state.last_published_at < POLL_INTERVAL {
+                state.max_decibel_level = state.max_decibel_level.max(value);
+                None
+            } else {
+                state.last_published_at = now;
+                let decibel_level = state.max_decibel_level.max(value);
+                state.max_decibel_level = 0.0;
+                Some(SoundMeterRow {
+                    decibel_level: Some(decibel_level),
+                    decibel_level_10: None,
+                })
+            }
+        } else {
+            None
+        }
     }
 }

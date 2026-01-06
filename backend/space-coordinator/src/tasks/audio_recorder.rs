@@ -10,6 +10,7 @@ use dxe_extern::google_cloud::{CredentialManager, Error as GcpError};
 use dxe_s2s_shared::entities::BookingWithUsers;
 use dxe_s2s_shared::handlers::UpdateAudioRequest;
 use dxe_types::{BookingId, UnitId};
+use futures::StreamExt;
 use parking_lot::Mutex;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -19,17 +20,27 @@ use tokio_task_scheduler::{Task, TaskBuilder};
 use crate::callback::EventStateCallback;
 use crate::client::DxeClient;
 use crate::config::{AudioRecorderConfig, GoogleApiConfig};
+use crate::tables::{TablePublisher, TableUpdateReceiver};
+use crate::tasks::sound_meter_controller::SoundMeterPath;
+use crate::types::{DeviceId, DeviceRef, PublishKey};
 
 struct RecorderProcess {
     recorder: process::Child,
     lame: process::Child,
     stream_feeder: Option<tokio::task::JoinHandle<()>>,
     file_writer: Option<tokio::task::JoinHandle<()>>,
+    presence_watcher: Option<tokio::task::JoinHandle<()>>,
+
     has_stopped: Arc<Mutex<bool>>,
+    presence_flag: Arc<Mutex<bool>>,
 }
 
 impl RecorderProcess {
-    pub async fn new(config: &AudioRecorderConfig, output_path: PathBuf) -> Result<Self, Error> {
+    pub async fn new(
+        config: &AudioRecorderConfig,
+        output_path: PathBuf,
+        sound_meter_subscription: Option<(TableUpdateReceiver, PublishKey, f64)>,
+    ) -> Result<Self, Error> {
         let mut recorder_cmd = process::Command::new(config.pw_record_bin.clone());
         recorder_cmd
             .arg(format!("--rate={}", config.sampling_rate))
@@ -90,12 +101,35 @@ impl RecorderProcess {
             }
         });
 
+        let (presence_watcher, presence_flag) =
+            if let Some((mut subscription, publish_key, threshold)) = sound_meter_subscription {
+                let presence_flag = Arc::new(Mutex::new(false));
+
+                let cloned_presence_flag = presence_flag.clone();
+                let task = tokio::task::spawn(async move {
+                    while let Some(Ok(table)) = subscription.next().await {
+                        if let Some(value) = table.get(&publish_key)
+                            && let Some(value) = value.as_f64()
+                            && value >= threshold
+                        {
+                            *cloned_presence_flag.clone().lock() = true;
+                        }
+                    }
+                });
+                (Some(task), presence_flag)
+            } else {
+                (None, Arc::new(Mutex::new(true)))
+            };
+
         Ok(RecorderProcess {
             recorder,
             lame,
             stream_feeder: Some(stream_feeder),
             file_writer: Some(file_writer),
+            presence_watcher,
+
             has_stopped,
+            presence_flag,
         })
     }
 
@@ -103,13 +137,16 @@ impl RecorderProcess {
         *self.has_stopped.lock()
     }
 
-    pub async fn stop(&mut self) -> Result<(), Error> {
+    pub async fn stop(&mut self) -> Result<bool, Error> {
         let Some(stream_feeder) = self.stream_feeder.take() else {
             return Err(Error::AlreadyStopped);
         };
         let Some(file_writer) = self.file_writer.take() else {
             return Err(Error::AlreadyStopped);
         };
+        if let Some(presence_watcher) = self.presence_watcher.take() {
+            presence_watcher.abort();
+        }
 
         self.recorder.kill().await?;
         self.lame.wait().await?;
@@ -117,13 +154,14 @@ impl RecorderProcess {
         let _ = stream_feeder.await;
         let _ = file_writer.await;
 
-        Ok(())
+        Ok(*self.presence_flag.lock())
     }
 }
 
 pub struct AudioRecorder {
     drive_client: GoogleDriveClient,
     dxe_client: DxeClient,
+    sound_meter_table: TablePublisher<DeviceId, DeviceRef, SoundMeterPath>,
 
     config: HashMap<UnitId, AudioRecorderConfig>,
 
@@ -135,6 +173,7 @@ impl AudioRecorder {
         google_api_config: &GoogleApiConfig,
         config: HashMap<UnitId, AudioRecorderConfig>,
         dxe_client: DxeClient,
+        sound_meter_table: TablePublisher<DeviceId, DeviceRef, SoundMeterPath>,
     ) -> Result<Self, Error> {
         let gcp_credential = CredentialManager::new(google_api_config, None)?;
         let drive_client = GoogleDriveClient::new(gcp_credential, &google_api_config.drive);
@@ -142,6 +181,7 @@ impl AudioRecorder {
         Ok(Self {
             drive_client,
             dxe_client,
+            sound_meter_table,
 
             config,
 
@@ -161,7 +201,16 @@ impl AudioRecorder {
         let mut path = config.path_prefix.clone();
         path.push(format!("{}.mp3", booking.booking.id));
 
-        let process = RecorderProcess::new(config, path).await?;
+        let sound_meter_subscription = config.sound_meter.as_ref().map(|sound_meter| {
+            (
+                self.sound_meter_table
+                    .subscribe(sound_meter.device_id.clone()),
+                sound_meter.publish_key.clone().unwrap(),
+                sound_meter.sound_level_threshold,
+            )
+        });
+
+        let process = RecorderProcess::new(config, path, sound_meter_subscription).await?;
 
         self.tasks.lock().insert(booking.booking.id, process);
 
@@ -175,14 +224,13 @@ impl AudioRecorder {
             return;
         };
 
-        if let Err(e) = child.stop().await {
-            log::warn!("Cannot stop recorder process: {e}");
-        }
-
-        log::info!(
-            "Recording finished for {}. Uploading to Google Drive...",
-            booking.booking.id
-        );
+        let presence = match child.stop().await {
+            Ok(presence) => presence,
+            Err(e) => {
+                log::warn!("Cannot stop recorder process: {e}");
+                false
+            }
+        };
 
         let mut path = config.path_prefix.clone();
         path.push(format!("{}.mp3", booking.booking.id));
@@ -190,6 +238,17 @@ impl AudioRecorder {
             log::warn!("File {path:?} not exists.");
             return;
         }
+
+        if !presence {
+            log::info!("No presence detected. Skipping upload...");
+            let _ = tokio::fs::remove_file(path).await;
+            return;
+        }
+
+        log::info!(
+            "Recording finished for {}. Uploading to Google Drive...",
+            booking.booking.id
+        );
 
         let drive_client = self.drive_client.clone();
         let dxe_client = self.dxe_client.clone();

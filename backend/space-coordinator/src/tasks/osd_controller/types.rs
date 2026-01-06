@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 pub enum AlertSeverity {
     Urgent,
     Normal,
+    Intrusive,
 }
 
 fn default_closeable() -> bool {
@@ -38,4 +39,5 @@ pub struct ParkingState {
     pub user_name: String,
     pub entry_date: DateTime<Utc>,
     pub exempted: bool,
+    pub fuzzy: bool,
 }

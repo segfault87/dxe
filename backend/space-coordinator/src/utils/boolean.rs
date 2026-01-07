@@ -62,14 +62,11 @@ impl<K> Condition<K> {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct OrExpression<K>(pub Box<Expression<K>>, pub Box<Expression<K>>);
-
-#[derive(Clone, Debug, Deserialize)]
 #[serde(untagged)]
 pub enum Expression<K> {
     Unary(Condition<K>),
     And(Vec<Expression<K>>),
-    Or { or: OrExpression<K> },
+    Or { or: Vec<Expression<K>> },
 }
 
 impl<K: Eq + Hash + Clone> Expression<K> {
@@ -82,7 +79,10 @@ impl<K: Eq + Hash + Clone> Expression<K> {
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
                 .all(|v| v)),
-            Self::Or { or } => Ok(or.0.test(table)? || or.1.test(table)?),
+            Self::Or { or: expressions } => Ok(expressions
+                .iter()
+                .map(|v| v.test(table))
+                .any(|v| matches!(v, Ok(true)))),
         }
     }
 
@@ -98,9 +98,10 @@ impl<K: Eq + Hash + Clone> Expression<K> {
                     values.extend(expression.keys());
                 }
             }
-            Self::Or { or } => {
-                values.extend(or.0.keys());
-                values.extend(or.1.keys());
+            Self::Or { or: expressions } => {
+                for expression in expressions {
+                    values.extend(expression.keys());
+                }
             }
         }
 

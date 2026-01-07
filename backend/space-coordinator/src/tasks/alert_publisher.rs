@@ -81,7 +81,6 @@ impl AlertPublisher {
                 }
 
                 if let Some(unit_ids) = &alert.bookings
-                    && !unit_ids.is_empty()
                     && unit_ids
                         .iter()
                         .filter(|id| self.clone().is_unit_active(id))

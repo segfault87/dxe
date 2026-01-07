@@ -91,6 +91,9 @@ impl AmanoClient {
             .chars()
             .rev()
             .take(4)
+            .collect::<String>()
+            .chars()
+            .rev()
             .collect::<String>();
 
         let mut request = self

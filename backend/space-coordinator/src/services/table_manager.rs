@@ -3,7 +3,7 @@ use crate::tasks::metrics_publisher::MetricsPath;
 use crate::tasks::sound_meter_controller::SoundMeterPath;
 use crate::tasks::z2m_controller::Z2mPath;
 use crate::types::{
-    DeviceId, DeviceRef, DeviceType, Endpoint, EndpointRef, MetricId, PublishedValues,
+    DeviceId, DeviceRef, DeviceType, Endpoint, EndpointKey, MetricId, PublishedValues,
 };
 
 #[derive(Clone)]
@@ -76,7 +76,7 @@ impl TableSnapshot {
 }
 
 impl StateTable for TableSnapshot {
-    type Key = EndpointRef;
+    type Key = EndpointKey;
 
     fn get(&self, key: &Self::Key) -> Option<serde_json::Value> {
         match &key.endpoint {

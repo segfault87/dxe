@@ -1,27 +1,29 @@
 use std::collections::VecDeque;
+use std::ops::{AddAssign, Div, SubAssign};
 
 use chrono::{DateTime, TimeDelta, Utc};
+use num_traits::Float;
 
-pub struct MovingAverage {
-    queue: VecDeque<(DateTime<Utc>, f64)>,
+pub struct MovingAverage<V> {
+    queue: VecDeque<(DateTime<Utc>, V)>,
     window: TimeDelta,
-    sum: f64,
+    sum: V,
 }
 
-impl MovingAverage {
+impl<V: AddAssign + Float + SubAssign> MovingAverage<V> {
     pub fn new(window: TimeDelta) -> Self {
         Self {
             queue: VecDeque::new(),
             window,
-            sum: 0.0,
+            sum: V::zero(),
         }
     }
 
-    pub fn push(&mut self, value: f64) -> f64 {
+    pub fn push(&mut self, value: V) -> <V as Div>::Output {
         let now = Utc::now();
 
         while let Some(front) = self.queue.front()
-            && now - front.0 < self.window
+            && now - front.0 > self.window
         {
             self.sum -= front.1;
             self.queue.pop_front();
@@ -33,11 +35,11 @@ impl MovingAverage {
         self.average()
     }
 
-    pub fn average(&self) -> f64 {
+    pub fn average(&self) -> <V as Div>::Output {
         if self.queue.is_empty() {
-            f64::NAN
+            V::nan()
         } else {
-            self.sum / self.queue.len() as f64
+            self.sum / V::from(self.queue.len()).unwrap()
         }
     }
 }

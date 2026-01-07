@@ -4,7 +4,7 @@ use dxe_types::TelemetryType;
 
 use crate::types::{Endpoint, PublishKey, PublishedValues};
 
-pub const PUBLISH_DURATION: TimeDelta = TimeDelta::seconds(10);
+pub const PUBLISH_RATE: TimeDelta = TimeDelta::seconds(10);
 pub const KEY_ENERGY: PublishKey = PublishKey::new_const("energy");
 pub const KEY_POWER: PublishKey = PublishKey::new_const("power");
 
@@ -78,7 +78,7 @@ impl super::TableSpec for Z2mPowerMeterTable {
 
         let now = Utc::now();
 
-        if now - state.last_published_at > PUBLISH_DURATION {
+        if now - state.last_published_at > PUBLISH_RATE {
             let row = Self::Row {
                 instantaneous_wattage: state.current_wattage,
                 power_usage_kwh: state.current_energy_usage_kwh,

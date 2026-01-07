@@ -1365,6 +1365,7 @@ dependencies = [
  "futures",
  "libc",
  "log",
+ "num-traits",
  "parking_lot",
  "pin-project",
  "ping",

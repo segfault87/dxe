@@ -4,7 +4,7 @@ use dxe_types::TelemetryType;
 
 use crate::types::{Endpoint, PublishKey, PublishedValues};
 
-const POLL_INTERVAL: TimeDelta = TimeDelta::seconds(10);
+const PUBLISH_RATE: TimeDelta = TimeDelta::seconds(10);
 const KEY_SOUND_LEVEL: PublishKey = PublishKey::new_const("sound_level");
 
 pub struct State {
@@ -55,7 +55,7 @@ impl super::TableSpec for SoundMeterTable {
         let now = Utc::now();
 
         if let Some(value) = values.get(&KEY_SOUND_LEVEL).and_then(|v| v.as_f64()) {
-            if now - state.last_published_at < POLL_INTERVAL {
+            if now - state.last_published_at < PUBLISH_RATE {
                 state.max_decibel_level = state.max_decibel_level.max(value);
                 None
             } else {

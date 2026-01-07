@@ -222,18 +222,18 @@ impl FromStr for Endpoint {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, DeserializeFromStr, SerializeDisplay)]
-pub struct EndpointRef {
+pub struct EndpointKey {
     pub endpoint: Endpoint,
     pub key: PublishKey,
 }
 
-impl Display for EndpointRef {
+impl Display for EndpointKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}:{}", self.endpoint, self.key)
     }
 }
 
-impl FromStr for EndpointRef {
+impl FromStr for EndpointKey {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -241,7 +241,7 @@ impl FromStr for EndpointRef {
             .rsplit_once(':')
             .ok_or(ParseError::EndpointRef(s.to_owned()))?;
 
-        Ok(EndpointRef {
+        Ok(EndpointKey {
             endpoint: Endpoint::from_str(value)?,
             key: key.to_owned().into(),
         })

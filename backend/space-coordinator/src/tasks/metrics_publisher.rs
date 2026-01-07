@@ -60,7 +60,9 @@ impl MetricsPublisher {
                 (
                     v.clone(),
                     (
-                        MovingAverage::new(metric.average_window.unwrap_or(TimeDelta::zero())),
+                        MovingAverage::<f64>::new(
+                            metric.average_window.unwrap_or(TimeDelta::zero()),
+                        ),
                         metric
                             .devices
                             .iter()

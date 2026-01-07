@@ -15,6 +15,7 @@ env_logger = "0.11"
 futures = "0.3"
 libc = "0.2"
 log = { workspace = true }
+num-traits = "0.2"
 parking_lot = { workspace = true }
 pin-project = "1"
 ping = "0.7"

@@ -61,9 +61,9 @@ impl Stream for Tasi653bSoundLevelMeter {
                         log::error!("Could not initialize sound meter: {e}");
                         this.sleep
                             .set(Some(tokio::time::sleep(Duration::from_secs(1))).into());
-                        cx.waker().wake_by_ref();
                     }
                 }
+                cx.waker().wake_by_ref();
                 Poll::Pending
             }
             Poll::Pending => Poll::Pending,

@@ -5,7 +5,9 @@ use dxe_types::{GroupId, IdentityId, IdentityProvider, UserId};
 use sqlx::SqliteConnection;
 
 use crate::Error;
-use crate::entities::{Group, Identity, IdentityDiscriminator, User, UserPlainCredential};
+use crate::entities::{
+    Group, Identity, IdentityDiscriminator, KakaoUser, User, UserPlainCredential,
+};
 
 pub async fn get_identity(
     connection: &mut SqliteConnection,
@@ -669,4 +671,45 @@ pub async fn get_user_plain_credential_with_handle(
             },
         )
     }))
+}
+
+pub async fn get_kakao_user(
+    connection: &mut SqliteConnection,
+    id: &str,
+) -> Result<Option<KakaoUser>, Error> {
+    Ok(sqlx::query_as!(
+        KakaoUser,
+        r#"
+        SELECT
+            id AS "id: _",
+            name AS "name: _",
+            created_at AS "created_at: _"
+        FROM kakao_user
+        WHERE id=?1
+        "#,
+        id
+    )
+    .fetch_optional(&mut *connection)
+    .await?)
+}
+
+pub async fn insert_kakao_user(
+    connection: &mut SqliteConnection,
+    now: DateTime<Utc>,
+    id: &str,
+    name: &str,
+) -> Result<bool, Error> {
+    let result = sqlx::query!(
+        r#"
+        INSERT INTO kakao_user(id, name, created_at)
+        VALUES(?1, ?2, ?3)
+    "#,
+        id,
+        name,
+        now,
+    )
+    .execute(&mut *connection)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
 }

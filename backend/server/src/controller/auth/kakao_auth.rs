@@ -7,6 +7,7 @@ use actix_web::cookie::Cookie;
 use actix_web::cookie::time::OffsetDateTime;
 use actix_web::http::header::LOCATION;
 use actix_web::{HttpResponse, ResponseError, web};
+use dxe_data::queries::identity::{get_kakao_user, insert_kakao_user};
 use dxe_data::queries::user::{get_user_by_foreign_id, is_administrator};
 use dxe_extern::kakao::client as kakao_client;
 use dxe_extern::kakao::models::AccountPropertyKey;
@@ -78,9 +79,9 @@ pub async fn redirect(
         let foreign_id = me.id.to_string();
 
         let mut tx = database.begin().await.map_err(dxe_data::Error::Sqlx)?;
+
         let user =
-            get_user_by_foreign_id(&mut tx, IdentityProvider::Kakao, foreign_id.as_str(), *now)
-                .await?;
+            get_user_by_foreign_id(&mut tx, IdentityProvider::Kakao, &foreign_id, *now).await?;
 
         if let Some(user) = user {
             let session = UserSession {
@@ -111,6 +112,11 @@ pub async fn redirect(
                 .cookie(refresh_cookie)
                 .finish())
         } else {
+            let kakao_user = get_kakao_user(&mut tx, &foreign_id).await?;
+            if kakao_user.is_none() {
+                let _ = insert_kakao_user(&mut tx, *now, &foreign_id, &name).await?;
+            }
+
             let encrypted_access_token = aes_crypto.encrypt(None, token.access_token.as_bytes())?;
             let mut cookie_bearer = Cookie::build("kakao_bearer_token", encrypted_access_token)
                 .path("/")

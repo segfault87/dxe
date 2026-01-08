@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO kakao_user(id, name, created_at)\n        VALUES(?1, ?2, ?3)\n    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "a972aab3155932d6f6fc7b34dad4fcd6db373e947881b6361c67ac3d315be78a"
+}

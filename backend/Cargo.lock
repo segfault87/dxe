@@ -1304,6 +1304,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "dxe-types",
+ "num-traits",
  "serde",
  "url",
 ]

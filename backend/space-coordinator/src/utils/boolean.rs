@@ -67,6 +67,7 @@ pub enum Expression<K> {
     Unary(Condition<K>),
     And(Vec<Expression<K>>),
     Or { or: Vec<Expression<K>> },
+    Not { not: Box<Expression<K>> },
 }
 
 impl<K: Eq + Hash + Clone> Expression<K> {
@@ -83,6 +84,9 @@ impl<K: Eq + Hash + Clone> Expression<K> {
                 .iter()
                 .map(|v| v.test(table))
                 .any(|v| matches!(v, Ok(true)))),
+            Self::Not { not: expression } => Ok(
+                !expression.test(table)?
+            ),
         }
     }
 
@@ -102,6 +106,9 @@ impl<K: Eq + Hash + Clone> Expression<K> {
                 for expression in expressions {
                     values.extend(expression.keys());
                 }
+            }
+            Self::Not { not: expression } => {
+                values.extend(expression.keys());
             }
         }
 

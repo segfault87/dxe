@@ -117,6 +117,8 @@ pub async fn redirect(
                 let _ = insert_kakao_user(&mut tx, *now, &foreign_id, &name).await?;
             }
 
+            let _ = tx.commit().await;
+
             let encrypted_access_token = aes_crypto.encrypt(None, token.access_token.as_bytes())?;
             let mut cookie_bearer = Cookie::build("kakao_bearer_token", encrypted_access_token)
                 .path("/")

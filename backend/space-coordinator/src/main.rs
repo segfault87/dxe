@@ -124,6 +124,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let booking_reminder = BookingReminder::new(client.clone());
 
+    booking_state_manager.add_callback(alert_publisher.clone());
     booking_state_manager.add_callback(z2m_controller.clone());
     booking_state_manager.add_callback(audio_recorder);
     booking_state_manager.add_callback(telemetry_manager.clone());

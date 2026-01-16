@@ -27,11 +27,11 @@ pub enum CarParkExemptionResult {
     NotFound,
     AlreadyApplied {
         entry_date: DateTime<Utc>,
-        fuzzy: bool,
+        fuzzy: Option<String>,
     },
     Success {
         entry_date: DateTime<Utc>,
-        fuzzy: bool,
+        fuzzy: Option<String>,
     },
 }
 
@@ -111,15 +111,17 @@ impl AmanoClient {
 
         let json_body: Vec<serde_json::Map<String, serde_json::Value>> = result.json().await?;
         let mut found_entry: Option<&serde_json::Map<String, serde_json::Value>> = None;
-        let mut fuzzy = true;
+        let mut fuzzy = None;
         for entry in json_body.iter() {
             if let Some(car_no) = entry.get("carNo")
                 && let Some(car_no) = car_no.as_str()
             {
                 found_entry = Some(entry);
                 if car_no == license_plate_number {
-                    fuzzy = false;
+                    fuzzy = None;
                     break;
+                } else {
+                    fuzzy = Some(car_no.to_owned());
                 }
             }
         }

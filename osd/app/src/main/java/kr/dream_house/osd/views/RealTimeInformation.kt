@@ -72,8 +72,8 @@ fun ParkingEntry(
                 append(elapsedTime.format())
             }
         }
-        if (parkingState.exempted) {
-            append(" ✅")
+        parkingState.fuzzy?.let {
+            append(" (${it}로 인식)")
         }
     }
 

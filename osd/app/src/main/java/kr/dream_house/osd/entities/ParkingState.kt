@@ -11,4 +11,5 @@ data class ParkingState(
     val userName: String,
     val entryDate: Instant,
     val exempted: Boolean,
+    val fuzzy: String?,
 )

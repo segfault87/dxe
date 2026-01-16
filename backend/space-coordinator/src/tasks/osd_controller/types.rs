@@ -39,5 +39,5 @@ pub struct ParkingState {
     pub user_name: String,
     pub entry_date: DateTime<Utc>,
     pub exempted: bool,
-    pub fuzzy: bool,
+    pub fuzzy: Option<String>,
 }

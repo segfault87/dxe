@@ -122,13 +122,23 @@ impl CarparkExempter {
                                 license_plate_number: license_plate_number.clone(),
                                 user_name: user_name.clone(),
                                 entry_date,
-                                exempted: success,
-                                fuzzy,
+                                exempted: true,
+                                fuzzy: fuzzy.clone(),
                             });
                     }
 
                     if success {
-                        self.notification_service.notify(NotificationPriority::Low, format!("Car parking exempted sucessfully for user {user_name} ({customer_name}){}", if fuzzy { " (fuzzy)" } else { "" })).await
+                        self.notification_service.notify(
+                            NotificationPriority::Low,
+                            format!(
+                                "Car parking exempted sucessfully for user {user_name} ({customer_name}){}",
+                                if let Some(fuzzy) = fuzzy {
+                                    format!(" (recognized as {fuzzy})")
+                                } else {
+                                    Default::default()
+                                }
+                            )
+                        ).await
                     } else {
                         continue;
                     }

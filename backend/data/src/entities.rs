@@ -8,8 +8,8 @@ pub use booking::{
     Product, ProductDiscriminator, TelemetryFile,
 };
 pub use identity::{
-    Group, GroupAssociation, Identity, IdentityDiscriminator, KakaoUser, User,
-    UserCashPaymentInformation, UserPlainCredential,
+    Group, GroupAssociation, Identity, IdentityDiscriminator, User, UserCashPaymentInformation,
+    UserPlainCredential,
 };
 pub use payment::{CashTransaction, TossPaymentsTransaction};
 pub use unit::{Space, Unit};

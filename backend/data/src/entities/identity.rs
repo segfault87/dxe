@@ -10,13 +10,6 @@ pub enum IdentityDiscriminator {
 }
 
 #[derive(Debug, Clone, FromRow)]
-pub struct KakaoUser {
-    pub id: String,
-    pub name: String,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, FromRow)]
 pub struct User {
     pub id: UserId,
     pub provider: IdentityProvider,

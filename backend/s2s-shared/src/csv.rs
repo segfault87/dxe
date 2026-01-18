@@ -2,8 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SoundMeterRow {
-    pub decibel_level: Option<f64>,
-    pub decibel_level_10: Option<i16>,
+    pub decibel_level: f64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

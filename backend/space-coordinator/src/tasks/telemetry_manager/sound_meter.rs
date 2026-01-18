@@ -62,10 +62,7 @@ impl super::TableSpec for SoundMeterTable {
                 state.last_published_at = now;
                 let decibel_level = state.max_decibel_level.max(value);
                 state.max_decibel_level = 0.0;
-                Some(SoundMeterRow {
-                    decibel_level: Some(decibel_level),
-                    decibel_level_10: None,
-                })
+                Some(SoundMeterRow { decibel_level })
             }
         } else {
             None

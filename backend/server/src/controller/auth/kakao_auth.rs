@@ -7,7 +7,6 @@ use actix_web::cookie::Cookie;
 use actix_web::cookie::time::OffsetDateTime;
 use actix_web::http::header::LOCATION;
 use actix_web::{HttpResponse, ResponseError, web};
-use dxe_data::queries::identity::{get_kakao_user, insert_kakao_user};
 use dxe_data::queries::user::{get_user_by_foreign_id, is_administrator};
 use dxe_extern::kakao::client as kakao_client;
 use dxe_extern::kakao::models::AccountPropertyKey;
@@ -112,13 +111,6 @@ pub async fn redirect(
                 .cookie(refresh_cookie)
                 .finish())
         } else {
-            let kakao_user = get_kakao_user(&mut tx, &foreign_id).await?;
-            if kakao_user.is_none() {
-                let _ = insert_kakao_user(&mut tx, *now, &foreign_id, &name).await?;
-            }
-
-            let _ = tx.commit().await;
-
             let encrypted_access_token = aes_crypto.encrypt(None, token.access_token.as_bytes())?;
             let mut cookie_bearer = Cookie::build("kakao_bearer_token", encrypted_access_token)
                 .path("/")

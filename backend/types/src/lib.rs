@@ -178,6 +178,7 @@ pub enum TelemetryType {
     PowerUsageTotal,
     PowerUsageRoom,
     SoundMeter,
+    AqRehearsalRoom,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Deserialize, Serialize)]

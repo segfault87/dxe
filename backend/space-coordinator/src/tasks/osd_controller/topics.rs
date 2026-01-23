@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use dxe_types::UnitId;
 use serde::Serialize;
 
 use super::OsdTopic;
-use super::types::{AlertData, Booking, ParkingState};
+use super::types::{AlertData, Booking, MixerChannelData, MixerGlobalData, ParkingState};
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -70,5 +72,33 @@ pub struct DoorLockOpenResult {
 impl OsdTopic for DoorLockOpenResult {
     fn topic_name(&self) -> String {
         String::from("doorlock/get")
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetMixerStates {
+    #[serde(skip)]
+    pub unit_id: UnitId,
+    pub overwrite: bool,
+    pub channels: HashMap<i8, MixerChannelData>,
+    pub globals: Option<MixerGlobalData>,
+}
+
+impl OsdTopic for SetMixerStates {
+    fn topic_name(&self) -> String {
+        format!("mixer_states/{}", self.unit_id)
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DoorbellRequest {
+    pub unit_id: Option<UnitId>,
+}
+
+impl OsdTopic for DoorbellRequest {
+    fn topic_name(&self) -> String {
+        String::from("doorbell_request")
     }
 }

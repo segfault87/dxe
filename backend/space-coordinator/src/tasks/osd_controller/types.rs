@@ -41,3 +41,26 @@ pub struct ParkingState {
     pub exempted: bool,
     pub fuzzy: Option<String>,
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all(serialize = "camelCase"))]
+pub struct MixerChannelData {
+    pub level: Option<i8>,
+    pub pan: Option<i8>,
+    pub reverb: Option<i8>,
+    pub mute: Option<bool>,
+    pub eq_high_level: Option<i8>,
+    pub eq_high_freq: Option<i8>,
+    pub eq_mid_level: Option<i8>,
+    pub eq_mid_freq: Option<i8>,
+    pub eq_mid_q: Option<i8>,
+    pub eq_low_level: Option<i8>,
+    pub eq_low_freq: Option<i8>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all(serialize = "camelCase"))]
+pub struct MixerGlobalData {
+    pub master_level: Option<i8>,
+    pub monitor_level: Option<i8>,
+}

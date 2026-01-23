@@ -1,4 +1,5 @@
 pub mod sound_meter;
+pub mod z2m_aq;
 pub mod z2m_power_meter;
 
 use std::collections::HashMap;
@@ -24,6 +25,7 @@ use crate::services::table_manager::TableManager;
 use crate::services::telemetry::TelemetryService;
 use crate::tables::TableUpdateReceiver;
 use crate::tasks::telemetry_manager::sound_meter::SoundMeterTable;
+use crate::tasks::telemetry_manager::z2m_aq::Z2mAirQualityTable;
 use crate::tasks::telemetry_manager::z2m_power_meter::Z2mPowerMeterTable;
 use crate::types::{Endpoint, PublishedValues};
 
@@ -230,6 +232,14 @@ impl TelemetryManager {
                         table.remote_type,
                     ));
                     self.clone().register(z2m_power_meter_table);
+                }
+                TableClass::Z2mAq => {
+                    let z2m_aq_table = Arc::new(Z2mAirQualityTable::new(
+                        table.name.clone(),
+                        table.endpoint.clone(),
+                        table.remote_type,
+                    ));
+                    self.clone().register(z2m_aq_table);
                 }
                 TableClass::SoundMeter => {
                     let sound_meter_table = Arc::new(SoundMeterTable::new(

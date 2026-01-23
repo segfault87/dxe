@@ -10,6 +10,7 @@ use crate::types::Endpoint;
 pub enum TableClass {
     SoundMeter,
     Z2mPowerMeter,
+    Z2mAq,
 }
 
 #[derive(Debug, Deserialize)]

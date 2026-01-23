@@ -15,7 +15,7 @@ use tokio_task_scheduler::{Scheduler, Task, TaskBuilder, TaskStatus};
 
 use crate::callback::{AlertCallback, EventStateCallback};
 use crate::client::DxeClient;
-use crate::config::osd::{AlertConfig, AlertKind, Config as OsdConfig};
+use crate::config::osd::{AlertConfig, AlertKind, Config as OsdConfig, MixerConfig};
 use crate::services::mqtt::{Error as MqttError, MqttService, MqttTopicPrefix};
 use crate::tasks::osd_controller::topics::DoorLockOpenResult;
 use crate::tasks::unit_fetcher::UnitsState;
@@ -35,6 +35,8 @@ pub struct OsdController {
 
     topic_prefix: MqttTopicPrefix,
     alerts: Vec<AlertConfig>,
+    mixer_configs: HashMap<UnitId, MixerConfig>,
+    doorbell_alert_id: Option<AlertId>,
 
     units: UnitsState,
     current_bookings: Mutex<HashMap<UnitId, BookingEntry>>,
@@ -56,6 +58,8 @@ impl OsdController {
 
             topic_prefix: config.topic_prefix.clone(),
             alerts: config.alerts.clone(),
+            mixer_configs: config.mixers.clone(),
+            doorbell_alert_id: config.doorbell_alert_id.clone(),
 
             units,
             current_bookings: Mutex::new(HashMap::new()),
@@ -169,6 +173,18 @@ impl OsdController {
 #[async_trait::async_trait]
 impl AlertCallback for OsdController {
     async fn on_alert(&self, alert_id: AlertId, started: bool) -> Result<(), Box<dyn StdError>> {
+        if let Some(doorbell_alert_id) = &self.doorbell_alert_id
+            && doorbell_alert_id == &alert_id
+        {
+            if let Err(e) = self
+                .publish(&topics::DoorbellRequest { unit_id: None })
+                .await
+            {
+                log::warn!("Could not publish doorbell alert: {e}");
+            }
+            return Ok(());
+        }
+
         for (alert, unit_id) in self.alerts.iter().filter_map(|v| {
             if let AlertKind::Alert { alert_id: id } = &v.kind
                 && &alert_id == id
@@ -245,6 +261,23 @@ impl EventStateCallback<BookingWithUsers> for OsdController {
                 .1
                 .insert(event.booking.id);
         } else {
+            if let Some(mixer_config) = self.mixer_configs.get(&event.booking.unit_id) {
+                let set_mixer_state = topics::SetMixerStates {
+                    unit_id: event.booking.unit_id.clone(),
+                    channels: mixer_config.channels.clone(),
+                    globals: Some(mixer_config.globals.clone()),
+                    overwrite: true,
+                };
+                let delay = mixer_config.reset_after;
+                let cloned_self = self.clone();
+                tokio::task::spawn(async move {
+                    tokio::time::sleep(delay.to_std().unwrap()).await;
+                    if let Err(e) = cloned_self.publish(&set_mixer_state).await {
+                        log::warn!("Could not send mixer states to OSD: {e}");
+                    }
+                });
+            }
+
             let booking = types::Booking {
                 booking_id: event.booking.id,
                 customer_name: event.booking.customer_name.clone(),

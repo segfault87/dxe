@@ -323,6 +323,7 @@ impl IntoView for TelemetryEntry {
                 dxe_types::TelemetryType::PowerUsageRoom => TelemetryType::PowerUsageRoom,
                 dxe_types::TelemetryType::PowerUsageTotal => TelemetryType::PowerUsageTotal,
                 dxe_types::TelemetryType::SoundMeter => TelemetryType::SoundMeter,
+                dxe_types::TelemetryType::AqRehearsalRoom => TelemetryType::AqRehearsalRoom,
             },
         })
     }

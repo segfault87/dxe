@@ -166,6 +166,9 @@ pub async fn get(
                 ))
                 .map_err(|e| Error::Internal(Box::new(e)))?;
         }
+        TelemetryType::AqRehearsalRoom => {
+            todo!()
+        }
     };
 
     svg.present().map_err(|e| Error::Internal(Box::new(e)))?;

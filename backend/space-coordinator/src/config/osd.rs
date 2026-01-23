@@ -36,9 +36,12 @@ pub struct AlertConfig {
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct MixerConfig {
-    pub channels: HashMap<i8, MixerChannelData>,
+    pub channels: HashMap<String, MixerChannelData>,
     pub globals: MixerGlobalData,
-    #[serde(rename = "reset_after_seconds", deserialize_with = "deserialize_time_delta_seconds")]
+    #[serde(
+        rename = "reset_after_seconds",
+        deserialize_with = "deserialize_time_delta_seconds"
+    )]
     pub reset_after: TimeDelta,
 }
 

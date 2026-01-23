@@ -103,6 +103,8 @@ pub struct Device {
     pub state_keys: Vec<PublishKey>,
     #[serde(default)]
     pub classes: DeviceClasses,
+    #[serde(default)]
+    pub skip_sync: bool,
 }
 
 impl Device {

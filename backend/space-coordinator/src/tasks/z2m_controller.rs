@@ -123,25 +123,27 @@ impl Z2mController {
 
     pub async fn start(&mut self) {
         let mut device_count = self.devices.len();
-        for id in self.devices.keys() {
+        for (id, device) in self.devices.iter() {
             if let Err(e) = self.mqtt_service.subscribe(&id.topic_name(None)).await {
                 log::warn!("Cannot subscribe to {id}: {e}");
                 continue;
             }
 
-            let values = match self.get_states(id).await {
-                Ok(v) => v,
-                Err(e) => {
-                    log::warn!("Could not get state for device {id}: {e}");
-                    continue;
-                }
-            };
+            if !device.skip_sync {
+                let values = match self.get_states(id).await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::warn!("Could not get state for device {id}: {e}");
+                        continue;
+                    }
+                };
 
-            log::info!("Got initial state for {id}");
+                log::info!("Got initial state for {id}");
+
+                let device_id = id.clone().into();
+                self.table.replace(device_id, values);
+            }
             device_count -= 1;
-
-            let device_id = id.clone().into();
-            self.table.replace(device_id, values);
         }
 
         if device_count == 0 {

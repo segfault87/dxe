@@ -26,4 +26,6 @@ pub struct Alert {
         default
     )]
     pub grace: Option<TimeDelta>,
+    #[serde(default)]
+    pub stateless: bool,
 }

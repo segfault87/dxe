@@ -125,7 +125,9 @@ impl AlertPublisher {
                             last_alert_at = now;
                         }
 
-                        alert_fired = true;
+                        if !alert.stateless {
+                            alert_fired = true;
+                        }
 
                         log::info!("Firing alert {}", alert.id);
 

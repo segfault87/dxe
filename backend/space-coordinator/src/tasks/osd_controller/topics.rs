@@ -81,7 +81,7 @@ pub struct SetMixerStates {
     #[serde(skip)]
     pub unit_id: UnitId,
     pub overwrite: bool,
-    pub channels: HashMap<i8, MixerChannelData>,
+    pub channels: HashMap<String, MixerChannelData>,
     pub globals: Option<MixerGlobalData>,
 }
 

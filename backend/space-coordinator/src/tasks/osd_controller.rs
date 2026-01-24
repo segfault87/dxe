@@ -222,6 +222,22 @@ impl EventStateCallback<BookingWithUsers> for OsdController {
         buffered: bool,
     ) -> Result<(), Box<dyn StdError>> {
         if buffered {
+            if let Some(mixer_config) = self.mixer_configs.get(&event.booking.unit_id) {
+                let set_mixer_state = topics::SetMixerStates {
+                    unit_id: event.booking.unit_id.clone(),
+                    channels: mixer_config.channels.clone(),
+                    globals: Some(mixer_config.globals.clone()),
+                    overwrite: true,
+                };
+                let delay = mixer_config.reset_after;
+                let cloned_self = self.clone();
+                tokio::task::spawn(async move {
+                    tokio::time::sleep(delay.to_std().unwrap()).await;
+                    if let Err(e) = cloned_self.publish(&set_mixer_state).await {
+                        log::warn!("Could not send mixer states to OSD: {e}");
+                    }
+                });
+            }
             if let Err(e) = self
                 .publish(&topics::SetScreenState {
                     unit_id: event.booking.unit_id.clone(),
@@ -261,23 +277,6 @@ impl EventStateCallback<BookingWithUsers> for OsdController {
                 .1
                 .insert(event.booking.id);
         } else {
-            if let Some(mixer_config) = self.mixer_configs.get(&event.booking.unit_id) {
-                let set_mixer_state = topics::SetMixerStates {
-                    unit_id: event.booking.unit_id.clone(),
-                    channels: mixer_config.channels.clone(),
-                    globals: Some(mixer_config.globals.clone()),
-                    overwrite: true,
-                };
-                let delay = mixer_config.reset_after;
-                let cloned_self = self.clone();
-                tokio::task::spawn(async move {
-                    tokio::time::sleep(delay.to_std().unwrap()).await;
-                    if let Err(e) = cloned_self.publish(&set_mixer_state).await {
-                        log::warn!("Could not send mixer states to OSD: {e}");
-                    }
-                });
-            }
-
             let booking = types::Booking {
                 booking_id: event.booking.id,
                 customer_name: event.booking.customer_name.clone(),

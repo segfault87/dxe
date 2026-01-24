@@ -36,7 +36,7 @@ import kr.dream_house.osd.AlertSeverity
 import kr.dream_house.osd.R
 
 @Composable
-fun ModalPopup(title: String, contents: String, onDismiss: (() -> Unit)?, severity: AlertSeverity) {
+fun AlertPopup(title: String, contents: String, onDismiss: (() -> Unit)?, severity: AlertSeverity) {
     if (severity == AlertSeverity.INTRUSIVE) {
         val context = LocalContext.current
 

@@ -1,0 +1,183 @@
+package kr.dream_house.osd.views
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import kr.dream_house.osd.midi.ChannelControlParameter
+import kr.dream_house.osd.midi.ChannelData
+import kr.dream_house.osd.midi.GlobalControlParameter
+import kr.dream_house.osd.midi.GlobalData
+import kr.dream_house.osd.midi.LocalMixerController
+import kr.dream_house.osd.midi.PartialChannelDataUpdate
+import kr.dream_house.osd.midi.PartialGlobalDataUpdate
+import kr.dream_house.osd.views.unit_default.TroubleshootingContact
+
+@Composable
+fun MixerRow(
+    name: String,
+    channelData: ChannelData,
+    onChangeLevel: (Float) -> Unit,
+    onChangePan: (Float) -> Unit,
+    onChangeReverb: (Float) -> Unit,
+    onChangeMute: (Boolean) -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(modifier = Modifier.width(200.dp), text = name)
+        Slider(
+            modifier = Modifier.weight(1.0f),
+            value = channelData.level,
+            valueRange = 0f..1f,
+            onValueChange = onChangeLevel,
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.tertiary,
+                activeTrackColor = MaterialTheme.colorScheme.tertiary
+            )
+        )
+        Slider(
+            modifier = Modifier.width(150.dp),
+            value = channelData.reverb,
+            valueRange = 0f..1f,
+            onValueChange = onChangeReverb
+        )
+        Switch(
+            checked = channelData.mute,
+            onCheckedChange = {
+                onChangeMute(it)
+            }
+        )
+    }
+}
+
+@Composable
+fun GlobalControlRow(
+    globalData: GlobalData,
+    onChangeMasterLevel: (Float) -> Unit,
+    onChangeMonitorLevel: (Float) -> Unit,
+) {
+    Row(modifier = Modifier.padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(modifier = Modifier.padding(end = 8.dp), text = "마스터 음량")
+        Slider(
+            modifier = Modifier.weight(1.0f),
+            value = globalData.masterLevel,
+            valueRange = 0f..1f,
+            onValueChange = onChangeMasterLevel,
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.secondary,
+                activeTrackColor = MaterialTheme.colorScheme.secondary
+            )
+        )
+        Text(modifier = Modifier.padding(start = 24.dp, end = 8.dp), text = "모니터 음량")
+        Slider(
+            modifier = Modifier.width(300.dp),
+            value = globalData.monitorLevel.toFloat(),
+            valueRange = 0f..1f,
+            onValueChange = onChangeMonitorLevel,
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.secondary,
+                activeTrackColor = MaterialTheme.colorScheme.secondary
+            )
+        )
+    }
+}
+
+@Composable
+fun MixerControls() {
+    if (LocalMixerController.current == null) {
+        TroubleshootingContact(message = "믹서가 연결되어 있지 않습니다. 위 연락처로 문의해주시기 바랍니다.")
+        return
+    }
+
+    val mixerController = LocalMixerController.current!!
+
+    val state by mixerController.state.collectAsState()
+    val isMixerConnected by mixerController.isConnected.collectAsState()
+
+    val scrollState = rememberScrollState()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            Row(
+                modifier = Modifier.padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(modifier = Modifier.width(200.dp), text = "채널명", fontWeight = FontWeight.Bold)
+                Text(
+                    modifier = Modifier.weight(1.0f),
+                    text = "음량",
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    modifier = Modifier.width(150.dp),
+                    text = "리버브",
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    modifier = Modifier.width(50.dp),
+                    text = "뮤트",
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1.0f).verticalScroll(scrollState),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                mixerController.channels.mapIndexed { idx, name ->
+                    val data = state.channels[idx]
+                    MixerRow(
+                        name,
+                        data,
+                        onChangeLevel = {
+                            mixerController.updateValues(idx, PartialChannelDataUpdate(level = it))
+                        },
+                        onChangePan = {
+                            mixerController.updateValues(idx, PartialChannelDataUpdate(pan = it))
+                        },
+                        onChangeReverb = {
+                            mixerController.updateValues(idx, PartialChannelDataUpdate(reverb = it))
+                        },
+                        onChangeMute = {
+                            mixerController.updateValues(idx, PartialChannelDataUpdate(mute = it))
+                        })
+                }
+            }
+            GlobalControlRow(
+                globalData = state.globals,
+                onChangeMasterLevel = {
+                    mixerController.updateValues(PartialGlobalDataUpdate(masterLevel = it))
+                },
+                onChangeMonitorLevel = {
+                    mixerController.updateValues(PartialGlobalDataUpdate(monitorLevel = it))
+                }
+            )
+        }
+
+        if (!isMixerConnected) {
+            TroubleshootingContact(modifier = Modifier.background(Color(0xccffffff)), message = "믹서가 연결되어 있지 않습니다. 위 연락처로 문의해주시기 바랍니다.")
+        }
+    }
+}

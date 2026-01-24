@@ -17,8 +17,8 @@ import androidx.compose.ui.unit.dp
 import kr.dream_house.osd.R
 
 @Composable
-fun TroubleshootingContact(message: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+fun TroubleshootingContact(modifier: Modifier = Modifier, message: String) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

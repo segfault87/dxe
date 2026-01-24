@@ -12,8 +12,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -28,34 +32,66 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonNull
+import kr.dream_house.osd.BuildConfig
 import kr.dream_house.osd.Navigation
 import kr.dream_house.osd.entities.AlertData
 import kr.dream_house.osd.entities.Booking
 import kr.dream_house.osd.entities.ParkingState
+import kr.dream_house.osd.midi.ChannelData
+import kr.dream_house.osd.midi.GlobalData
+import kr.dream_house.osd.midi.LocalMixerController
+import kr.dream_house.osd.midi.updateFrom
 import kr.dream_house.osd.mqtt.MqttService
 import kr.dream_house.osd.mqtt.TopicSubscriber
 import kr.dream_house.osd.mqtt.topics.Alert
 import kr.dream_house.osd.mqtt.topics.CurrentSession
 import kr.dream_house.osd.mqtt.topics.DoorLockOpenResult
+import kr.dream_house.osd.mqtt.topics.DoorbellRequest
 import kr.dream_house.osd.mqtt.topics.ParkingStates
+import kr.dream_house.osd.mqtt.topics.SetMixerStates
 import kr.dream_house.osd.mqttConfigFlow
 import kr.dream_house.osd.ui.theme.WhitishYellow
 import kr.dream_house.osd.views.unit_default.UnitInformation
+
+const val SUBPAGE_TIMEOUT_MILLISECONDS: Long = 1000 * 60 * 5
+
+enum class CurrentPage {
+    Mixer,
+    UnitInformation,
+}
 
 @Composable
 fun MainScreen(navController: NavHostController) {
     val context = LocalContext.current
     val mqttConfig by mqttConfigFlow(context).collectAsState(null)
     val coroutineScope = rememberCoroutineScope()
+    val mixerController = LocalMixerController.current
+    var timerTask by remember { mutableStateOf<Job?>(null) }
+    var currentPage by remember { mutableStateOf(CurrentPage.Mixer) }
 
     var activeBooking by remember { mutableStateOf<Booking?>(null) }
     var parkingStates by remember { mutableStateOf<List<ParkingState>>(emptyList()) }
     var currentAlert by remember { mutableStateOf<AlertData?>(null) }
     var sendOpenDoorRequest by remember { mutableStateOf<suspend () -> DoorLockOpenResult?>({ null }) }
+    var doorbellRequest by remember { mutableStateOf(false) }
+
+    LaunchedEffect(currentPage) {
+        timerTask?.cancel()
+
+        if (currentPage != CurrentPage.Mixer) {
+            timerTask = null
+        } else {
+            timerTask = coroutineScope.launch {
+                delay(SUBPAGE_TIMEOUT_MILLISECONDS)
+                currentPage = CurrentPage.Mixer
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         coroutineScope.launch {
@@ -125,6 +161,35 @@ fun MainScreen(navController: NavHostController) {
                     doorLockOpenResultChannel.trySend(payload)
                 }
             }
+            val onSetMixerStates = object: TopicSubscriber<SetMixerStates> {
+                override fun onPayload(topic: String, payload: SetMixerStates) {
+                    mixerController?.let { controller ->
+                        if (payload.overwrite) {
+                            val initialChannelStates = mutableListOf<ChannelData>()
+                            for (i in 0 until controller.channels.size) {
+                                initialChannelStates.add(payload.channels[i.toString()]?.let {
+                                    ChannelData().updateFrom(it)
+                                } ?: ChannelData())
+                            }
+                            val initialGlobalStates = GlobalData().updateFrom(payload.globals)
+                            controller.updateInitialChannelStates(initialChannelStates, initialGlobalStates)
+                        } else {
+                            for ((channel, data) in payload.channels) {
+                                controller.updateValues(channel.toInt(), data)
+                            }
+                            controller.updateValues(payload.globals)
+                        }
+                    }
+
+                }
+            }
+            val onDoorbellRequest = object: TopicSubscriber<DoorbellRequest> {
+                override fun onPayload(topic: String, payload: DoorbellRequest) {
+                    if (payload.unitId == null || payload.unitId == BuildConfig.UNIT_ID) {
+                        doorbellRequest = true
+                    }
+                }
+            }
 
             sendOpenDoorRequest = {
                 if (!it.publish(DoorLockOpenResult.setTopicName, JsonNull, 1, false)) {
@@ -138,8 +203,12 @@ fun MainScreen(navController: NavHostController) {
             it.subscribe(onCurrentSession)
             it.subscribe(onAlert)
             it.subscribe(onParkingStates)
+            it.subscribe(onSetMixerStates)
+            it.subscribe(onDoorbellRequest)
 
             return@DisposableEffect onDispose {
+                it.unsubscribe(onDoorbellRequest)
+                it.unsubscribe(onSetMixerStates)
                 it.unsubscribe(onParkingStates)
                 it.unsubscribe(onAlert)
                 it.unsubscribe(onCurrentSession)
@@ -158,21 +227,61 @@ fun MainScreen(navController: NavHostController) {
                     colors = CardDefaults.cardColors(containerColor = Color(0xfffff1d7)),
                     elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
                 ) {
-                    RealTimeInformation(
-                        sendOpenDoorRequest = sendOpenDoorRequest,
-                        activeBooking = activeBooking,
-                        parkingStates = parkingStates
-                    )
+                    Column {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            RealTimeInformation(
+                                sendOpenDoorRequest = sendOpenDoorRequest,
+                                activeBooking = activeBooking,
+                                parkingStates = parkingStates
+                            )
+
+                            ElevatedButton(
+                                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                                colors = ButtonDefaults.elevatedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.tertiary
+                                ),
+                                onClick = {
+                                    currentPage = CurrentPage.Mixer
+                                },
+                                enabled = currentPage != CurrentPage.Mixer,
+                            ) {
+                                Text(
+                                    modifier = Modifier.padding(16.dp),
+                                    text = "음량 설정",
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                            }
+                            ElevatedButton(
+                                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                                colors = ButtonDefaults.elevatedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.tertiary
+                                ),
+                                onClick = {
+                                    currentPage = CurrentPage.UnitInformation
+                                },
+                                enabled = currentPage != CurrentPage.UnitInformation,
+                            ) {
+                                Text(
+                                    modifier = Modifier.padding(16.dp),
+                                    text = "도움말",
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                            }
+                        }
+                    }
                 }
             }
             Box(modifier = Modifier.weight(0.7f)) {
-                UnitInformation()
+                when (currentPage) {
+                    CurrentPage.Mixer -> MixerControls()
+                    CurrentPage.UnitInformation -> UnitInformation()
+                }
             }
         }
     }
 
     currentAlert?.let {
-        ModalPopup(
+        AlertPopup(
             it.title,
             it.contents,
             if (it.closeable) {
@@ -181,6 +290,15 @@ fun MainScreen(navController: NavHostController) {
                 null
             },
             it.severity
+        )
+    }
+
+    if (doorbellRequest) {
+        DoorbellPopup(
+            sendOpenDoorRequest,
+            {
+                doorbellRequest = false
+            }
         )
     }
 }

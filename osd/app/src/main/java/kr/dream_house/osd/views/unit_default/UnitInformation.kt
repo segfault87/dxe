@@ -12,27 +12,18 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kr.dream_house.osd.R
 
-const val SUBPAGE_TIMEOUT_MILLISECONDS: Long = 1000 * 60 * 5
-
 enum class Subpage(val contents: @Composable (onClose: () -> Unit) -> Unit) {
-    MIXER_SETUP({ MixerSetup(it) }),
     VOLUME_ADJUSTMENT({ VolumeAdjustment(it) }),
-    REVERB_SETTINGS({ ReverbSettings(it) }),
     CONNECT_MOBILE({ ConnectMobile(it) }),
     CONNECT_AUDIO_EQUIPMENT({ ConnectAudioEquipment(it) }),
     CONTACT({ Contact(it) });
@@ -48,21 +39,6 @@ fun MenuItemButton(onClick: () -> Unit, text: String) {
 @Composable
 fun UnitInformation() {
     var currentPage by remember { mutableStateOf<Subpage?>(null) }
-    var timerTask by remember { mutableStateOf<Job?>(null) }
-    val coroutineScope = rememberCoroutineScope()
-
-    LaunchedEffect(currentPage) {
-        timerTask?.cancel()
-
-        if (currentPage == null) {
-            timerTask = null
-        } else {
-            timerTask = coroutineScope.launch {
-                delay(SUBPAGE_TIMEOUT_MILLISECONDS)
-                currentPage = null
-            }
-        }
-    }
 
     if (currentPage != null) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -78,16 +54,8 @@ fun UnitInformation() {
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 MenuItemButton(
-                    onClick = { currentPage = Subpage.MIXER_SETUP },
-                    text = "믹서 설정방법 / 마이크, 건반 소리가 안 나요"
-                )
-                MenuItemButton(
                     onClick = { currentPage = Subpage.VOLUME_ADJUSTMENT },
                     text = "모니터링이 잘 안 돼요 / 마이크 소리가 너무 작아요"
-                )
-                MenuItemButton(
-                    onClick = { currentPage = Subpage.REVERB_SETTINGS },
-                    text = "마이크에 리버브를 걸고 싶어요"
                 )
                 MenuItemButton(
                     onClick = { currentPage = Subpage.CONNECT_MOBILE },

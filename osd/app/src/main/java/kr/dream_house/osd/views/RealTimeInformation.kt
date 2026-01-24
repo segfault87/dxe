@@ -8,6 +8,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -84,7 +85,7 @@ fun ParkingEntry(
 }
 
 @Composable
-fun RealTimeInformation(
+fun ColumnScope.RealTimeInformation(
     sendOpenDoorRequest: suspend () -> DoorLockOpenResult?,
     activeBooking: Booking?,
     parkingStates: List<ParkingState>
@@ -94,50 +95,48 @@ fun RealTimeInformation(
 
     var doorUnlockInProgress by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier.weight(1.0f).verticalScroll(rememberScrollState())
-        ) {
-            Text(modifier = Modifier.padding(16.dp), text = "입차 정보", style = MaterialTheme.typography.titleLarge)
-            if (parkingStates.isNotEmpty()) {
-                for (parkingState in parkingStates) {
-                    ParkingEntry(parkingState)
-                }
-            } else {
-                Text(
-                    modifier = Modifier.padding(start = 32.dp, top = 16.dp, end = 16.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    text = "입차된 차량 없음")
+    Column(
+        modifier = Modifier.weight(1.0f).verticalScroll(rememberScrollState())
+    ) {
+        Text(modifier = Modifier.padding(16.dp), text = "입차 정보", style = MaterialTheme.typography.titleLarge)
+        if (parkingStates.isNotEmpty()) {
+            for (parkingState in parkingStates) {
+                ParkingEntry(parkingState)
             }
+        } else {
+            Text(
+                modifier = Modifier.padding(start = 32.dp, top = 16.dp, end = 16.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                text = "입차된 차량 없음")
         }
-        if (activeBooking != null) {
-            ElevatedButton(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                enabled = !doorUnlockInProgress,
-                colors = ButtonDefaults.elevatedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.tertiary
-                ),
-                onClick = {
-                    coroutineScope.launch {
-                        doorUnlockInProgress = true
-                        val result = sendOpenDoorRequest()
-                        val success = result?.success ?: false
-                        val message = if (success) {
-                            "문이 열렸습니다."
-                        } else {
-                            result?.error ?: "일시적인 오류가 발생했습니다."
-                        }
-                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                        doorUnlockInProgress = false
+    }
+    if (activeBooking != null) {
+        ElevatedButton(
+            modifier = Modifier.fillMaxWidth().padding(8.dp),
+            enabled = !doorUnlockInProgress,
+            colors = ButtonDefaults.elevatedButtonColors(
+                contentColor = MaterialTheme.colorScheme.tertiary
+            ),
+            onClick = {
+                coroutineScope.launch {
+                    doorUnlockInProgress = true
+                    val result = sendOpenDoorRequest()
+                    val success = result?.success ?: false
+                    val message = if (success) {
+                        "문이 열렸습니다."
+                    } else {
+                        result?.error ?: "일시적인 오류가 발생했습니다."
                     }
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    doorUnlockInProgress = false
                 }
-            ) {
-                Text(
-                    modifier = Modifier.padding(16.dp),
-                    text = "출입문 열기",
-                    style = MaterialTheme.typography.titleLarge
-                )
             }
+        ) {
+            Text(
+                modifier = Modifier.padding(16.dp),
+                text = "출입문 열기",
+                style = MaterialTheme.typography.titleLarge
+            )
         }
     }
 }

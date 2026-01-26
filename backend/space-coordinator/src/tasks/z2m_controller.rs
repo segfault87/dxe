@@ -82,7 +82,8 @@ pub struct Z2mController {
     active_bookings: Mutex<Option<HashMap<UnitId, HashSet<BookingId>>>>,
     presence: Mutex<bool>,
 
-    state_keys: HashMap<Z2mDeviceId, Vec<PublishKey>>,
+    state_keys: HashMap<Z2mDeviceId, HashSet<PublishKey>>,
+    volatile_state_keys: HashMap<Z2mDeviceId, HashSet<PublishKey>>,
     table: TablePublisher<DeviceId, DeviceRef, Z2mPath>,
 }
 
@@ -112,6 +113,11 @@ impl Z2mController {
                 .devices
                 .iter()
                 .map(|v| (v.id.clone(), v.state_keys()))
+                .collect(),
+            volatile_state_keys: config
+                .devices
+                .iter()
+                .map(|v| (v.id.clone(), v.volatile_state_keys.clone()))
                 .collect(),
             table: TablePublisher::new(),
         }
@@ -310,7 +316,7 @@ impl Z2mController {
         if let Some(device_id) = Z2mDeviceId::from_topic_name(&publish.topic)
             && let Some(device) = self.devices.get(&device_id)
         {
-            let values = match serde_json::from_slice::<PublishedValues>(&publish.payload) {
+            let mut values = match serde_json::from_slice::<PublishedValues>(&publish.payload) {
                 Ok(v) => v,
                 Err(e) => {
                     log::warn!("Failed to serialize payload for {device_id}: {e}");
@@ -318,7 +324,34 @@ impl Z2mController {
                 }
             };
 
-            self.table.update(device.id.clone().into(), values);
+            if let Some(state_keys) = self.state_keys.get(&device_id) {
+                let states = state_keys
+                    .iter()
+                    .filter_map(|key| values.remove(key).map(|v| (key.clone(), v)))
+                    .collect::<HashMap<_, _>>();
+
+                if !states.is_empty() {
+                    self.table.update(device.id.clone().into(), states);
+                }
+            }
+
+            if let Some(volatile_state_keys) = self.volatile_state_keys.get(&device_id) {
+                let states = volatile_state_keys
+                    .iter()
+                    .filter_map(|key| values.remove(key).map(|v| (key.clone(), v)))
+                    .collect::<HashMap<_, _>>();
+
+                if !states.is_empty() {
+                    let clearance = states
+                        .keys()
+                        .map(|v| (v.clone(), serde_json::Value::Null))
+                        .collect::<HashMap<_, _>>();
+
+                    self.table.update(device.id.clone().into(), states);
+                    // Clear immediately after broadcasting
+                    self.table.update(device.id.clone().into(), clearance);
+                }
+            }
         }
     }
 

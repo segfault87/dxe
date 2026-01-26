@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::{collections::HashMap, fmt::Display};
 
 use chrono::TimeDelta;
@@ -100,7 +101,9 @@ pub struct DeviceClasses {
 pub struct Device {
     pub id: Z2mDeviceId,
     #[serde(default)]
-    pub state_keys: Vec<PublishKey>,
+    pub state_keys: HashSet<PublishKey>,
+    #[serde(default)]
+    pub volatile_state_keys: HashSet<PublishKey>,
     #[serde(default)]
     pub classes: DeviceClasses,
     #[serde(default)]
@@ -108,8 +111,8 @@ pub struct Device {
 }
 
 impl Device {
-    pub fn state_keys(&self) -> Vec<PublishKey> {
-        let mut keys = vec![];
+    pub fn state_keys(&self) -> HashSet<PublishKey> {
+        let mut keys = HashSet::new();
 
         keys.extend(self.state_keys.iter().cloned());
         if let Some(switch) = &self.classes.switch {

@@ -434,13 +434,11 @@ class Vm3100ProMixerDevice : MixerDevice {
                 ChannelControlParameter.PAN -> 10
                 ChannelControlParameter.EQ_LOW_FREQ -> 12
                 ChannelControlParameter.EQ_LOW_LEVEL -> 13
-                ChannelControlParameter.EQ_LOW_Q -> null
                 ChannelControlParameter.EQ_MID_FREQ -> 14
                 ChannelControlParameter.EQ_MID_LEVEL -> 15
                 ChannelControlParameter.EQ_MID_Q -> 16
                 ChannelControlParameter.EQ_HIGH_FREQ -> 17
                 ChannelControlParameter.EQ_HIGH_LEVEL -> 18
-                ChannelControlParameter.EQ_HIGH_Q -> null
             }
         } else if ((16..19).contains(channel)) {
             when (parameter) {
@@ -450,13 +448,11 @@ class Vm3100ProMixerDevice : MixerDevice {
                 ChannelControlParameter.PAN -> 70
                 ChannelControlParameter.EQ_LOW_FREQ -> 71
                 ChannelControlParameter.EQ_LOW_LEVEL -> 72
-                ChannelControlParameter.EQ_LOW_Q -> null
                 ChannelControlParameter.EQ_MID_FREQ -> 73
                 ChannelControlParameter.EQ_MID_LEVEL -> 74
                 ChannelControlParameter.EQ_MID_Q -> 75
                 ChannelControlParameter.EQ_HIGH_FREQ -> 76
                 ChannelControlParameter.EQ_HIGH_LEVEL -> 77
-                ChannelControlParameter.EQ_HIGH_Q -> null
             }
         } else {
             null

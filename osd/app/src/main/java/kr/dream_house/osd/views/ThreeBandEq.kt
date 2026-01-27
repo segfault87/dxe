@@ -3,6 +3,7 @@ package kr.dream_house.osd.views
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
@@ -47,11 +48,11 @@ import kr.dream_house.osd.utils.ThreeBandEq
 import kotlin.math.log2
 import kotlin.math.pow
 
-val MIN_FREQ_LOG2 = log2(20.0f)
-val MAX_FREQ_LOG2 = log2(20000.0f)
-val FREQ_SPAN_LOG2 = MAX_FREQ_LOG2 - MIN_FREQ_LOG2
+private val MIN_FREQ_LOG2 = log2(20.0f)
+private val MAX_FREQ_LOG2 = log2(20000.0f)
+private val FREQ_SPAN_LOG2 = MAX_FREQ_LOG2 - MIN_FREQ_LOG2
 
-fun gainFraction(
+private fun gainFraction(
     gain: Float,
     gainRange: ClosedFloatingPointRange<Float>,
 ): Float {
@@ -59,7 +60,7 @@ fun gainFraction(
 }
 
 @Composable
-fun BoxWithConstraintsScope.EqHandle(
+private fun BoxWithConstraintsScope.EqHandle(
     freq: Float,
     freqRange: ClosedFloatingPointRange<Float>?,
     gain: Float,
@@ -115,7 +116,7 @@ fun BoxWithConstraintsScope.EqHandle(
 }
 
 @Composable
-fun BoxWithConstraintsScope.ThreeBandEqCurve(
+private fun BoxWithConstraintsScope.ThreeBandEqCurve(
     eq: ThreeBandEq,
     gainRange: ClosedFloatingPointRange<Float>,
 ) {
@@ -146,11 +147,11 @@ fun BoxWithConstraintsScope.ThreeBandEqCurve(
 }
 
 @Composable
-fun ThreeBandEqView(
+private fun ThreeBandEqView(
     capabilities: Set<MixerCapability>,
     channelData: ChannelData,
     onUpdateValue: (PartialChannelDataUpdate) -> Unit,
-    midQRange: ClosedFloatingPointRange<Float>,
+    qRange: ClosedFloatingPointRange<Float>,
     modifier: Modifier = Modifier,
 ) {
     val eq = remember { ThreeBandEq(
@@ -164,6 +165,7 @@ fun ThreeBandEqView(
     val lowFreqAdjustable = remember { capabilities.contains(MixerCapability.CHANNEL_THREE_BAND_EQ_LOW_FREQ) }
     val midFreqAdjustable = remember { capabilities.contains(MixerCapability.CHANNEL_THREE_BAND_EQ_MID_FREQ) }
     val highFreqAdjustable = remember { capabilities.contains(MixerCapability.CHANNEL_THREE_BAND_EQ_HIGH_FREQ) }
+    val midQAdjustable = remember { capabilities.contains(MixerCapability.CHANNEL_THREE_BAND_EQ_MID_Q) }
 
     Column(modifier = modifier.fillMaxWidth()) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(200.dp)) {
@@ -199,20 +201,25 @@ fun ThreeBandEqView(
                 },
             )
         }
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Spacer(modifier = Modifier.weight(1.0f))
-            Slider(
-                modifier = Modifier.weight(1.0f),
-                valueRange = midQRange,
-                value = midQ,
-                onValueChange = {
-                    midQ = it
-                    val qValue = 2.0f.pow(midQ)
 
-                    eq.updateMid(channelData.eqMidFreq, channelData.eqMidLevel, qValue)
-                    onUpdateValue(PartialChannelDataUpdate(eqMidQ = qValue))
-                }
-            )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Spacer(modifier = Modifier.weight(1.0f))
+            if (midQAdjustable) {
+                Slider(
+                    modifier = Modifier.weight(1.0f),
+                    valueRange = qRange,
+                    value = midQ,
+                    onValueChange = {
+                        midQ = it
+                        val qValue = 2.0f.pow(midQ)
+
+                        eq.updateMid(channelData.eqMidFreq, channelData.eqMidLevel, qValue)
+                        onUpdateValue(PartialChannelDataUpdate(eqMidQ = qValue))
+                    }
+                )
+            } else {
+                Spacer(modifier = Modifier.weight(1.0f))
+            }
             Spacer(modifier = Modifier.weight(1.0f))
         }
     }
@@ -240,7 +247,7 @@ fun ThreeBandEqPopup(
                     capabilities = capabilities,
                     channelData = channelData,
                     onUpdateValue = onUpdateValue,
-                    midQRange = -1.0f..3.0f
+                    qRange = -1.0f..3.0f
                 )
                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
                 TextButton(modifier = Modifier.fillMaxWidth(), onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)) {

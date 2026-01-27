@@ -15,13 +15,11 @@ data class ChannelData(
     val mute: Boolean = false,
     val eqHighLevel: Float = 0.0f,
     val eqHighFreq: Float = 9490.0f,
-    val eqHighQ: Float = 0.5f,
     val eqMidLevel: Float = 0.0f,
     val eqMidFreq: Float = 2080.0f,
     val eqMidQ: Float = 0.5f,
     val eqLowLevel: Float = 0.0f,
     val eqLowFreq: Float = 99.0f,
-    val eqLowQ: Float = 0.5f,
 )
 
 @Serializable
@@ -32,13 +30,11 @@ data class PartialChannelDataUpdate(
     val mute: Boolean? = null,
     val eqHighLevel: Float? = null,
     val eqHighFreq: Float? = null,
-    val eqHighQ: Float? = null,
     val eqMidLevel: Float? = null,
     val eqMidFreq: Float? = null,
     val eqMidQ: Float? = null,
     val eqLowLevel: Float? = null,
     val eqLowFreq: Float? = null,
-    val eqLowQ: Float? = null,
 )
 
 fun ChannelData.updateFrom(update: PartialChannelDataUpdate): ChannelData {
@@ -49,13 +45,11 @@ fun ChannelData.updateFrom(update: PartialChannelDataUpdate): ChannelData {
         mute = update.mute ?: mute,
         eqHighLevel = update.eqHighLevel ?: eqHighLevel,
         eqHighFreq = update.eqHighFreq ?: eqHighFreq,
-        eqHighQ = update.eqHighQ ?: eqHighQ,
         eqMidLevel = update.eqMidLevel ?: eqMidLevel,
         eqMidFreq = update.eqMidFreq ?: eqMidFreq,
         eqMidQ = update.eqMidQ ?: eqMidQ,
         eqLowLevel = update.eqLowLevel ?: eqLowLevel,
         eqLowFreq = update.eqLowFreq ?: eqLowFreq,
-        eqLowQ = update.eqLowQ ?: eqLowQ,
     )
 }
 
@@ -66,13 +60,11 @@ private data class TransformedChannelData(
     var mute: Byte? = null,
     var eqHighLevel: Byte? = null,
     var eqHighFreq: Byte? = null,
-    var eqHighQ: Byte? = null,
     var eqMidLevel: Byte? = null,
     var eqMidFreq: Byte? = null,
     var eqMidQ: Byte? = null,
     var eqLowLevel: Byte? = null,
     var eqLowFreq: Byte? = null,
-    var eqLowQ: Byte? = null,
 )
 
 private fun PartialChannelDataUpdate.transform(channel: Int, data: TransformedChannelData, device: MixerDevice): List<ControlValue> {
@@ -150,18 +142,6 @@ private fun PartialChannelDataUpdate.transform(channel: Int, data: TransformedCh
             }
         }
     }
-    eqHighQ?.let {
-        device.translateChannelThreeBandEqHighQValue(it)?.let { updatedValue ->
-            if (data.eqHighQ != updatedValue) {
-                data.eqHighQ = updatedValue
-                result.add(ControlValue.ChannelValue(
-                    channel = channel,
-                    control = ChannelControlParameter.EQ_HIGH_Q,
-                    value = updatedValue,
-                ))
-            }
-        }
-    }
     eqMidLevel?.let {
         device.translateChannelEqLevelValue(it)?.let { updatedValue ->
             if (data.eqMidLevel != updatedValue) {
@@ -222,18 +202,6 @@ private fun PartialChannelDataUpdate.transform(channel: Int, data: TransformedCh
             }
         }
     }
-    eqLowQ?.let {
-        device.translateChannelThreeBandEqLowQValue(it)?.let { updatedValue ->
-            if (data.eqLowQ != updatedValue) {
-                data.eqLowQ = updatedValue
-                result.add(ControlValue.ChannelValue(
-                    channel = channel,
-                    control = ChannelControlParameter.EQ_LOW_Q,
-                    value = updatedValue,
-                ))
-            }
-        }
-    }
 
     return result
 }
@@ -249,9 +217,7 @@ private fun ChannelData.transform(device: MixerDevice): TransformedChannelData {
     val eqHighFreq = device.translateChannelThreeBandEqHighFreqValue(eqHighFreq)
     val eqMidFreq = device.translateChannelThreeBandEqMidFreqValue(eqMidFreq)
     val eqLowFreq = device.translateChannelThreeBandEqLowFreqValue(eqLowFreq)
-    val eqHighQ = device.translateChannelThreeBandEqHighQValue(eqHighQ)
     val eqMidQ = device.translateChannelThreeBandEqMidQValue(eqMidQ)
-    val eqLowQ = device.translateChannelThreeBandEqLowQValue(eqLowQ)
 
     return TransformedChannelData(
         level = level,
@@ -264,9 +230,7 @@ private fun ChannelData.transform(device: MixerDevice): TransformedChannelData {
         eqHighFreq = eqHighFreq,
         eqMidFreq = eqMidFreq,
         eqLowFreq = eqLowFreq,
-        eqHighQ = eqHighQ,
         eqMidQ = eqMidQ,
-        eqLowQ = eqLowQ,
     )
 }
 
@@ -353,25 +317,7 @@ private fun TransformedChannelData.buildControlPayloads(channel: Int): List<Cont
             value = it,
         ))
     }
-    eqHighQ?.let {
-        result.add(
-            ControlValue.ChannelValue(
-                control = ChannelControlParameter.EQ_HIGH_Q,
-                channel = channel,
-                value = it,
-            )
-        )
-    }
     eqMidQ?.let {
-        result.add(
-            ControlValue.ChannelValue(
-                control = ChannelControlParameter.EQ_MID_Q,
-                channel = channel,
-                value = it,
-            )
-        )
-    }
-    eqLowQ?.let {
         result.add(
             ControlValue.ChannelValue(
                 control = ChannelControlParameter.EQ_MID_Q,
@@ -653,15 +599,6 @@ class MixerController(
                             null
                         }
                     }
-                    ChannelControlParameter.EQ_HIGH_Q -> {
-                        val localValue = device.translateRemoteChannelThreeBandEqHighQValue(value)
-                        if (localValue != null && transformedData.eqHighQ != value) {
-                            transformedData.eqHighQ = value
-                            channelData.copy(eqHighQ = localValue)
-                        } else {
-                            null
-                        }
-                    }
                     ChannelControlParameter.EQ_MID_LEVEL -> {
                         val localValue = device.translateRemoteChannelEqLevelValue(value)
                         if (localValue != null && transformedData.eqMidLevel != value) {
@@ -703,15 +640,6 @@ class MixerController(
                         if (localValue != null && transformedData.eqLowFreq != value) {
                             transformedData.eqLowFreq = value
                             channelData.copy(eqLowFreq = localValue)
-                        } else {
-                            null
-                        }
-                    }
-                    ChannelControlParameter.EQ_LOW_Q -> {
-                        val localValue = device.translateRemoteChannelThreeBandEqLowQValue(value)
-                        if (localValue != null && transformedData.eqLowQ != value) {
-                            transformedData.eqLowQ = value
-                            channelData.copy(eqLowQ = localValue)
                         } else {
                             null
                         }

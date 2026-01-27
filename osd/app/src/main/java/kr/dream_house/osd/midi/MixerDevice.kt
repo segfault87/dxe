@@ -9,9 +9,7 @@ enum class MixerCapability {
     CHANNEL_THREE_BAND_EQ_HIGH_FREQ,
     CHANNEL_THREE_BAND_EQ_MID_FREQ,
     CHANNEL_THREE_BAND_EQ_LOW_FREQ,
-    CHANNEL_THREE_BAND_EQ_LOW_Q,
     CHANNEL_THREE_BAND_EQ_MID_Q,
-    CHANNEL_THREE_BAND_EQ_HIGH_Q,
     GLOBAL_MASTER_LEVEL,
     GLOBAL_MONITOR_LEVEL,
 }
@@ -23,13 +21,11 @@ enum class ChannelControlParameter {
     MUTE,
     EQ_LOW_FREQ,
     EQ_LOW_LEVEL,
-    EQ_LOW_Q,
     EQ_MID_FREQ,
     EQ_MID_LEVEL,
     EQ_MID_Q,
     EQ_HIGH_FREQ,
     EQ_HIGH_LEVEL,
-    EQ_HIGH_Q,
 }
 
 enum class GlobalControlParameter {
@@ -69,12 +65,8 @@ interface MixerDevice {
     fun translateRemoteChannelThreeBandEqMidFreqValue(value: Byte): Float? = null
     fun translateChannelThreeBandEqLowFreqValue(freq: Float): Byte? = null
     fun translateRemoteChannelThreeBandEqLowFreqValue(value: Byte): Float? = null
-    fun translateChannelThreeBandEqHighQValue(q: Float): Byte? = null
-    fun translateRemoteChannelThreeBandEqHighQValue(value: Byte): Float? = null
     fun translateChannelThreeBandEqMidQValue(q: Float): Byte? = null
     fun translateRemoteChannelThreeBandEqMidQValue(value: Byte): Float? = null
-    fun translateChannelThreeBandEqLowQValue(q: Float): Byte? = null
-    fun translateRemoteChannelThreeBandEqLowQValue(value: Byte): Float? = null
 
     fun translateGlobalMasterLevelValue(level: Float): Byte? = null
     fun translateRemoteGlobalMasterLevelValue(value: Byte): Float? = null
@@ -100,9 +92,7 @@ fun MixerDevice.queryCapability(capability: MixerCapability): Boolean {
         MixerCapability.CHANNEL_THREE_BAND_EQ_HIGH_FREQ -> translateChannelThreeBandEqHighFreqValue(10000.0f) != null
         MixerCapability.CHANNEL_THREE_BAND_EQ_MID_FREQ -> translateChannelThreeBandEqMidFreqValue(2000.0f) != null
         MixerCapability.CHANNEL_THREE_BAND_EQ_LOW_FREQ -> translateChannelThreeBandEqLowFreqValue(100.0f) != null
-        MixerCapability.CHANNEL_THREE_BAND_EQ_HIGH_Q -> translateChannelThreeBandEqHighQValue(0.5f) != null
         MixerCapability.CHANNEL_THREE_BAND_EQ_MID_Q -> translateChannelThreeBandEqMidQValue(0.5f) != null
-        MixerCapability.CHANNEL_THREE_BAND_EQ_LOW_Q -> translateChannelThreeBandEqLowQValue(0.5f) != null
         MixerCapability.GLOBAL_MASTER_LEVEL -> translateGlobalMasterLevelValue(0.0f) != null
         MixerCapability.GLOBAL_MONITOR_LEVEL -> translateGlobalMonitorLevelValue(0.0f) != null
     }

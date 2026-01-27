@@ -51,13 +51,11 @@ pub struct MixerChannelData {
     pub mute: Option<bool>,
     pub eq_high_level: Option<f64>,
     pub eq_high_freq: Option<f64>,
-    pub eq_high_q: Option<f64>,
     pub eq_mid_level: Option<f64>,
     pub eq_mid_freq: Option<f64>,
     pub eq_mid_q: Option<f64>,
     pub eq_low_level: Option<f64>,
     pub eq_low_freq: Option<f64>,
-    pub eq_low_q: Option<f64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -222,22 +222,6 @@ impl EventStateCallback<BookingWithUsers> for OsdController {
         buffered: bool,
     ) -> Result<(), Box<dyn StdError>> {
         if buffered {
-            if let Some(mixer_config) = self.mixer_configs.get(&event.booking.unit_id) {
-                let set_mixer_state = topics::SetMixerStates {
-                    unit_id: event.booking.unit_id.clone(),
-                    channels: mixer_config.channels.clone(),
-                    globals: Some(mixer_config.globals.clone()),
-                    overwrite: true,
-                };
-                let delay = mixer_config.reset_after;
-                let cloned_self = self.clone();
-                tokio::task::spawn(async move {
-                    tokio::time::sleep(delay.to_std().unwrap()).await;
-                    if let Err(e) = cloned_self.publish(&set_mixer_state).await {
-                        log::warn!("Could not send mixer states to OSD: {e}");
-                    }
-                });
-            }
             if let Err(e) = self
                 .publish(&topics::SetScreenState {
                     unit_id: event.booking.unit_id.clone(),
@@ -248,26 +232,45 @@ impl EventStateCallback<BookingWithUsers> for OsdController {
                 log::warn!("Could not send SetScreenState to OSD: {e}");
             }
 
-            if let Some(on_sign_in) = self.alerts.iter().find(|v| {
-                matches!(v.kind, AlertKind::OnSignOn)
-                    && v.unit_id
-                        .as_ref()
-                        .is_none_or(|unit_id| unit_id == &event.booking.unit_id)
-            }) && self
+            if self
                 .current_bookings
                 .lock()
                 .entry(event.booking.unit_id.clone())
                 .or_default()
                 .1
                 .is_empty()
-                && let Err(e) = self
+            {
+                if let Some(mixer_config) = self.mixer_configs.get(&event.booking.unit_id) {
+                    let set_mixer_state = topics::SetMixerStates {
+                        unit_id: event.booking.unit_id.clone(),
+                        channels: mixer_config.channels.clone(),
+                        globals: Some(mixer_config.globals.clone()),
+                        overwrite: true,
+                    };
+                    let delay = mixer_config.reset_after;
+                    let cloned_self = self.clone();
+                    tokio::task::spawn(async move {
+                        tokio::time::sleep(delay.to_std().unwrap()).await;
+                        if let Err(e) = cloned_self.publish(&set_mixer_state).await {
+                            log::warn!("Could not send mixer states to OSD: {e}");
+                        }
+                    });
+                }
+
+                if let Some(on_sign_in) = self.alerts.iter().find(|v| {
+                    matches!(v.kind, AlertKind::OnSignOn)
+                        && v.unit_id
+                            .as_ref()
+                            .is_none_or(|unit_id| unit_id == &event.booking.unit_id)
+                }) && let Err(e) = self
                     .publish(&topics::Alert {
                         unit_id: event.booking.unit_id.clone(),
                         alert: Some(on_sign_in.data.clone()),
                     })
                     .await
-            {
-                log::warn!("Could not send sign in alert to OSD: {e}");
+                {
+                    log::warn!("Could not send sign in alert to OSD: {e}");
+                }
             }
 
             self.current_bookings
@@ -284,12 +287,7 @@ impl EventStateCallback<BookingWithUsers> for OsdController {
                 time_to: event.booking.date_end.to_utc(),
             };
 
-            if let Some(on_sign_in) = self.alerts.iter().find(|v| {
-                matches!(v.kind, AlertKind::OnSignOn)
-                    && v.unit_id
-                        .as_ref()
-                        .is_none_or(|unit_id| unit_id == &event.booking.unit_id)
-            }) && self
+            if self
                 .current_bookings
                 .lock()
                 .entry(event.booking.unit_id.clone())
@@ -297,14 +295,38 @@ impl EventStateCallback<BookingWithUsers> for OsdController {
                 .1
                 .len()
                 > 1
-                && let Err(e) = self
+            {
+                if let Some(mixer_config) = self.mixer_configs.get(&event.booking.unit_id) {
+                    let set_mixer_state = topics::SetMixerStates {
+                        unit_id: event.booking.unit_id.clone(),
+                        channels: mixer_config.channels.clone(),
+                        globals: Some(mixer_config.globals.clone()),
+                        overwrite: true,
+                    };
+                    let delay = mixer_config.reset_after;
+                    let cloned_self = self.clone();
+                    tokio::task::spawn(async move {
+                        tokio::time::sleep(delay.to_std().unwrap()).await;
+                        if let Err(e) = cloned_self.publish(&set_mixer_state).await {
+                            log::warn!("Could not send mixer states to OSD: {e}");
+                        }
+                    });
+                }
+
+                if let Some(on_sign_in) = self.alerts.iter().find(|v| {
+                    matches!(v.kind, AlertKind::OnSignOn)
+                        && v.unit_id
+                            .as_ref()
+                            .is_none_or(|unit_id| unit_id == &event.booking.unit_id)
+                }) && let Err(e) = self
                     .publish(&topics::Alert {
                         unit_id: event.booking.unit_id.clone(),
                         alert: Some(on_sign_in.data.clone()),
                     })
                     .await
-            {
-                log::warn!("Could not send sign in alert to OSD: {e}");
+                {
+                    log::warn!("Could not send sign in alert to OSD: {e}");
+                }
             }
 
             if let Err(e) = self

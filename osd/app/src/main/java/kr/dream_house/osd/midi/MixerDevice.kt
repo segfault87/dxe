@@ -85,6 +85,9 @@ interface MixerDevice {
     fun parseCCPayload(packet: ByteArray, offset: Int, size: Int): ControlValue?
     fun buildCCPayload(value: ControlValue, output: ByteArray, offset: Int): Int
     fun getCCPayloadSizeHint(value: ControlValue): Int
+
+    fun flowControlMilliseconds(): Long
+    fun maxPayloadInBatch(): Int
 }
 
 fun MixerDevice.queryCapability(capability: MixerCapability): Boolean {

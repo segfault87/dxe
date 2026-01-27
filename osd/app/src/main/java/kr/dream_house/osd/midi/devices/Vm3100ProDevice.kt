@@ -592,4 +592,8 @@ class Vm3100ProMixerDevice : MixerDevice {
             }
         }
     }
+
+    override fun flowControlMilliseconds(): Long = 10
+
+    override fun maxPayloadInBatch(): Int = 5
 }

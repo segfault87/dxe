@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -92,6 +93,10 @@ class MainActivity : ComponentActivity() {
         val mixerController = midiDeviceManager?.let {
             MixerController(it, Vm3100ProMixerDevice())
         }
+
+        onBackPressedDispatcher.addCallback(this, object: OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {}
+        })
 
         enableEdgeToEdge()
         setContent {

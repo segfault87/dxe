@@ -11,6 +11,7 @@ composeBom = "2025.12.00"
 datastorePreferences = "1.2.0"
 pahoMqttAndroid = "4.4.2"
 navigation = "2.9.6"
+foundationLayout = "1.10.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -33,6 +34,7 @@ androidx-navigation-compose = { group = "androidx.navigation", name = "navigatio
 paho-mqtt-android = { module = "com.github.hannesa2:paho.mqtt.android", version.ref = "pahoMqttAndroid" }
 kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version = "0.7.1" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version = "1.9.0" }
+androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

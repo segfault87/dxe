@@ -469,8 +469,8 @@ private fun TransformedGlobalData.buildControlPayloads(): List<ControlValue> {
 
 @Serializable
 data class MixerState(
-    val channels: List<ChannelData>,
-    val globals: GlobalData,
+    val channels: List<ChannelData> = emptyList(),
+    val globals: GlobalData = GlobalData(),
 )
 
 private data class TransformedMixerState(
@@ -526,6 +526,10 @@ class MixerController(
     val channels: Array<String>
         get() = device.channelNames
 
+    val capabilities: Set<MixerCapability> by lazy {
+        MixerCapability.entries.filter { device.queryCapability(it) }.toSet()
+    }
+
     fun attach() {
         midiDeviceManager.addHandler(this)
     }
@@ -560,16 +564,30 @@ class MixerController(
     }
 
     private fun pushUpdates(updates: List<ControlValue>): Boolean {
-        return if (updates.isNotEmpty()) {
-            val size = updates.sumOf { device.getCCPayloadSizeHint(it) }
-            val payload = ByteArray(size)
-            var offset = 0
-            for (update in updates) {
-                offset += device.buildCCPayload(update, payload, offset)
+        return when {
+            updates.isEmpty() -> {
+                false
             }
-            midiDeviceManager.send(payload, 0, size)
-        } else {
-            false
+            updates.size <= device.maxPayloadInBatch() -> {
+                // Post small updates at once
+                val size = updates.sumOf { device.getCCPayloadSizeHint(it) }
+                val payload = ByteArray(size)
+                var offset = 0
+                for (update in updates) {
+                    offset += device.buildCCPayload(update, payload, offset)
+                }
+                midiDeviceManager.send(payload, 0, size)
+            }
+            else -> {
+                // Send in chunks in deferred if the payload is too big
+                val payloads = mutableListOf<ByteArray>()
+                for (update in updates) {
+                    val payload = ByteArray(device.getCCPayloadSizeHint(update))
+                    device.buildCCPayload(update, payload, 0)
+                    payloads.add(payload)
+                }
+                sendBulkPayloads(payloads)
+            }
         }
     }
 
@@ -779,13 +797,18 @@ class MixerController(
         sendBulkPayloads(device.initializeState(controlValues))
     }
 
-    private fun sendBulkPayloads(payloads: List<ByteArray>) {
+    private fun sendBulkPayloads(payloads: List<ByteArray>): Boolean {
+        // Sometimes mixer can't accept bulk messages at once and we have to schedule it by given msecs interval
+
         var timestamp = System.nanoTime()
         for (payload in payloads) {
-            // Sometimes mixer can't accept bulk messages at once and we have to schedule it by 10 msecs interval
-            midiDeviceManager.send(payload, 0, payload.size, timestamp)
-            timestamp += 10000000
+            if (!midiDeviceManager.send(payload, 0, payload.size, timestamp)) {
+                return false
+            }
+            timestamp += 1000000 * device.flowControlMilliseconds()
         }
+
+        return true
     }
 
     override fun onReceive(payload: ByteArray, offset: Int, count: Int) {

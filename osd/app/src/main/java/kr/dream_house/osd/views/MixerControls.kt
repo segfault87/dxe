@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -18,17 +20,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import kr.dream_house.osd.midi.ChannelControlParameter
 import kr.dream_house.osd.midi.ChannelData
-import kr.dream_house.osd.midi.GlobalControlParameter
 import kr.dream_house.osd.midi.GlobalData
 import kr.dream_house.osd.midi.LocalMixerController
+import kr.dream_house.osd.midi.MixerCapability
 import kr.dream_house.osd.midi.PartialChannelDataUpdate
 import kr.dream_house.osd.midi.PartialGlobalDataUpdate
 import kr.dream_house.osd.views.unit_default.TroubleshootingContact
@@ -36,16 +40,19 @@ import kr.dream_house.osd.views.unit_default.TroubleshootingContact
 @Composable
 fun MixerRow(
     name: String,
+    capabilities: Set<MixerCapability>,
     channelData: ChannelData,
     onChangeLevel: (Float) -> Unit,
     onChangePan: (Float) -> Unit,
     onChangeReverb: (Float) -> Unit,
     onChangeMute: (Boolean) -> Unit,
+    onOpenEqPopup: () -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(modifier = Modifier.width(200.dp), text = name)
         Slider(
             modifier = Modifier.weight(1.0f),
+            enabled = capabilities.contains(MixerCapability.CHANNEL_LEVEL),
             value = channelData.level,
             valueRange = 0f..1f,
             onValueChange = onChangeLevel,
@@ -55,13 +62,30 @@ fun MixerRow(
             )
         )
         Slider(
-            modifier = Modifier.width(150.dp),
+            modifier = Modifier.width(100.dp),
+            enabled = capabilities.contains(MixerCapability.CHANNEL_REVERB),
             value = channelData.reverb,
             valueRange = 0f..1f,
             onValueChange = onChangeReverb
         )
+        CenteredSlider(
+            modifier = Modifier.width(100.dp),
+            enabled = capabilities.contains(MixerCapability.CHANNEL_PAN),
+            value = channelData.pan,
+            centerThreshold = 0.1f,
+            valueRange = -1f..1f,
+            onValueChanged = onChangePan,
+        )
+        FilledTonalButton(
+            modifier = Modifier.width(80.dp),
+            enabled = capabilities.contains(MixerCapability.CHANNEL_THREE_BAND_EQ_LEVEL),
+            onClick = onOpenEqPopup,
+        ) {
+            Text("설정")
+        }
         Switch(
             checked = channelData.mute,
+            enabled = capabilities.contains(MixerCapability.CHANNEL_MUTE),
             onCheckedChange = {
                 onChangeMute(it)
             }
@@ -71,6 +95,7 @@ fun MixerRow(
 
 @Composable
 fun GlobalControlRow(
+    capability: Set<MixerCapability>,
     globalData: GlobalData,
     onChangeMasterLevel: (Float) -> Unit,
     onChangeMonitorLevel: (Float) -> Unit,
@@ -79,6 +104,7 @@ fun GlobalControlRow(
         Text(modifier = Modifier.padding(end = 8.dp), text = "마스터 음량")
         Slider(
             modifier = Modifier.weight(1.0f),
+            enabled = capability.contains(MixerCapability.GLOBAL_MASTER_LEVEL),
             value = globalData.masterLevel,
             valueRange = 0f..1f,
             onValueChange = onChangeMasterLevel,
@@ -90,7 +116,8 @@ fun GlobalControlRow(
         Text(modifier = Modifier.padding(start = 24.dp, end = 8.dp), text = "모니터 음량")
         Slider(
             modifier = Modifier.width(300.dp),
-            value = globalData.monitorLevel.toFloat(),
+            enabled = capability.contains(MixerCapability.GLOBAL_MONITOR_LEVEL),
+            value = globalData.monitorLevel,
             valueRange = 0f..1f,
             onValueChange = onChangeMonitorLevel,
             colors = SliderDefaults.colors(
@@ -109,9 +136,13 @@ fun MixerControls() {
     }
 
     val mixerController = LocalMixerController.current!!
+    val capabilities = remember { mixerController.capabilities }
+
 
     val state by mixerController.state.collectAsState()
     val isMixerConnected by mixerController.isConnected.collectAsState()
+
+    var eqPopup by remember { mutableStateOf<Int?>(null) }
 
     val scrollState = rememberScrollState()
 
@@ -130,8 +161,20 @@ fun MixerControls() {
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    modifier = Modifier.width(150.dp),
+                    modifier = Modifier.width(100.dp),
                     text = "리버브",
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    modifier = Modifier.width(100.dp),
+                    text = "밸런스",
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    modifier = Modifier.width(80.dp),
+                    text = "EQ",
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Bold
                 )
@@ -149,8 +192,9 @@ fun MixerControls() {
                 mixerController.channels.mapIndexed { idx, name ->
                     val data = state.channels[idx]
                     MixerRow(
-                        name,
-                        data,
+                        name = name,
+                        capabilities = capabilities,
+                        channelData = data,
                         onChangeLevel = {
                             mixerController.updateValues(idx, PartialChannelDataUpdate(level = it))
                         },
@@ -162,10 +206,16 @@ fun MixerControls() {
                         },
                         onChangeMute = {
                             mixerController.updateValues(idx, PartialChannelDataUpdate(mute = it))
-                        })
+                        },
+                        onOpenEqPopup = {
+                            eqPopup = idx
+                        },
+                    )
                 }
             }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             GlobalControlRow(
+                capabilities,
                 globalData = state.globals,
                 onChangeMasterLevel = {
                     mixerController.updateValues(PartialGlobalDataUpdate(masterLevel = it))
@@ -176,8 +226,24 @@ fun MixerControls() {
             )
         }
 
+        eqPopup?.let { channel ->
+            ThreeBandEqPopup(
+                channelName = mixerController.channels[channel],
+                capabilities = capabilities,
+                channelData = state.channels[channel],
+                onUpdateValue = {
+                    mixerController.updateValues(channel, it)
+                },
+                onDismiss = {
+                    eqPopup = null
+                }
+            )
+        }
+
         if (!isMixerConnected) {
-            TroubleshootingContact(modifier = Modifier.background(Color(0xccffffff)), message = "믹서가 연결되어 있지 않습니다. 위 연락처로 문의해주시기 바랍니다.")
+            TroubleshootingContact(
+                modifier = Modifier.background(Color(0xccffffff)),
+                message = "믹서가 연결되어 있지 않습니다. 위 연락처로 문의해주시기 바랍니다.")
         }
     }
 }

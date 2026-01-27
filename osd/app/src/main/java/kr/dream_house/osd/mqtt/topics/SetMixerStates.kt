@@ -14,5 +14,7 @@ data class SetMixerStates(
 ) {
     companion object : TopicSpec {
         override val topicName = "dxe/mixer_states/${BuildConfig.UNIT_ID}"
+
+        val syncTopicName = "dxe/mixer_states/${BuildConfig.UNIT_ID}/sync"
     }
 }

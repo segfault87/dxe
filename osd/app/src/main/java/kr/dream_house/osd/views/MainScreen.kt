@@ -27,14 +27,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonNull
 import kr.dream_house.osd.BuildConfig
@@ -45,6 +49,7 @@ import kr.dream_house.osd.entities.ParkingState
 import kr.dream_house.osd.midi.ChannelData
 import kr.dream_house.osd.midi.GlobalData
 import kr.dream_house.osd.midi.LocalMixerController
+import kr.dream_house.osd.midi.MixerState
 import kr.dream_house.osd.midi.updateFrom
 import kr.dream_house.osd.mqtt.MqttService
 import kr.dream_house.osd.mqtt.TopicSubscriber
@@ -65,6 +70,7 @@ enum class CurrentPage {
     UnitInformation,
 }
 
+@OptIn(FlowPreview::class)
 @Composable
 fun MainScreen(navController: NavHostController) {
     val context = LocalContext.current
@@ -74,10 +80,12 @@ fun MainScreen(navController: NavHostController) {
     var timerTask by remember { mutableStateOf<Job?>(null) }
     var currentPage by remember { mutableStateOf(CurrentPage.Mixer) }
 
+    val mixerState by mixerController?.state?.collectAsState() ?: remember { mutableStateOf(MixerState())  }
     var activeBooking by remember { mutableStateOf<Booking?>(null) }
     var parkingStates by remember { mutableStateOf<List<ParkingState>>(emptyList()) }
     var currentAlert by remember { mutableStateOf<AlertData?>(null) }
     var sendOpenDoorRequest by remember { mutableStateOf<suspend () -> DoorLockOpenResult?>({ null }) }
+    var publishMixerState by remember { mutableStateOf<suspend (MixerState) -> Unit>({}) }
     var doorbellRequest by remember { mutableStateOf(false) }
 
     LaunchedEffect(currentPage) {
@@ -101,6 +109,15 @@ fun MainScreen(navController: NavHostController) {
                 navController.navigate(route = Navigation.Config)
             }
         }
+    }
+
+    LaunchedEffect(Unit) {
+        snapshotFlow { mixerState }
+            .debounce(5000L)
+            .distinctUntilChanged()
+            .collect {
+                publishMixerState(it)
+            }
     }
 
     var mqttServiceBinder by remember { mutableStateOf<MqttService.LocalBinder?>(null) }
@@ -129,7 +146,7 @@ fun MainScreen(navController: NavHostController) {
     }
 
     DisposableEffect(mqttServiceBinder) {
-        mqttServiceBinder?.let {
+        mqttServiceBinder?.let { service ->
             val onCurrentSession = object: TopicSubscriber<CurrentSession> {
                 override fun onPayload(
                     topic: String,
@@ -191,28 +208,34 @@ fun MainScreen(navController: NavHostController) {
                 }
             }
 
+            publishMixerState = {
+                service.publish(SetMixerStates.syncTopicName, it, 1, false)
+            }
+
             sendOpenDoorRequest = {
-                if (!it.publish(DoorLockOpenResult.setTopicName, JsonNull, 1, false)) {
+                if (!service.publish(DoorLockOpenResult.setTopicName, JsonNull, 1, false)) {
                     null
                 } else {
                     doorLockOpenResultChannel.receive()
                 }
             }
 
-            it.subscribe(onDoorLockOpenResult)
-            it.subscribe(onCurrentSession)
-            it.subscribe(onAlert)
-            it.subscribe(onParkingStates)
-            it.subscribe(onSetMixerStates)
-            it.subscribe(onDoorbellRequest)
+            service.subscribe(onDoorLockOpenResult)
+            service.subscribe(onCurrentSession)
+            service.subscribe(onAlert)
+            service.subscribe(onParkingStates)
+            service.subscribe(onSetMixerStates)
+            service.subscribe(onDoorbellRequest)
 
             return@DisposableEffect onDispose {
-                it.unsubscribe(onDoorbellRequest)
-                it.unsubscribe(onSetMixerStates)
-                it.unsubscribe(onParkingStates)
-                it.unsubscribe(onAlert)
-                it.unsubscribe(onCurrentSession)
-                it.unsubscribe(onDoorLockOpenResult)
+                service.unsubscribe(onDoorbellRequest)
+                service.unsubscribe(onSetMixerStates)
+                service.unsubscribe(onParkingStates)
+                service.unsubscribe(onAlert)
+                service.unsubscribe(onCurrentSession)
+                service.unsubscribe(onDoorLockOpenResult)
+                sendOpenDoorRequest = { null }
+                publishMixerState = {}
             }
         }
 

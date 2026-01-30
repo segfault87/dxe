@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            identity_id AS \"identity_id: IdentityId\",\n            unit_id AS \"unit_id: UnitId\",\n            data AS \"data: Json<MixerPreferences>\",\n            created_at AS \"created_at: DateTime<Utc>\",\n            updated_at AS \"updated_at: DateTime<Utc>\"\n        FROM\n            mixer_config\n        WHERE\n            identity_id = ?1 AND\n            unit_id = ?2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "identity_id: IdentityId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "unit_id: UnitId",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "data: Json<MixerPreferences>",
+        "ordinal": 2,
+        "type_info": "Null"
+      },
+      {
+        "name": "created_at: DateTime<Utc>",
+        "ordinal": 3,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "updated_at: DateTime<Utc>",
+        "ordinal": 4,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4f7bea81ca5a52cbf7522af122a8c1352490f3e5119ae112b6606083c4aa100a"
+}

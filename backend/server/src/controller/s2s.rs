@@ -3,6 +3,7 @@ mod audio_recording;
 mod booking_reminder;
 mod bookings;
 mod doorlock;
+mod mixer_preferences;
 mod telemetry;
 mod units;
 
@@ -25,4 +26,9 @@ pub fn scope() -> actix_web::Scope {
         )
         .service(web::resource("/adhoc-parkings").route(web::get().to(adhoc_parkings::get)))
         .service(web::resource("/doorlock").route(web::post().to(doorlock::post)))
+        .service(
+            web::resource("/mixer")
+                .route(web::get().to(mixer_preferences::get))
+                .route(web::post().to(mixer_preferences::post)),
+        )
 }

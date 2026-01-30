@@ -1,6 +1,7 @@
 mod booking;
 mod identity;
 mod payment;
+mod prefs;
 mod unit;
 
 pub use booking::{
@@ -12,4 +13,5 @@ pub use identity::{
     UserPlainCredential,
 };
 pub use payment::{CashTransaction, TossPaymentsTransaction};
+pub use prefs::MixerConfig;
 pub use unit::{Space, Unit};

@@ -6,7 +6,9 @@ use std::error::Error as StdError;
 use std::sync::Arc;
 
 use dxe_s2s_shared::entities::BookingWithUsers;
-use dxe_types::{BookingId, UnitId};
+use dxe_s2s_shared::handlers::{GetMixerConfigResponse, UpdateMixerConfigRequest};
+use dxe_types::entities::MixerPresets;
+use dxe_types::{BookingId, IdentityId, UnitId};
 use parking_lot::Mutex;
 use rumqttc::Publish;
 use serde::Serialize;
@@ -15,7 +17,7 @@ use tokio_task_scheduler::{Scheduler, Task, TaskBuilder, TaskStatus};
 
 use crate::callback::{AlertCallback, EventStateCallback};
 use crate::client::DxeClient;
-use crate::config::osd::{AlertConfig, AlertKind, Config as OsdConfig, MixerConfig};
+use crate::config::osd::{AlertConfig, AlertKind, Config as OsdConfig};
 use crate::services::mqtt::{Error as MqttError, MqttService, MqttTopicPrefix};
 use crate::tasks::osd_controller::topics::DoorLockOpenResult;
 use crate::tasks::unit_fetcher::UnitsState;
@@ -35,7 +37,7 @@ pub struct OsdController {
 
     topic_prefix: MqttTopicPrefix,
     alerts: Vec<AlertConfig>,
-    mixer_configs: HashMap<UnitId, MixerConfig>,
+    mixer_configs: HashMap<UnitId, MixerPresets>,
     doorbell_alert_id: Option<AlertId>,
 
     units: UnitsState,
@@ -67,29 +69,84 @@ impl OsdController {
         }
     }
 
+    async fn handle_doorlock(self: Arc<Self>) {
+        let result = match self
+            .client
+            .post::<serde_json::Value, serde_json::Value>(
+                "/doorlock",
+                None,
+                serde_json::Value::Null,
+            )
+            .await
+        {
+            Ok(_) => DoorLockOpenResult {
+                success: true,
+                error: None,
+            },
+            Err(e) => DoorLockOpenResult {
+                success: false,
+                error: Some(e.to_string()),
+            },
+        };
+
+        if let Err(e) = self.publish(&result).await {
+            log::warn!("Could not publish door lock open result: {e}");
+        }
+    }
+
+    async fn handle_mixer_preferences(
+        self: Arc<Self>,
+        unit_id: UnitId,
+        payload: types::UpdateMixerConfig,
+    ) {
+        match self
+            .client
+            .post::<_, serde_json::Value>(
+                "/mixer",
+                None,
+                UpdateMixerConfigRequest {
+                    identity_id: payload.identity_id,
+                    unit_id: unit_id.clone(),
+                    prefs: payload.prefs.into(),
+                },
+            )
+            .await
+        {
+            Ok(_) => log::info!(
+                "Mixer data updated for {} on {unit_id}",
+                payload.identity_id
+            ),
+            Err(e) => log::warn!("Could not update mixer preferences: {e}"),
+        }
+    }
+
     async fn handle_message(self: Arc<Self>, message: Publish) {
         if message.topic == self.topic_prefix.topic("doorlock/set") {
-            let result = match self
-                .client
-                .post::<serde_json::Value, serde_json::Value>(
-                    "/doorlock",
-                    None,
-                    serde_json::Value::Null,
-                )
-                .await
-            {
-                Ok(_) => DoorLockOpenResult {
-                    success: true,
-                    error: None,
-                },
-                Err(e) => DoorLockOpenResult {
-                    success: false,
-                    error: Some(e.to_string()),
-                },
+            self.clone().handle_doorlock().await;
+        } else if let topic = self.topic_prefix.topic("mixer_preferences/")
+            && message.topic.starts_with(&topic)
+            && message.topic.ends_with("/set")
+        {
+            let Some(unit_id) = message
+                .topic
+                .strip_prefix(&topic)
+                .and_then(|v| v.strip_suffix("/set"))
+            else {
+                log::warn!(
+                    "Invalid unit id for mixer_preferences/#/set: {}",
+                    message.topic
+                );
+                return;
             };
+            let unit_id = UnitId::from(unit_id.to_owned());
 
-            if let Err(e) = self.publish(&result).await {
-                log::warn!("Could not publish door lock open result: {e}");
+            match serde_json::from_slice::<types::UpdateMixerConfig>(&message.payload) {
+                Ok(payload) => {
+                    self.clone()
+                        .handle_mixer_preferences(unit_id, payload)
+                        .await
+                }
+                Err(e) => log::warn!("Could not deserialize mixer preferences: {e}"),
             }
         }
     }
@@ -121,6 +178,44 @@ impl OsdController {
         }
     }
 
+    async fn send_mixer_states(self: Arc<Self>, unit_id: UnitId, identity_id: IdentityId) {
+        let prefs = match self
+            .client
+            .get::<GetMixerConfigResponse>(
+                "/mixer",
+                Some(&format!("unit_id={unit_id}&identity_id={identity_id}")),
+            )
+            .await
+        {
+            Ok(v) => v.prefs,
+            Err(e) => {
+                log::warn!("Could not get mixer config for {identity_id}: {e}");
+                None
+            }
+        };
+
+        let prefs = prefs
+            .map(|v| types::MixerPreferences::from(v))
+            .unwrap_or_else(|| types::MixerPreferences {
+                default: self
+                    .mixer_configs
+                    .get(&unit_id)
+                    .cloned()
+                    .unwrap_or_else(Default::default)
+                    .into(),
+                scenes: Default::default(),
+            });
+
+        let topic = topics::SetMixerPreferences {
+            unit_id: unit_id.clone(),
+            prefs,
+        };
+
+        if let Err(e) = self.publish(&topic).await {
+            log::warn!("Could not send mixer states to OSD: {e}");
+        }
+    }
+
     async fn update(self: Arc<Self>) {
         self.push_current_states().await;
 
@@ -142,6 +237,9 @@ impl OsdController {
     pub async fn task(self) -> Result<(Arc<Self>, JoinHandle<()>, Task), Error> {
         self.mqtt_service
             .subscribe(&self.topic_prefix.topic("doorlock/set"))
+            .await?;
+        self.mqtt_service
+            .subscribe(&self.topic_prefix.topic("mixer_preferences/#/set"))
             .await?;
         let mut subscriber = self.mqtt_service.receiver(self.topic_prefix.clone());
 
@@ -240,22 +338,9 @@ impl EventStateCallback<BookingWithUsers> for OsdController {
                 .1
                 .is_empty()
             {
-                if let Some(mixer_config) = self.mixer_configs.get(&event.booking.unit_id) {
-                    let set_mixer_state = topics::SetMixerStates {
-                        unit_id: event.booking.unit_id.clone(),
-                        channels: mixer_config.channels.clone(),
-                        globals: Some(mixer_config.globals.clone()),
-                        overwrite: true,
-                    };
-                    let delay = mixer_config.reset_after;
-                    let cloned_self = self.clone();
-                    tokio::task::spawn(async move {
-                        tokio::time::sleep(delay.to_std().unwrap()).await;
-                        if let Err(e) = cloned_self.publish(&set_mixer_state).await {
-                            log::warn!("Could not send mixer states to OSD: {e}");
-                        }
-                    });
-                }
+                self.clone()
+                    .send_mixer_states(event.booking.unit_id.clone(), event.booking.customer_id)
+                    .await;
 
                 if let Some(on_sign_in) = self.alerts.iter().find(|v| {
                     matches!(v.kind, AlertKind::OnSignOn)
@@ -296,22 +381,9 @@ impl EventStateCallback<BookingWithUsers> for OsdController {
                 .len()
                 > 1
             {
-                if let Some(mixer_config) = self.mixer_configs.get(&event.booking.unit_id) {
-                    let set_mixer_state = topics::SetMixerStates {
-                        unit_id: event.booking.unit_id.clone(),
-                        channels: mixer_config.channels.clone(),
-                        globals: Some(mixer_config.globals.clone()),
-                        overwrite: true,
-                    };
-                    let delay = mixer_config.reset_after;
-                    let cloned_self = self.clone();
-                    tokio::task::spawn(async move {
-                        tokio::time::sleep(delay.to_std().unwrap()).await;
-                        if let Err(e) = cloned_self.publish(&set_mixer_state).await {
-                            log::warn!("Could not send mixer states to OSD: {e}");
-                        }
-                    });
-                }
+                self.clone()
+                    .send_mixer_states(event.booking.unit_id.clone(), event.booking.customer_id)
+                    .await;
 
                 if let Some(on_sign_in) = self.alerts.iter().find(|v| {
                     matches!(v.kind, AlertKind::OnSignOn)

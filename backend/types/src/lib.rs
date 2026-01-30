@@ -1,3 +1,5 @@
+pub mod entities;
+
 use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
@@ -107,6 +109,12 @@ pub struct IdentityId(Uuid);
 impl IdentityId {
     pub fn generate() -> Self {
         Self(Uuid::new_v4())
+    }
+}
+
+impl std::fmt::Display for IdentityId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }
 

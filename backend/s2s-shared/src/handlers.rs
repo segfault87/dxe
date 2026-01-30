@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 
-use dxe_types::{TelemetryType, UnitId};
+use dxe_types::entities::MixerPreferences;
+use dxe_types::{IdentityId, TelemetryType, UnitId};
 use serde::{Deserialize, Serialize};
 
 use crate::Timestamp;
@@ -56,4 +57,22 @@ pub struct UploadTelemetryFileRequest {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GetAdhocParkingsResponse {
     pub parkings: Vec<AdhocParking>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GetMixerConfigQuery {
+    pub identity_id: IdentityId,
+    pub unit_id: UnitId,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GetMixerConfigResponse {
+    pub prefs: Option<MixerPreferences>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UpdateMixerConfigRequest {
+    pub identity_id: IdentityId,
+    pub unit_id: UnitId,
+    pub prefs: MixerPreferences,
 }

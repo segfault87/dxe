@@ -2,10 +2,11 @@ use std::collections::HashMap;
 
 use chrono::TimeDelta;
 use dxe_types::UnitId;
+use dxe_types::entities::MixerPresets;
 use serde::Deserialize;
 
 use crate::services::mqtt::MqttTopicPrefix;
-use crate::tasks::osd_controller::types::{AlertData, MixerChannelData, MixerGlobalData};
+use crate::tasks::osd_controller::types::AlertData;
 use crate::types::AlertId;
 use crate::utils::deserializers::deserialize_time_delta_seconds;
 
@@ -35,20 +36,9 @@ pub struct AlertConfig {
 }
 
 #[derive(Deserialize, Clone, Debug)]
-pub struct MixerConfig {
-    pub channels: HashMap<String, MixerChannelData>,
-    pub globals: MixerGlobalData,
-    #[serde(
-        rename = "reset_after_seconds",
-        deserialize_with = "deserialize_time_delta_seconds"
-    )]
-    pub reset_after: TimeDelta,
-}
-
-#[derive(Deserialize, Clone, Debug)]
 pub struct Config {
     pub topic_prefix: MqttTopicPrefix,
     pub alerts: Vec<AlertConfig>,
-    pub mixers: HashMap<UnitId, MixerConfig>,
+    pub mixers: HashMap<UnitId, MixerPresets>,
     pub doorbell_alert_id: Option<AlertId>,
 }

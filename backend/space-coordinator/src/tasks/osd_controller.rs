@@ -133,7 +133,7 @@ impl OsdController {
                 .and_then(|v| v.strip_suffix("/set"))
             else {
                 log::warn!(
-                    "Invalid unit id for mixer_preferences/#/set: {}",
+                    "Invalid unit id for mixer_preferences/+/set: {}",
                     message.topic
                 );
                 return;
@@ -239,7 +239,7 @@ impl OsdController {
             .subscribe(&self.topic_prefix.topic("doorlock/set"))
             .await?;
         self.mqtt_service
-            .subscribe(&self.topic_prefix.topic("mixer_preferences/#/set"))
+            .subscribe(&self.topic_prefix.topic("mixer_preferences/+/set"))
             .await?;
         let mut subscriber = self.mqtt_service.receiver(self.topic_prefix.clone());
 

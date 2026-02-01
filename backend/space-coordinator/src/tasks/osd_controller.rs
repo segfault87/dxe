@@ -105,7 +105,7 @@ impl OsdController {
                 "/mixer",
                 None,
                 UpdateMixerConfigRequest {
-                    identity_id: payload.identity_id,
+                    identity_id: payload.customer_id,
                     unit_id: unit_id.clone(),
                     prefs: payload.prefs.into(),
                 },
@@ -114,7 +114,7 @@ impl OsdController {
         {
             Ok(_) => log::info!(
                 "Mixer data updated for {} on {unit_id}",
-                payload.identity_id
+                payload.customer_id
             ),
             Err(e) => log::warn!("Could not update mixer preferences: {e}"),
         }
@@ -367,6 +367,7 @@ impl EventStateCallback<BookingWithUsers> for OsdController {
         } else {
             let booking = types::Booking {
                 booking_id: event.booking.id,
+                customer_id: event.booking.customer_id,
                 customer_name: event.booking.customer_name.clone(),
                 time_from: event.booking.date_start.to_utc(),
                 time_to: event.booking.date_end.to_utc(),

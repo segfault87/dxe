@@ -31,6 +31,7 @@ pub struct AlertData {
 #[serde(rename_all = "camelCase")]
 pub struct Booking {
     pub booking_id: BookingId,
+    pub customer_id: IdentityId,
     pub customer_name: String,
     pub time_from: DateTime<Utc>,
     pub time_to: DateTime<Utc>,
@@ -184,6 +185,6 @@ impl From<entities::MixerPreferences> for MixerPreferences {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateMixerConfig {
-    pub identity_id: IdentityId,
+    pub customer_id: IdentityId,
     pub prefs: MixerPreferences,
 }

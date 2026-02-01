@@ -47,7 +47,7 @@ pub struct ParkingState {
     pub fuzzy: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MixerChannelData {
     pub level: Option<f64>,
@@ -99,7 +99,7 @@ impl From<entities::MixerChannelData> for MixerChannelData {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MixerGlobalData {
     pub master_level: Option<f64>,
@@ -127,7 +127,9 @@ impl From<entities::MixerGlobalData> for MixerGlobalData {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MixerPresets {
+    #[serde(default)]
     pub channels: Vec<MixerChannelData>,
+    #[serde(default)]
     pub globals: MixerGlobalData,
 }
 

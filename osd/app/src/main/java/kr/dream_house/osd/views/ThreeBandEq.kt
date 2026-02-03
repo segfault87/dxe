@@ -27,7 +27,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -35,15 +37,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.PointMode
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.core.graphics.ColorUtils
+import kr.dream_house.osd.entities.PartialChannelDataUpdate
 import kr.dream_house.osd.midi.ChannelData
 import kr.dream_house.osd.midi.MixerCapability
-import kr.dream_house.osd.midi.PartialChannelDataUpdate
 import kr.dream_house.osd.utils.ThreeBandEq
 import kotlin.math.log2
 import kotlin.math.pow
@@ -66,16 +71,29 @@ private fun BoxWithConstraintsScope.EqHandle(
     gain: Float,
     gainRange: ClosedFloatingPointRange<Float>,
     onUpdateValues: (Float, Float?) -> Unit,
-    size: Dp = 24.dp,
-    color: @Composable () -> Color = { MaterialTheme.colorScheme.secondary },
+    size: Dp = 30.dp,
+    color: Color,
 ) {
     val freqFraction = (log2(freq) - MIN_FREQ_LOG2) / FREQ_SPAN_LOG2
     val gainFraction = gainFraction(gain, gainRange)
 
     val half = size * 0.5f
 
-    var posX by remember { mutableStateOf(freqFraction * maxWidth.value) }
-    var posY by remember { mutableStateOf(gainFraction * maxHeight.value) }
+    var posX by remember { mutableFloatStateOf(freqFraction * maxWidth.value) }
+    var posY by remember { mutableFloatStateOf(gainFraction * maxHeight.value) }
+
+    LaunchedEffect(freqFraction) {
+        val newPosX = freqFraction * maxWidth.value
+        if (posX != newPosX) {
+            posX = newPosX
+        }
+    }
+    LaunchedEffect(gainFraction) {
+        val newPosY = gainFraction * maxHeight.value
+        if (posY != newPosY) {
+            posY = newPosY
+        }
+    }
 
     Box(modifier = Modifier
         .offset(x = posX.dp - half, y = posY.dp - half)
@@ -86,7 +104,7 @@ private fun BoxWithConstraintsScope.EqHandle(
             ambientColor = Color.Gray,
             spotColor = Color.DarkGray,
         )
-        .background(color = color(), shape = CircleShape)
+        .background(color = color, shape = CircleShape)
         .pointerInput(Unit) {
             detectDragGestures { change, dragAmount ->
                 change.consume()
@@ -140,7 +158,15 @@ private fun BoxWithConstraintsScope.ThreeBandEqCurve(
         drawPoints(
             points = points,
             pointMode = PointMode.Polygon,
+            color = Color.Gray,
+            strokeWidth = 1.0f,
+        )
+
+        drawLine(
             color = Color.LightGray,
+            start = Offset(0.0f, height * 0.5f),
+            end = Offset(width.toFloat(), height * 0.5f),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10.0f, 10.0f)),
             strokeWidth = 1.0f,
         )
     }
@@ -148,19 +174,21 @@ private fun BoxWithConstraintsScope.ThreeBandEqCurve(
 
 @Composable
 private fun ThreeBandEqView(
+    eq: ThreeBandEq,
     capabilities: Set<MixerCapability>,
     channelData: ChannelData,
     onUpdateValue: (PartialChannelDataUpdate) -> Unit,
     qRange: ClosedFloatingPointRange<Float>,
     modifier: Modifier = Modifier,
 ) {
-    val eq = remember { ThreeBandEq(
-        channelData.eqLowFreq, channelData.eqLowLevel,
-        channelData.eqMidFreq, channelData.eqMidLevel, channelData.eqMidQ,
-        channelData.eqHighFreq, channelData.eqHighLevel
-    ) }
+    var midQ by remember { mutableFloatStateOf(log2(channelData.eqMidQ)) }
 
-    var midQ by remember { mutableStateOf(log2(channelData.eqMidQ)) }
+    LaunchedEffect(channelData) {
+        val currentMidQ = 2.0f.pow(midQ)
+        if (currentMidQ != channelData.eqMidQ) {
+            midQ = log2(channelData.eqMidQ)
+        }
+    }
 
     val lowFreqAdjustable = remember { capabilities.contains(MixerCapability.CHANNEL_THREE_BAND_EQ_LOW_FREQ) }
     val midFreqAdjustable = remember { capabilities.contains(MixerCapability.CHANNEL_THREE_BAND_EQ_MID_FREQ) }
@@ -179,6 +207,7 @@ private fun ThreeBandEqView(
                     onUpdateValue(PartialChannelDataUpdate(eqLowLevel = level, eqLowFreq = freq))
                     eq.updateLow(freq ?: channelData.eqLowFreq, level)
                 },
+                color = Color(ColorUtils.blendARGB(MaterialTheme.colorScheme.secondary.toArgb(), Color.Black.toArgb(), 0.3f))
             )
             EqHandle(
                 freq = channelData.eqMidFreq,
@@ -187,8 +216,9 @@ private fun ThreeBandEqView(
                 gainRange = -12.0f..12.0f,
                 onUpdateValues = { level, freq ->
                     onUpdateValue(PartialChannelDataUpdate(eqMidLevel = level, eqMidFreq = freq))
-                    eq.updateMid(freq ?: channelData.eqMidFreq, level, channelData.eqMidQ)
+                    eq.updateMid(freq ?: channelData.eqMidFreq, level, 2.0f.pow(midQ))
                 },
+                color = MaterialTheme.colorScheme.secondary,
             )
             EqHandle(
                 freq = channelData.eqHighFreq,
@@ -199,6 +229,7 @@ private fun ThreeBandEqView(
                     onUpdateValue(PartialChannelDataUpdate(eqHighLevel = level, eqHighFreq = freq))
                     eq.updateHigh(freq ?: channelData.eqHighFreq, level)
                 },
+                color = Color(ColorUtils.blendARGB(MaterialTheme.colorScheme.secondary.toArgb(), Color.White.toArgb(), 0.3f))
             )
         }
 
@@ -234,6 +265,12 @@ fun ThreeBandEqPopup(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val eq = remember { ThreeBandEq(
+        channelData.eqLowFreq, channelData.eqLowLevel,
+        channelData.eqMidFreq, channelData.eqMidLevel, channelData.eqMidQ,
+        channelData.eqHighFreq, channelData.eqHighLevel
+    ) }
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = modifier.width(800.dp).shadow(16.dp, shape = MaterialTheme.shapes.medium),
@@ -244,14 +281,36 @@ fun ThreeBandEqPopup(
                 Text(modifier = Modifier.fillMaxWidth(), text = "$channelName - EQ 설정", textAlign = TextAlign.Center, style = MaterialTheme.typography.headlineSmall)
                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
                 ThreeBandEqView(
+                    eq = eq,
                     capabilities = capabilities,
                     channelData = channelData,
                     onUpdateValue = onUpdateValue,
                     qRange = -1.0f..3.0f
                 )
                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-                TextButton(modifier = Modifier.fillMaxWidth(), onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)) {
-                    Text("닫기", style = MaterialTheme.typography.headlineSmall)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    TextButton(modifier = Modifier.weight(1.0f), onClick = {
+                        val default = ChannelData()
+                        onUpdateValue(
+                            PartialChannelDataUpdate(
+                                eqHighFreq = default.eqHighFreq,
+                                eqHighLevel = default.eqHighLevel,
+                                eqMidFreq = default.eqMidFreq,
+                                eqMidLevel = default.eqMidLevel,
+                                eqMidQ = default.eqMidQ,
+                                eqLowFreq = default.eqLowFreq,
+                                eqLowLevel = default.eqLowLevel,
+                            )
+                        )
+                        eq.updateLow(default.eqLowFreq, default.eqLowLevel)
+                        eq.updateMid(default.eqMidFreq, default.eqMidLevel, default.eqMidQ)
+                        eq.updateHigh(default.eqHighFreq, default.eqHighLevel)
+                    }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.secondary)) {
+                        Text("초기화", style = MaterialTheme.typography.headlineSmall)
+                    }
+                    TextButton(modifier = Modifier.weight(1.0f), onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)) {
+                        Text("닫기", style = MaterialTheme.typography.headlineSmall)
+                    }
                 }
             }
         }

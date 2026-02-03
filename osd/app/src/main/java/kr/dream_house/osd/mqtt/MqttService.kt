@@ -92,20 +92,22 @@ class MqttService : LifecycleService() {
         val topic = companion.topicName
 
         if (!callbacks.containsKey(topic)) {
-            val bundle = SubscriberBundle(topic, object: Deserializer<T> {
-                override fun deserialize(value: ByteArray): T {
-                    return Json.decodeFromString(value.decodeToString())
-                }
-            })
-            bundle.addCallback(callback)
-            callbacks[topic] = bundle
-            subscriptions[topic] = qos
-            events.trySend(
-                MqttEvent.Subscribe(
-                    topic = topic,
-                    qos = qos,
+            synchronized(subscriptions) {
+                val bundle = SubscriberBundle(topic, object: Deserializer<T> {
+                    override fun deserialize(value: ByteArray): T {
+                        return Json.decodeFromString(value.decodeToString())
+                    }
+                })
+                bundle.addCallback(callback)
+                callbacks[topic] = bundle
+                subscriptions[topic] = qos
+                events.trySend(
+                    MqttEvent.Subscribe(
+                        topic = topic,
+                        qos = qos,
+                    )
                 )
-            )
+            }
         } else {
             @Suppress("UNCHECKED_CAST") val bundle: SubscriberBundle<T> = callbacks[topic] as SubscriberBundle<T>
             bundle.addCallback(callback)
@@ -128,12 +130,15 @@ class MqttService : LifecycleService() {
             }
         }
 
-        for (key in keysToRemove) {
-            subscriptions.remove(key)
-            callbacks.remove(key)
-            events.trySend(MqttEvent.Unsubscribe(
-                topic = key
-            ))
+        synchronized(subscriptions) {
+            for (key in keysToRemove) {
+                subscriptions.remove(key)
+                callbacks.remove(key)
+
+                events.trySend(MqttEvent.Unsubscribe(
+                    topic = key
+                ))
+            }
         }
 
         return removed
@@ -263,8 +268,10 @@ class MqttService : LifecycleService() {
 
         Log.d(TAG, "Connected to MQTT endpoint ($uri)")
 
-        for ((subscription, qos) in subscriptions) {
-            client.subscribe(subscription, qos)
+        synchronized(subscriptions) {
+            for ((subscription, qos) in subscriptions) {
+                client.subscribe(subscription, qos)
+            }
         }
 
         lifecycleScope.launch {

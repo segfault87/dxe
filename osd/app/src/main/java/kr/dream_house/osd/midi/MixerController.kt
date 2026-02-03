@@ -2,10 +2,16 @@ package kr.dream_house.osd.midi
 
 import android.util.Log
 import androidx.compose.runtime.compositionLocalOf
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
+import kr.dream_house.osd.entities.MixerPresets
+import kr.dream_house.osd.entities.PartialChannelDataUpdate
+import kr.dream_house.osd.entities.PartialGlobalDataUpdate
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 @Serializable
 data class ChannelData(
@@ -22,20 +28,21 @@ data class ChannelData(
     val eqLowFreq: Float = 99.0f,
 )
 
-@Serializable
-data class PartialChannelDataUpdate(
-    val level: Float? = null,
-    val pan: Float? = null,
-    val reverb: Float? = null,
-    val mute: Boolean? = null,
-    val eqHighLevel: Float? = null,
-    val eqHighFreq: Float? = null,
-    val eqMidLevel: Float? = null,
-    val eqMidFreq: Float? = null,
-    val eqMidQ: Float? = null,
-    val eqLowLevel: Float? = null,
-    val eqLowFreq: Float? = null,
-)
+fun ChannelData.snapshot(): PartialChannelDataUpdate {
+    return PartialChannelDataUpdate(
+        level = level,
+        pan = pan,
+        reverb = reverb,
+        mute = mute,
+        eqHighLevel = eqHighLevel,
+        eqHighFreq = eqHighFreq,
+        eqMidLevel = eqMidLevel,
+        eqMidFreq = eqMidFreq,
+        eqMidQ = eqMidQ,
+        eqLowLevel = eqLowLevel,
+        eqLowFreq = eqLowFreq,
+    )
+}
 
 fun ChannelData.updateFrom(update: PartialChannelDataUpdate): ChannelData {
     return ChannelData(
@@ -336,11 +343,12 @@ data class GlobalData(
     val monitorLevel: Float = 0.0f,
 )
 
-@Serializable
-data class PartialGlobalDataUpdate(
-    val masterLevel: Float? = null,
-    val monitorLevel: Float? = null,
-)
+private fun GlobalData.snapshot(): PartialGlobalDataUpdate {
+    return PartialGlobalDataUpdate(
+        masterLevel = masterLevel,
+        monitorLevel = monitorLevel,
+    )
+}
 
 fun GlobalData.updateFrom(update: PartialGlobalDataUpdate): GlobalData {
     return GlobalData(
@@ -484,7 +492,7 @@ class MixerController(
         midiDeviceManager.removeHandler(this)
     }
 
-    fun updateValues(channel: Int, update: PartialChannelDataUpdate): Boolean {
+    fun updateValues(channel: Int, update: PartialChannelDataUpdate) {
         _state.update { currentState ->
             val updatedChannelData = currentState.channels.mapIndexed { idx, item ->
                 if (idx == channel) {
@@ -497,23 +505,28 @@ class MixerController(
         }
 
         val updates = update.transform(channel, transformedState.channels[channel], device)
-        return pushUpdates(updates)
+        pushUpdates(updates)
     }
 
-    fun updateValues(update: PartialGlobalDataUpdate): Boolean {
+    fun updateValues(update: PartialGlobalDataUpdate) {
         _state.update { currentState ->
             currentState.copy(globals = currentState.globals.updateFrom(update))
         }
 
         val updates = update.transform(transformedState.globals, device)
-        return pushUpdates(updates)
+        pushUpdates(updates)
     }
 
-    private fun pushUpdates(updates: List<ControlValue>): Boolean {
-        return when {
-            updates.isEmpty() -> {
-                false
-            }
+    fun snapshot(): MixerPresets {
+        return MixerPresets(
+            channels = _state.value.channels.map { it.snapshot() },
+            globals = _state.value.globals.snapshot(),
+        )
+    }
+
+    private fun pushUpdates(updates: List<ControlValue>) {
+        when {
+            updates.isEmpty() -> {}
             updates.size <= device.maxPayloadInBatch() -> {
                 // Post small updates at once
                 val size = updates.sumOf { device.getCCPayloadSizeHint(it) }
@@ -699,7 +712,35 @@ class MixerController(
         }
     }
 
-    fun updateInitialChannelStates(channelStates: List<ChannelData>, globalStates: GlobalData) {
+    @OptIn(ExperimentalAtomicApi::class)
+    suspend fun checkMixerLiveliness() {
+        val flag = AtomicBoolean(true)
+
+        val onChecked: () -> Unit = {
+            flag.store(false)
+        }
+
+        midiDeviceManager.addIdentityRequestCallback(onChecked)
+        var retries = 0
+        while (flag.load()) {
+            midiDeviceManager.sendIdentityRequest()
+            delay(1000)
+            retries += 1
+            if (retries > 5) {
+                Log.w(TAG, "Mixer is not responding. Setting state to false")
+                _isConnected.update {
+                    false
+                }
+            }
+        }
+
+        midiDeviceManager.removeIdentityRequestCallback(onChecked)
+        _isConnected.update {
+            true
+        }
+    }
+
+    suspend fun updateInitialChannelStates(channelStates: List<ChannelData>, globalStates: GlobalData) {
         // Truncate to configured channel count
         val newChannelStates = channelStates.take(channels.size).toMutableList()
         if (newChannelStates.size < channels.size) {
@@ -711,7 +752,7 @@ class MixerController(
         resetStates()
     }
 
-    fun resetStates() {
+    suspend fun resetStates() {
         _state.update {
             MixerState(
                 channels = initialChannelStates,
@@ -721,22 +762,15 @@ class MixerController(
 
         transformedState = _state.value.transform(device)
 
+        checkMixerLiveliness()
+
         val controlValues = transformedState.buildControlPayloads()
         sendBulkPayloads(device.initializeState(controlValues))
     }
 
-    private fun sendBulkPayloads(payloads: List<ByteArray>): Boolean {
+    private fun sendBulkPayloads(payloads: List<ByteArray>) {
         // Sometimes mixer can't accept bulk messages at once and we have to schedule it by given msecs interval
-
-        var timestamp = System.nanoTime()
-        for (payload in payloads) {
-            if (!midiDeviceManager.send(payload, 0, payload.size, timestamp)) {
-                return false
-            }
-            timestamp += 1000000 * device.flowControlMilliseconds()
-        }
-
-        return true
+        midiDeviceManager.enqueueBulkPayloads(payloads, device.flowControlMilliseconds())
     }
 
     override fun onReceive(payload: ByteArray, offset: Int, count: Int) {
@@ -749,11 +783,13 @@ class MixerController(
         _isConnected.update { true }
 
         val controlValues = transformedState.buildControlPayloads()
-        Log.d(TAG, "Connected to mixer. initializing values...")
+        Log.i(TAG, "Connected to mixer. initializing values...")
         sendBulkPayloads(device.initializeState(controlValues))
     }
 
     override fun onDisconnect() {
+        Log.w(TAG, "Mixer disconnected.")
+
         _isConnected.update { false }
     }
 

@@ -27,16 +27,19 @@ interface MidiDeviceEventHandler {
     fun onDisconnect()
 }
 
-class MidiDeviceManager(private val midiManager: MidiManager) : MidiManager.DeviceCallback() {
+class MidiDeviceManager(private val midiManager: MidiManager) : MidiManager.DeviceCallback(), MidiDeviceEventHandler {
     companion object {
         private const val TAG = "MidiDeviceManager"
 
         private const val DESIRED_PORT_INPUT = 0
         private const val DESIRED_PORT_OUTPUT = 0
+
+        private val SYSEX_IDENTITY_REQUEST = byteArrayOf(0xf0.toByte(), 0x7e, 0x7f, 0x06, 0x01, 0xf7.toByte())
     }
 
     private var currentDevice: MidiDevice? = null
-    private var inputPort: MidiInputPort? = null
+    private var currentDeviceSerial: String? = null
+    private var inputPorts = mutableListOf<MidiInputPort>()
 
     private val executor = Executors.newFixedThreadPool(1)
     private val handler = Handler()
@@ -56,6 +59,8 @@ class MidiDeviceManager(private val midiManager: MidiManager) : MidiManager.Devi
             midiManager.devices.toList()
         }
 
+        addHandler(this)
+
         // Pick first device
         infos.firstOrNull()?.let {
             initializeDevice(it)
@@ -72,13 +77,6 @@ class MidiDeviceManager(private val midiManager: MidiManager) : MidiManager.Devi
 
                 Log.i(TAG, "Opened MIDI device: $device")
 
-                val inputPortNumber = if (deviceInfo.inputPortCount - 1 > DESIRED_PORT_INPUT) {
-                    Log.w(TAG, "MIDI device $deviceInfo has fewer input port count than desired value. defaulting to 0...")
-                    0
-                } else {
-                    DESIRED_PORT_INPUT
-                }
-
                 val outputPortNumber = if (deviceInfo.outputPortCount - 1 > DESIRED_PORT_OUTPUT) {
                     Log.w(TAG, "MIDI device $deviceInfo has fewer output port count than desired value. defaulting to 0...")
                     0
@@ -86,8 +84,9 @@ class MidiDeviceManager(private val midiManager: MidiManager) : MidiManager.Devi
                     DESIRED_PORT_OUTPUT
                 }
 
-                inputPort = device.openInputPort(inputPortNumber)
-                Log.d(TAG, "Opening input port $inputPortNumber complete")
+                for (i in 0 until deviceInfo.inputPortCount) {
+                    inputPorts.add(device.openInputPort(i))
+                }
 
                 val outputPort = device.openOutputPort(outputPortNumber)
                 Log.d(TAG, "Output output port $outputPortNumber complete")
@@ -108,6 +107,7 @@ class MidiDeviceManager(private val midiManager: MidiManager) : MidiManager.Devi
                     handler.onConnect()
                 }
 
+                currentDeviceSerial = deviceInfo.properties.getString("serial_number")
                 currentDevice = device
             }
         }, null)
@@ -115,7 +115,7 @@ class MidiDeviceManager(private val midiManager: MidiManager) : MidiManager.Devi
 
     fun addHandler(handler: MidiDeviceEventHandler) {
         handlers.add(handler)
-        if (inputPort != null && currentDevice != null) {
+        if (currentDevice != null) {
             handler.onConnect()
         } else {
             handler.onDisconnect()
@@ -126,30 +126,60 @@ class MidiDeviceManager(private val midiManager: MidiManager) : MidiManager.Devi
         handlers.remove(handler)
     }
 
-    fun send(payload: ByteArray, offset: Int, count: Int, timestamp: Long? = null): Boolean {
-        return if (inputPort == null) {
+    private fun sendBulkPayloads(payloads: List<ByteArray>, timeInterval: Long, port: Int = 0) {
+        val port = inputPorts.getOrNull(port)
+        if (port == null) {
+            Log.e(TAG, "Trying to send while input port is not opened.")
+            return
+        }
+
+        postEvent {
+            try {
+                for (payload in payloads) {
+                    port.send(payload, 0, payload.size)
+                    Thread.sleep(timeInterval)
+                }
+            } catch (e: IOException) {
+                Log.e(TAG, "Can't send MIDI message to port: $e")
+            }
+        }
+    }
+
+    fun enqueueBulkPayloads(payloads: List<ByteArray>, timeInterval: Long) {
+        postEvent {
+            sendBulkPayloads(payloads, timeInterval)
+        }
+    }
+
+    private var identityRequestCallbacks = mutableListOf<() -> Unit>()
+
+    fun addIdentityRequestCallback(fn: () -> Unit) {
+        identityRequestCallbacks.add(fn)
+    }
+
+    fun removeIdentityRequestCallback(fn: () -> Unit) {
+        identityRequestCallbacks.remove(fn)
+    }
+
+    fun sendIdentityRequest() {
+        send(SYSEX_IDENTITY_REQUEST, 0, SYSEX_IDENTITY_REQUEST.size)
+    }
+
+    fun send(payload: ByteArray, offset: Int, count: Int, port: Int = 0, timestamp: Long? = null): Boolean {
+        val port = inputPorts.getOrNull(port)
+        return if (port == null) {
             Log.e(TAG, "Trying to send while input port is not opened.")
             false
         } else {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                executor.submit {
-                    try {
-                        if (timestamp != null) {
-                            inputPort?.send(payload, offset, count, timestamp)
-                        } else {
-                            inputPort?.send(payload, offset, count)
-                        }
-                    } catch (e: IOException) {
-                        Log.e(TAG, "Can't send MIDI message to port: $e")
+            postEvent {
+                try {
+                    if (timestamp != null) {
+                        port.send(payload, offset, count, timestamp)
+                    } else {
+                        port.send(payload, offset, count)
                     }
-                }
-            } else {
-                handler.post {
-                    try {
-                        inputPort?.send(payload, offset, count)
-                    } catch (e: IOException) {
-                        Log.e(TAG, "Can't send MIDI message to port: $e")
-                    }
+                } catch (e: IOException) {
+                    Log.e(TAG, "Can't send MIDI message to port: $e")
                 }
             }
 
@@ -157,22 +187,29 @@ class MidiDeviceManager(private val midiManager: MidiManager) : MidiManager.Devi
         }
     }
 
-    override fun onDeviceAdded(device: MidiDeviceInfo?) {
+    private fun postEvent(task: () -> Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            executor.submit(task)
+        } else {
+            handler.post(task)
+        }
+    }
+
+    override fun onDeviceAdded(device: MidiDeviceInfo) {
         super.onDeviceAdded(device)
 
         Log.i(TAG, "onDeviceAdded: $device")
 
-        if (device != null && currentDevice != null) {
+        if (currentDevice == null) {
             initializeDevice(device)
         }
     }
 
-    override fun onDeviceRemoved(device: MidiDeviceInfo?) {
+    override fun onDeviceRemoved(device: MidiDeviceInfo) {
         super.onDeviceRemoved(device)
 
-        Log.i(TAG, "onDeviceRemoved: $device")
-
-        if (device == currentDevice) {
+        val removedDeviceSerial = device.properties.getString("serial_number")
+        if (currentDeviceSerial == removedDeviceSerial) {
             for (handler in handlers) {
                 handler.onDisconnect()
             }
@@ -180,6 +217,18 @@ class MidiDeviceManager(private val midiManager: MidiManager) : MidiManager.Devi
 
         currentDevice?.close()
         currentDevice = null
-        inputPort = null
+        inputPorts.clear();
     }
+
+    override fun onReceive(payload: ByteArray, offset: Int, count: Int) {
+        if (count > 0 && payload[offset] == 0xf0.toByte()) {
+            for (fn in identityRequestCallbacks) {
+                fn()
+            }
+        }
+    }
+
+    override fun onConnect() {}
+
+    override fun onDisconnect() {}
 }

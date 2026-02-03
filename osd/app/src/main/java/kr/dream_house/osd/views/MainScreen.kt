@@ -45,6 +45,7 @@ import kr.dream_house.osd.BuildConfig
 import kr.dream_house.osd.Navigation
 import kr.dream_house.osd.entities.AlertData
 import kr.dream_house.osd.entities.Booking
+import kr.dream_house.osd.entities.MixerPreferences
 import kr.dream_house.osd.entities.ParkingState
 import kr.dream_house.osd.midi.ChannelData
 import kr.dream_house.osd.midi.GlobalData
@@ -58,6 +59,7 @@ import kr.dream_house.osd.mqtt.topics.CurrentSession
 import kr.dream_house.osd.mqtt.topics.DoorLockOpenResult
 import kr.dream_house.osd.mqtt.topics.DoorbellRequest
 import kr.dream_house.osd.mqtt.topics.ParkingStates
+import kr.dream_house.osd.mqtt.topics.SetMixerPreferences
 import kr.dream_house.osd.mqtt.topics.SetMixerStates
 import kr.dream_house.osd.mqttConfigFlow
 import kr.dream_house.osd.ui.theme.WhitishYellow
@@ -82,10 +84,12 @@ fun MainScreen(navController: NavHostController) {
 
     val mixerState by mixerController?.state?.collectAsState() ?: remember { mutableStateOf(MixerState())  }
     var activeBooking by remember { mutableStateOf<Booking?>(null) }
+    var mixerPreferences by remember { mutableStateOf<MixerPreferences?>(null) }
     var parkingStates by remember { mutableStateOf<List<ParkingState>>(emptyList()) }
     var currentAlert by remember { mutableStateOf<AlertData?>(null) }
     var sendOpenDoorRequest by remember { mutableStateOf<suspend () -> DoorLockOpenResult?>({ null }) }
     var publishMixerState by remember { mutableStateOf<suspend (MixerState) -> Unit>({}) }
+    var updateMixerPreferences by remember { mutableStateOf<(MixerPreferences) -> Unit>({}) }
     var doorbellRequest by remember { mutableStateOf(false) }
 
     LaunchedEffect(currentPage) {
@@ -189,7 +193,9 @@ fun MainScreen(navController: NavHostController) {
                                 } ?: ChannelData())
                             }
                             val initialGlobalStates = GlobalData().updateFrom(payload.globals)
-                            controller.updateInitialChannelStates(initialChannelStates, initialGlobalStates)
+                            coroutineScope.launch {
+                                controller.updateInitialChannelStates(initialChannelStates, initialGlobalStates)
+                            }
                         } else {
                             for ((channel, data) in payload.channels) {
                                 controller.updateValues(channel.toInt(), data)
@@ -200,12 +206,42 @@ fun MainScreen(navController: NavHostController) {
 
                 }
             }
+            val onSetMixerPreferences = object: TopicSubscriber<SetMixerPreferences> {
+                override fun onPayload(topic: String, payload: SetMixerPreferences) {
+                    mixerController?.let { controller ->
+                        val prefs = payload.prefs
+                        mixerPreferences = prefs
+                        val default = prefs.default
+                        val initialChannelStates = mutableListOf<ChannelData>()
+                        for (i in 0 until controller.channels.size) {
+                            initialChannelStates.add(default.channels.getOrNull(i)?.let {
+                                ChannelData().updateFrom(it)
+                            } ?: ChannelData())
+                        }
+                        val initialGlobalStates = GlobalData().updateFrom(default.globals)
+                        coroutineScope.launch {
+                            controller.updateInitialChannelStates(initialChannelStates, initialGlobalStates)
+                        }
+                    }
+                }
+            }
             val onDoorbellRequest = object: TopicSubscriber<DoorbellRequest> {
                 override fun onPayload(topic: String, payload: DoorbellRequest) {
                     if (payload.unitId == null || payload.unitId == BuildConfig.UNIT_ID) {
                         doorbellRequest = true
                     }
                 }
+            }
+
+            updateMixerPreferences = { prefs ->
+                activeBooking?.customerId?.let { customerId ->
+                    service.publish(SetMixerPreferences.Update.TOPIC_NAME, SetMixerPreferences.Update(
+                        customerId = customerId,
+                        prefs = prefs,
+                    ), 1, false)
+                }
+
+                mixerPreferences = prefs
             }
 
             publishMixerState = {
@@ -224,18 +260,21 @@ fun MainScreen(navController: NavHostController) {
             service.subscribe(onCurrentSession)
             service.subscribe(onAlert)
             service.subscribe(onParkingStates)
+            service.subscribe(onSetMixerPreferences)
             service.subscribe(onSetMixerStates)
             service.subscribe(onDoorbellRequest)
 
             return@DisposableEffect onDispose {
                 service.unsubscribe(onDoorbellRequest)
                 service.unsubscribe(onSetMixerStates)
+                service.unsubscribe(onSetMixerPreferences)
                 service.unsubscribe(onParkingStates)
                 service.unsubscribe(onAlert)
                 service.unsubscribe(onCurrentSession)
                 service.unsubscribe(onDoorLockOpenResult)
                 sendOpenDoorRequest = { null }
                 publishMixerState = {}
+                updateMixerPreferences = {}
             }
         }
 
@@ -270,7 +309,7 @@ fun MainScreen(navController: NavHostController) {
                             ) {
                                 Text(
                                     modifier = Modifier.padding(16.dp),
-                                    text = "음량 설정",
+                                    text = "믹서 설정",
                                     style = MaterialTheme.typography.titleLarge
                                 )
                             }
@@ -296,7 +335,11 @@ fun MainScreen(navController: NavHostController) {
             }
             Box(modifier = Modifier.weight(0.7f)) {
                 when (currentPage) {
-                    CurrentPage.Mixer -> MixerControls()
+                    CurrentPage.Mixer -> MixerControls(
+                        mixerPreferences = mixerPreferences,
+                        onUpdateMixerPreferences = updateMixerPreferences,
+                        customerId = activeBooking?.customerId
+                    )
                     CurrentPage.UnitInformation -> UnitInformation()
                 }
             }

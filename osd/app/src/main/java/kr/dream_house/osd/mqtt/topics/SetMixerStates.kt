@@ -2,8 +2,8 @@ package kr.dream_house.osd.mqtt.topics
 
 import kotlinx.serialization.Serializable
 import kr.dream_house.osd.BuildConfig
-import kr.dream_house.osd.midi.PartialChannelDataUpdate
-import kr.dream_house.osd.midi.PartialGlobalDataUpdate
+import kr.dream_house.osd.entities.PartialChannelDataUpdate
+import kr.dream_house.osd.entities.PartialGlobalDataUpdate
 import kr.dream_house.osd.mqtt.TopicSpec
 
 @Serializable

@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -22,6 +24,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,16 +32,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
+import kr.dream_house.osd.IdentityId
+import kr.dream_house.osd.entities.MixerPreferences
+import kr.dream_house.osd.entities.MixerPresets
+import kr.dream_house.osd.entities.PartialChannelDataUpdate
+import kr.dream_house.osd.entities.PartialGlobalDataUpdate
 import kr.dream_house.osd.midi.ChannelData
 import kr.dream_house.osd.midi.GlobalData
 import kr.dream_house.osd.midi.LocalMixerController
 import kr.dream_house.osd.midi.MixerCapability
-import kr.dream_house.osd.midi.PartialChannelDataUpdate
-import kr.dream_house.osd.midi.PartialGlobalDataUpdate
+import kr.dream_house.osd.midi.updateFrom
 import kr.dream_house.osd.views.unit_default.TroubleshootingContact
 
 @Composable
-fun MixerRow(
+private fun MixerRow(
     name: String,
     capabilities: Set<MixerCapability>,
     channelData: ChannelData,
@@ -94,7 +102,7 @@ fun MixerRow(
 }
 
 @Composable
-fun GlobalControlRow(
+private fun GlobalControlRow(
     capability: Set<MixerCapability>,
     globalData: GlobalData,
     onChangeMasterLevel: (Float) -> Unit,
@@ -129,7 +137,7 @@ fun GlobalControlRow(
 }
 
 @Composable
-fun MixerControls() {
+fun MixerControls(mixerPreferences: MixerPreferences?, onUpdateMixerPreferences: (MixerPreferences) -> Unit, customerId: IdentityId?) {
     if (LocalMixerController.current == null) {
         TroubleshootingContact(message = "믹서가 연결되어 있지 않습니다. 위 연락처로 문의해주시기 바랍니다.")
         return
@@ -137,12 +145,14 @@ fun MixerControls() {
 
     val mixerController = LocalMixerController.current!!
     val capabilities = remember { mixerController.capabilities }
-
+    val coroutineScope = rememberCoroutineScope()
 
     val state by mixerController.state.collectAsState()
     val isMixerConnected by mixerController.isConnected.collectAsState()
 
     var eqPopup by remember { mutableStateOf<Int?>(null) }
+    var showLoadPreset by remember { mutableStateOf<MixerPreferences?>(null) }
+    var showSavePreset by remember { mutableStateOf<MixerPresets?>(null) }
 
     val scrollState = rememberScrollState()
 
@@ -224,6 +234,27 @@ fun MixerControls() {
                     mixerController.updateValues(PartialGlobalDataUpdate(monitorLevel = it))
                 }
             )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Spacer(modifier = Modifier.weight(1.0f))
+                FilledTonalButton(
+                    onClick = {
+                        mixerPreferences?.let {
+                            showLoadPreset = it
+                        }
+                    },
+                    enabled = mixerPreferences != null,
+                ) {
+                    Text("믹서 설정 불러오기", style = MaterialTheme.typography.bodyLarge)
+                }
+                FilledTonalButton(
+                    onClick = {
+                        showSavePreset = mixerController.snapshot()
+                    },
+                    enabled = customerId != null,
+                ) {
+                    Text("믹서 설정 저장", style = MaterialTheme.typography.bodyLarge)
+                }
+            }
         }
 
         eqPopup?.let { channel ->
@@ -236,6 +267,34 @@ fun MixerControls() {
                 },
                 onDismiss = {
                     eqPopup = null
+                }
+            )
+        }
+
+        showLoadPreset?.let { prefs ->
+            LoadMixerPresets(
+                prefs = prefs,
+                onSelectMixerPresets = { presets ->
+                    coroutineScope.launch {
+                        mixerController.updateInitialChannelStates(
+                            presets.channels.map { ChannelData().updateFrom(it) },
+                            GlobalData().updateFrom(presets.globals)
+                        )
+                    }
+                },
+                onDismiss = {
+                    showLoadPreset = null
+                }
+            )
+        }
+
+        showSavePreset?.let { presets ->
+            SaveMixerPresets(
+                presets = presets,
+                prefs = mixerPreferences,
+                onUpdatePreferences = onUpdateMixerPreferences,
+                onDismiss = {
+                    showSavePreset = null
                 }
             )
         }

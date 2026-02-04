@@ -3,7 +3,7 @@ use actix_web::{HttpResponse, HttpResponseBuilder, web};
 use async_compression::tokio::bufread::BrotliDecoder;
 use chrono::TimeDelta;
 use dxe_data::queries::booking::get_telemetry_file;
-use dxe_s2s_shared::csv::{SoundMeterRow, Z2mPowerMeterRow};
+use dxe_s2s_shared::csv::{SoundMeterRow, Z2mAirQualityRow, Z2mPowerMeterRow};
 use dxe_types::{BookingId, TelemetryType};
 use plotters::backend::SVGBackend;
 use plotters::chart::{ChartBuilder, LabelAreaPosition};
@@ -167,7 +167,68 @@ pub async fn get(
                 .map_err(|e| Error::Internal(Box::new(e)))?;
         }
         TelemetryType::AqRehearsalRoom => {
-            todo!()
+            chart.caption("Air quality index", ("sans-serif", (5).percent()));
+
+            let rows = read_csv::<Z2mAirQualityRow, _>(brotli_decoder).await?;
+            let last = rows
+                .last()
+                .map(|v| v.0)
+                .unwrap_or(TimeDelta::milliseconds(0));
+
+            let mut co2_min = -1;
+            let mut co2_max = 0;
+            let mut temp_min = -1.0;
+            let mut temp_max = 0.0;
+
+            for (_, row) in rows.iter() {
+                if co2_min < 0 || row.co2 < co2_min {
+                    co2_min = row.co2;
+                }
+                if row.co2 > co2_max {
+                    co2_max = row.co2;
+                }
+                if temp_min < 0.0 || row.temperature < temp_min {
+                    temp_min = row.temperature;
+                }
+                if row.temperature > temp_max {
+                    temp_max = row.temperature;
+                }
+            }
+
+            let mut chart = chart
+                .right_y_label_area_size((16).percent())
+                .build_cartesian_2d(TimeDelta::zero()..last, temp_min..temp_max)
+                .map_err(|e| Error::Internal(Box::new(e)))?
+                .set_secondary_coord(TimeDelta::milliseconds(0)..last, co2_min..co2_max);
+
+            chart
+                .configure_mesh()
+                .y_desc("Temperature (℃)")
+                .x_desc("Time elapsed")
+                .x_label_formatter(&|x| {
+                    format!("{:02}:{:02}", x.num_minutes(), x.num_seconds() % 60)
+                })
+                .draw()
+                .map_err(|e| Error::Internal(Box::new(e)))?;
+
+            chart
+                .configure_secondary_axes()
+                .y_desc("CO₂ (PPM)")
+                .draw()
+                .map_err(|e| Error::Internal(Box::new(e)))?;
+
+            chart
+                .draw_series(LineSeries::new(
+                    rows.iter().map(|(time, row)| (*time, row.temperature)),
+                    BLACK,
+                ))
+                .map_err(|e| Error::Internal(Box::new(e)))?;
+            chart
+                .draw_secondary_series(LineSeries::new(
+                    rows.iter().map(|(time, row)| (*time, row.co2)),
+                    RGBAColor(0, 0, 0, 0.3),
+                ))
+                .map_err(|e| Error::Internal(Box::new(e)))?;
         }
     };
 

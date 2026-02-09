@@ -8,10 +8,10 @@ import androidx.navigation.compose.rememberNavController
 import kr.dream_house.osd.Navigation
 
 @Composable
-fun App(modifier: Modifier) {
+fun App(modifier: Modifier, startDestination: Any = Navigation.MainScreen) {
     val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = Navigation.MainScreen) {
+    NavHost(modifier = modifier, navController = navController, startDestination = startDestination) {
         composable<Navigation.MainScreen> {
             MainScreen(navController)
         }

@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import info.mqtt.android.service.MqttAndroidClient
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -19,13 +18,13 @@ import org.eclipse.paho.client.mqttv3.MqttMessage
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
-class AsyncMqttClient(private val scope: CoroutineScope, context: Context, uri: String, clientId: String) {
+class AsyncMqttClient(context: Context, uri: String, clientId: String) {
 
     companion object {
         private const val TAG = "AsyncMqttClient"
     }
 
-    val client = MqttAndroidClient(context, "tcp://10.10.0.100:1883", clientId).also {
+    val client = MqttAndroidClient(context, uri, clientId).also {
         it.setTraceEnabled(true)
     }
 

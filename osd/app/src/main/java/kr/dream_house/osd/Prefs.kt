@@ -14,6 +14,7 @@ private const val KEY_MQTT_HOST = "MQTT_HOST"
 private const val KEY_MQTT_PORT = "MQTT_PORT"
 private const val KEY_MQTT_USERNAME = "MQTT_USERNAME"
 private const val KEY_MQTT_PASSWORD = "MQTT_PASSWORD"
+private const val KEY_CRASH_COLLECTOR_URL = "CRASH_COLLECTOR_URL"
 
 const val MQTT_DEFAULT_PORT = 1883
 
@@ -44,6 +45,16 @@ suspend fun setMqttPrefs(context: Context, host: String, port: Int, username: St
     }
 }
 
+suspend fun setCrashCollectorUrl(context: Context, url: String?) {
+    context.dataStore.edit { prefs ->
+        if (url != null) {
+            prefs[stringPreferencesKey((KEY_CRASH_COLLECTOR_URL))] = url
+        } else {
+            prefs.remove(stringPreferencesKey(KEY_CRASH_COLLECTOR_URL))
+        }
+    }
+}
+
 fun mqttConfigFlow(context: Context): Flow<MqttConfig?> {
     return context.dataStore.data.map { prefs ->
         val host = prefs[stringPreferencesKey(KEY_MQTT_HOST)]
@@ -56,5 +67,11 @@ fun mqttConfigFlow(context: Context): Flow<MqttConfig?> {
         } else {
             null
         }
+    }
+}
+
+fun crashCollectorUrlFlow(context: Context): Flow<String?> {
+    return context.dataStore.data.map { prefs ->
+        prefs[stringPreferencesKey(KEY_CRASH_COLLECTOR_URL)]
     }
 }

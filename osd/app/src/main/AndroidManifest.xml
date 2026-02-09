@@ -8,9 +8,14 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.MANAGE_DEVICE_POLICY_LOCK_TASK" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
     <uses-feature android:name="android.software.midi" android:required="true"/>
 
     <application
+        android:name=".DxeApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -18,13 +23,18 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
         android:enableOnBackInvokedCallback="true"
         android:theme="@style/Theme.DXE" >
+
         <activity
-            android:name=".MainActivity"
+            android:name=".DpcActivity"
+            android:process=":bastion"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.DXE" >
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:lockTaskMode="if_whitelisted" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -32,6 +42,13 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".MainActivity"
+            android:label="@string/app_name"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:lockTaskMode="if_whitelisted" />
 
         <service
             android:name=".mqtt.MqttService"

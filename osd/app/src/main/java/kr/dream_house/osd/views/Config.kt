@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -22,6 +23,7 @@ import kotlinx.coroutines.launch
 import kr.dream_house.osd.MQTT_DEFAULT_PORT
 import kr.dream_house.osd.Navigation
 import kr.dream_house.osd.mqttConfigFlow
+import kr.dream_house.osd.setCrashCollectorUrl
 import kr.dream_house.osd.setMqttPrefs
 
 @Composable
@@ -34,6 +36,7 @@ fun Config(navController: NavController) {
     var port by remember { mutableStateOf("$MQTT_DEFAULT_PORT") }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var crashCollectorUrl by remember { mutableStateOf("") }
 
     LaunchedEffect(mqttConfig) {
         mqttConfig?.let {
@@ -45,12 +48,12 @@ fun Config(navController: NavController) {
     }
 
     Column {
-        Row {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Host: ")
             TextField(value = host, onValueChange = { host = it })
         }
 
-        Row {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Port: ")
             TextField(
                 keyboardOptions = KeyboardOptions(
@@ -63,12 +66,12 @@ fun Config(navController: NavController) {
             )
         }
 
-        Row {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Username: ")
             TextField(value = username, onValueChange = { username = it })
         }
 
-        Row {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Password: ")
             TextField(
                 keyboardOptions = KeyboardOptions(
@@ -80,10 +83,16 @@ fun Config(navController: NavController) {
             )
         }
 
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Crash Collector URL: ")
+            TextField(value = crashCollectorUrl, onValueChange = { crashCollectorUrl = it })
+        }
+
         Button(
             enabled = host.isNotEmpty(),
             onClick = { coroutineScope.launch {
                 setMqttPrefs(context, host, port.toInt(), username.ifEmpty { null }, password.ifEmpty { null })
+                setCrashCollectorUrl(context, crashCollectorUrl.ifEmpty { null })
                 navController.navigate(route = Navigation.MainScreen)
             } }
         ) {

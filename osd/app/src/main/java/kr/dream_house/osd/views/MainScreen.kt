@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.debounce
@@ -173,7 +174,7 @@ fun MainScreen(navController: NavHostController) {
                     currentAlert = payload.alert
                 }
             }
-            val doorLockOpenResultChannel = Channel<DoorLockOpenResult>()
+            val doorLockOpenResultChannel = Channel<DoorLockOpenResult>(1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
             val onDoorLockOpenResult = object: TopicSubscriber<DoorLockOpenResult> {
                 override fun onPayload(
                     topic: String,
@@ -249,10 +250,16 @@ fun MainScreen(navController: NavHostController) {
             }
 
             sendOpenDoorRequest = {
+                val timeout = coroutineScope.launch {
+                    delay(5000)
+                    doorLockOpenResultChannel.trySend(DoorLockOpenResult(false, "통신에 실패했습니다."))
+                }
                 if (!service.publish(DoorLockOpenResult.setTopicName, JsonNull, 1, false)) {
                     null
                 } else {
-                    doorLockOpenResultChannel.receive()
+                    val result = doorLockOpenResultChannel.receive()
+                    timeout.cancel()
+                    result
                 }
             }
 

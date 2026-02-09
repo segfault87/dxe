@@ -26,6 +26,7 @@ import kotlinx.serialization.json.Json
 import kr.dream_house.osd.DeviceAdminReceiver
 import kr.dream_house.osd.MqttConfig
 import kr.dream_house.osd.R
+import kr.dream_house.osd.mqtt.topics.Ping
 import kr.dream_house.osd.mqtt.topics.SetScreenState
 import kr.dream_house.osd.mqttConfigFlow
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions
@@ -39,16 +40,9 @@ class MqttService : LifecycleService() {
 
         private const val SERVICE_ID = 100
 
-        private var IS_RUNNING = false
-
         fun startIfNotRunning(context: Context) {
-            if (IS_RUNNING)
-                return
-
             val intent = Intent(context, MqttService::class.java)
             context.startService(intent)
-
-            IS_RUNNING = true
         }
     }
 
@@ -86,6 +80,7 @@ class MqttService : LifecycleService() {
     private lateinit var adminComponent: ComponentName
 
     private var mqttClientJob: Job? = null
+    private var hasStarted = false
 
     inline fun <reified T> subscribe(callback: TopicSubscriber<T>, qos: Int = 1) {
         val companion = T::class.companionObjectInstance as? TopicSpec ?: throw IllegalStateException("Type ${T::class} is not a topic")
@@ -174,12 +169,16 @@ class MqttService : LifecycleService() {
 
     override fun onUnbind(intent: Intent?): Boolean {
         super.onUnbind(intent)
-
         return false
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
+
+        if (hasStarted) {
+            return START_STICKY
+        }
+        hasStarted = true
 
         Log.d(TAG, "onStartCommand: $intent $flags $startId")
 
@@ -249,7 +248,7 @@ class MqttService : LifecycleService() {
 
     private suspend fun mqttClientLoop(config: MqttConfig) {
         val uri = "tcp://${config.host}:${config.port}"
-        val client = AsyncMqttClient(lifecycleScope, this, uri, "OSD_${UUID.randomUUID()}")
+        val client = AsyncMqttClient(this, uri, "OSD_${UUID.randomUUID()}")
 
         Log.d(TAG, "Connecting to MQTT...")
 
@@ -258,6 +257,7 @@ class MqttService : LifecycleService() {
             connectOptions.userName = config.username
             connectOptions.password = config.password.toCharArray()
         }
+        connectOptions.connectionTimeout = 5
 
         val disconnectionTrigger = try {
             client.connect(connectOptions)
@@ -300,6 +300,13 @@ class MqttService : LifecycleService() {
                 } else {
                     Log.w(TAG, "No handler found for topic $topic")
                 }
+            }
+        }
+
+        lifecycleScope.launch {
+            while (client.client.isConnected) {
+                delay(10000)
+                client.publish(Ping.OUTBOUND_TOPIC_NAME, Json.encodeToString(Ping(System.currentTimeMillis())), 1, false)
             }
         }
 

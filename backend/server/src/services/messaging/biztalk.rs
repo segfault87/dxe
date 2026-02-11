@@ -5,20 +5,20 @@ use dxe_extern::biztalk::models::AlimTalkButtonAttachment;
 use super::MessagingBackend;
 use crate::config::{BiztalkConfig, TimeZoneConfig, UrlConfig};
 
-const MESSAGE_AUDIO_READY_01: &str = include_str!("biztalk/AUDIO_READY_01.txt").trim_ascii();
-const MESSAGE_RESERVATION_CANCEL_CONFIRM_01: &str =
+const MESSAGE_AUDIO_READY: &str = include_str!("biztalk/AUDIO_READY_01.txt").trim_ascii();
+const MESSAGE_RESERVATION_CANCEL_CONFIRM: &str =
     include_str!("biztalk/RESERVATION_CANCEL_CONFIRM_01.txt").trim_ascii();
-const MESSAGE_RESERVATION_CANCEL_HRF_01: &str =
+const MESSAGE_RESERVATION_CANCEL_HRF: &str =
     include_str!("biztalk/RESERVATION_CANCEL_HRF_01.txt").trim_ascii();
-const MESSAGE_RESERVATION_CANCEL_NRF_01: &str =
+const MESSAGE_RESERVATION_CANCEL_NRF: &str =
     include_str!("biztalk/RESERVATION_CANCEL_NRF_01.txt").trim_ascii();
-const MESSAGE_RESERVATION_CANCEL_RF_01: &str =
+const MESSAGE_RESERVATION_CANCEL_RF: &str =
     include_str!("biztalk/RESERVATION_CANCEL_RF_01.txt").trim_ascii();
-const MESSAGE_RESERVATION_CONFIRMATION_02: &str =
+const MESSAGE_RESERVATION_CONFIRMATION: &str =
     include_str!("biztalk/RESERVATION_CONFIRMATION_02.txt").trim_ascii();
-const MESSAGE_RESERVATION_REMINDER_01: &str =
-    include_str!("biztalk/RESERVATION_REMINDER_01.txt").trim_ascii();
-const MESSAGE_RESERVATION_AMEND_01: &str =
+const MESSAGE_RESERVATION_REMINDER: &str =
+    include_str!("biztalk/RESERVATION_REMINDER_02.txt").trim_ascii();
+const MESSAGE_RESERVATION_AMEND: &str =
     include_str!("biztalk/RESERVATION_AMEND_01.txt").trim_ascii();
 
 const TEMPLATE_AUDIO_READY: &str = "AUDIO_READY_01";
@@ -27,7 +27,7 @@ const TEMPLATE_RESERVATION_CANCEL_NO_REFUND: &str = "RESERVATION_CANCEL_NRF_01";
 const TEMPLATE_RESERVATION_CANCEL_HALF_REFUND: &str = "RESERVATION_CANCEL_HRF_01";
 const TEMPLATE_RESERVATION_CANCEL_FULL_REFUND: &str = "RESERVATION_CANCEL_RF_01";
 const TEMPLATE_RESERVATION_CONFIRMATION: &str = "RESERVATION_CONFIRMATION_02";
-const TEMPLATE_RESERVATION_REMINDER: &str = "RESERVATION_REMINDER_01";
+const TEMPLATE_RESERVATION_REMINDER: &str = "RESERVATION_REMINDER_02";
 const TEMPLATE_RESERVATION_AMEND: &str = "RESERVATION_AMEND_01";
 
 pub type BiztalkRecipient = String;
@@ -74,7 +74,7 @@ impl MessagingBackend for BiztalkClient {
             (end - start).num_hours()
         );
 
-        let message = MESSAGE_RESERVATION_CONFIRMATION_02
+        let message = MESSAGE_RESERVATION_CONFIRMATION
             .replace("#{customer}", booking.customer.name())
             .replace("#{reservation_dt}", &time_str);
 
@@ -143,7 +143,7 @@ impl MessagingBackend for BiztalkClient {
             (end - start).num_hours()
         );
 
-        let message = MESSAGE_RESERVATION_REMINDER_01
+        let message = MESSAGE_RESERVATION_REMINDER
             .replace("#{customer}", booking.customer.name())
             .replace("#{reservation_relative_time}", relative_time_str.trim())
             .replace("#{reservation_dt}", &time_str);
@@ -161,7 +161,7 @@ impl MessagingBackend for BiztalkClient {
                     TEMPLATE_RESERVATION_REMINDER,
                     message.clone(),
                     Some(vec![AlimTalkButtonAttachment {
-                        name: "이용 안내".to_owned(),
+                        name: "예약 확인".to_owned(),
                         r#type: Default::default(),
                         url_mobile: url.to_string(),
                         url_pc: Some(url.to_string()),
@@ -207,7 +207,7 @@ impl MessagingBackend for BiztalkClient {
             (new_end - new_start).num_hours()
         );
 
-        let message = MESSAGE_RESERVATION_AMEND_01
+        let message = MESSAGE_RESERVATION_AMEND
             .replace("#{customer}", booking.customer.name())
             .replace("#{old_reservation_dt}", &prev_time_str)
             .replace("#{new_reservation_dt}", &new_time_str);
@@ -263,19 +263,19 @@ impl MessagingBackend for BiztalkClient {
         let (template, message) = match refund_rate {
             0 => (
                 TEMPLATE_RESERVATION_CANCEL_NO_REFUND,
-                MESSAGE_RESERVATION_CANCEL_NRF_01
+                MESSAGE_RESERVATION_CANCEL_NRF
                     .replace("#{customer}", booking.customer.name())
                     .replace("#{reservation_dt}", &time_str),
             ),
             50 => (
                 TEMPLATE_RESERVATION_CANCEL_HALF_REFUND,
-                MESSAGE_RESERVATION_CANCEL_HRF_01
+                MESSAGE_RESERVATION_CANCEL_HRF
                     .replace("#{customer}", booking.customer.name())
                     .replace("#{reservation_dt}", &time_str),
             ),
             100 => (
                 TEMPLATE_RESERVATION_CANCEL_FULL_REFUND,
-                MESSAGE_RESERVATION_CANCEL_RF_01
+                MESSAGE_RESERVATION_CANCEL_RF
                     .replace("#{customer}", booking.customer.name())
                     .replace("#{reservation_dt}", &time_str),
             ),
@@ -319,7 +319,7 @@ impl MessagingBackend for BiztalkClient {
             (end - start).num_hours()
         );
 
-        let message = MESSAGE_RESERVATION_CANCEL_CONFIRM_01
+        let message = MESSAGE_RESERVATION_CANCEL_CONFIRM
             .replace("#{customer}", booking.customer.name())
             .replace("#{reservation_dt}", &time_str)
             .replace("#{refund_price}", &refunded_price.to_string());
@@ -357,7 +357,7 @@ impl MessagingBackend for BiztalkClient {
             .map(|v| v.format("%Y-%m-%d %H:%M:%S").to_string())
             .unwrap_or(String::from("-"));
 
-        let message = MESSAGE_AUDIO_READY_01
+        let message = MESSAGE_AUDIO_READY
             .replace("#{customer}", booking.customer.name())
             .replace("#{reservation_dt}", &time_str)
             .replace("#{expires_dt}", &expires_in);

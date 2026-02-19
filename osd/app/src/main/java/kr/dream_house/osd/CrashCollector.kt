@@ -3,10 +3,7 @@ package kr.dream_house.osd
 import android.content.Context
 import android.util.Log
 import com.google.auto.service.AutoService
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.acra.config.CoreConfiguration
 import org.acra.data.CrashReportData
@@ -20,22 +17,30 @@ class CrashCollector(private val crashCollectorUrlFlow: Flow<String?>) : ReportS
         private const val TAG = "CrashCollector"
     }
 
-    @OptIn(DelicateCoroutinesApi::class, ExperimentalCoroutinesApi::class)
+    private var collectorUrl: String? = null
+
+    init {
+        Thread {
+            runBlocking {
+                crashCollectorUrlFlow.collect {
+                    collectorUrl = it
+                }
+            }
+        }.start()
+    }
+
     override fun send(context: Context, errorContent: CrashReportData) {
-        val url = runBlocking {
-            crashCollectorUrlFlow.first()
-        }
-        if (url == null) {
+        if (collectorUrl == null) {
             Log.i(TAG, "Crash collector URL is empty. skipping...")
         }
 
         val json = errorContent.toJSON().toByteArray(Charsets.UTF_8)
 
-        val connection = URL(url).openConnection() as HttpURLConnection
+        val connection = URL(collectorUrl).openConnection() as HttpURLConnection
         connection.apply {
             requestMethod = "POST"
             setRequestProperty("Content-Type", "application/json; utf-8")
-            setRequestProperty("Accept", "application/json");
+            setRequestProperty("Accept", "application/json")
             doOutput = true
         }
 
@@ -46,6 +51,7 @@ class CrashCollector(private val crashCollectorUrlFlow: Flow<String?>) : ReportS
             val inputStream = connection.getInputStream()
             val buf = ByteArray(1000)
             while (inputStream.read(buf) > 0) {
+                // ...
             }
         } catch (e: Exception) {
             Log.e(TAG, "Could not send crash report: $e")

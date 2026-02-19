@@ -26,6 +26,7 @@ import kotlinx.serialization.json.Json
 import kr.dream_house.osd.DeviceAdminReceiver
 import kr.dream_house.osd.MqttConfig
 import kr.dream_house.osd.R
+import kr.dream_house.osd.mqtt.topics.ControlDevice
 import kr.dream_house.osd.mqtt.topics.Ping
 import kr.dream_house.osd.mqtt.topics.SetScreenState
 import kr.dream_house.osd.mqttConfigFlow
@@ -39,11 +40,6 @@ class MqttService : LifecycleService() {
         const val TAG = "MqttService"
 
         private const val SERVICE_ID = 100
-
-        fun startIfNotRunning(context: Context) {
-            val intent = Intent(context, MqttService::class.java)
-            context.startService(intent)
-        }
     }
 
     class BootIntentReceiver : BroadcastReceiver() {
@@ -76,33 +72,36 @@ class MqttService : LifecycleService() {
     val events = Channel<MqttEvent>()
 
     private lateinit var powerManager: PowerManager
+    private lateinit var serviceWakeLock: PowerManager.WakeLock
+    private lateinit var screenWakeLock: PowerManager.WakeLock
     private lateinit var devicePolicyManager: DevicePolicyManager
     private lateinit var adminComponent: ComponentName
 
     private var mqttClientJob: Job? = null
     private var hasStarted = false
+    private var omitScreenState = false
 
     inline fun <reified T> subscribe(callback: TopicSubscriber<T>, qos: Int = 1) {
         val companion = T::class.companionObjectInstance as? TopicSpec ?: throw IllegalStateException("Type ${T::class} is not a topic")
         val topic = companion.topicName
 
         if (!callbacks.containsKey(topic)) {
+            val bundle = SubscriberBundle(topic, object: Deserializer<T> {
+                override fun deserialize(value: ByteArray): T {
+                    return Json.decodeFromString(value.decodeToString())
+                }
+            })
+            bundle.addCallback(callback)
+            callbacks[topic] = bundle
             synchronized(subscriptions) {
-                val bundle = SubscriberBundle(topic, object: Deserializer<T> {
-                    override fun deserialize(value: ByteArray): T {
-                        return Json.decodeFromString(value.decodeToString())
-                    }
-                })
-                bundle.addCallback(callback)
-                callbacks[topic] = bundle
                 subscriptions[topic] = qos
-                events.trySend(
-                    MqttEvent.Subscribe(
-                        topic = topic,
-                        qos = qos,
-                    )
-                )
             }
+            events.trySend(
+                MqttEvent.Subscribe(
+                    topic = topic,
+                    qos = qos,
+                )
+            )
         } else {
             @Suppress("UNCHECKED_CAST") val bundle: SubscriberBundle<T> = callbacks[topic] as SubscriberBundle<T>
             bundle.addCallback(callback)
@@ -160,6 +159,21 @@ class MqttService : LifecycleService() {
         powerManager = getSystemService(PowerManager::class.java)
         devicePolicyManager = getSystemService(DevicePolicyManager::class.java)
         adminComponent = ComponentName(this, DeviceAdminReceiver::class.java)
+
+        serviceWakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "dxe:serviceWakeLock")
+        screenWakeLock = powerManager.newWakeLock(
+            PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
+            "dxe:screenWakeLock"
+        )
+
+        @SuppressLint("WakelockTimeout")
+        serviceWakeLock.acquire()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+
+        serviceWakeLock.release()
     }
 
     override fun onBind(intent: Intent): IBinder {
@@ -179,8 +193,6 @@ class MqttService : LifecycleService() {
             return START_STICKY
         }
         hasStarted = true
-
-        Log.d(TAG, "onStartCommand: $intent $flags $startId")
 
         startForeground()
 
@@ -228,19 +240,29 @@ class MqttService : LifecycleService() {
     private fun subscribeServiceTopics() {
         subscribe(object: TopicSubscriber<SetScreenState> {
             override fun onPayload(topic: String, payload: SetScreenState) {
+                if (omitScreenState) {
+                    return
+                }
+
                 if (payload.isActive) {
-                    val wakeLock = powerManager.newWakeLock(
-                        PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
-                        "Dxe:SetScreenState"
-                    )
                     @SuppressLint("WakelockTimeout")
-                    wakeLock.acquire()
+                    screenWakeLock.acquire()
                 } else {
+                    if (screenWakeLock.isHeld) {
+                        screenWakeLock.release()
+                    }
                     if (devicePolicyManager.isAdminActive(adminComponent)) {
                         devicePolicyManager.lockNow()
                     } else {
                         Log.w(TAG, "Not turning screen off as device admin is not active.")
                     }
+                }
+            }
+        })
+        subscribe(object: TopicSubscriber<ControlDevice> {
+            override fun onPayload(topic: String, payload: ControlDevice) {
+                payload.omitScreenState?.let {
+                    omitScreenState = it
                 }
             }
         })

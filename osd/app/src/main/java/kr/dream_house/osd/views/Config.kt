@@ -2,8 +2,9 @@ package kr.dream_house.osd.views
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -15,21 +16,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.navigation.NavController
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import kr.dream_house.osd.MQTT_DEFAULT_PORT
-import kr.dream_house.osd.Navigation
+import kr.dream_house.osd.crashCollectorUrlFlow
 import kr.dream_house.osd.mqttConfigFlow
 import kr.dream_house.osd.setCrashCollectorUrl
 import kr.dream_house.osd.setMqttPrefs
 
 @Composable
-fun Config(navController: NavController) {
+fun Config(onDismiss: () -> Unit) {
     val context = LocalContext.current
     val mqttConfig by mqttConfigFlow(context).collectAsState(initial = null)
+    val crashCollectorConfig by crashCollectorUrlFlow(context).collectAsState(null)
     val coroutineScope = rememberCoroutineScope()
 
     var host by remember { mutableStateOf("") }
@@ -47,7 +50,13 @@ fun Config(navController: NavController) {
         }
     }
 
-    Column {
+    LaunchedEffect(crashCollectorConfig) {
+        crashCollectorConfig?.let {
+            crashCollectorUrl = it
+        }
+    }
+
+    Column(modifier = Modifier.padding(24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Host: ")
             TextField(value = host, onValueChange = { host = it })
@@ -88,12 +97,12 @@ fun Config(navController: NavController) {
             TextField(value = crashCollectorUrl, onValueChange = { crashCollectorUrl = it })
         }
 
-        Button(
+        FilledTonalButton(
             enabled = host.isNotEmpty(),
             onClick = { coroutineScope.launch {
                 setMqttPrefs(context, host, port.toInt(), username.ifEmpty { null }, password.ifEmpty { null })
                 setCrashCollectorUrl(context, crashCollectorUrl.ifEmpty { null })
-                navController.navigate(route = Navigation.MainScreen)
+                onDismiss()
             } }
         ) {
             Text("Save")

@@ -22,4 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "DXE"
 include(":app")
- 
+include(":bastion")

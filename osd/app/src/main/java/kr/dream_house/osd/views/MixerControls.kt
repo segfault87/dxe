@@ -137,7 +137,11 @@ private fun GlobalControlRow(
 }
 
 @Composable
-fun MixerControls(mixerPreferences: MixerPreferences?, onUpdateMixerPreferences: (MixerPreferences) -> Unit, customerId: IdentityId?) {
+fun MixerControls(
+    mixerPreferences: MixerPreferences?,
+    onUpdateMixerPreferences: (MixerPreferences) -> Unit,
+    customerId: IdentityId?
+) {
     if (LocalMixerController.current == null) {
         TroubleshootingContact(message = "믹서가 연결되어 있지 않습니다. 위 연락처로 문의해주시기 바랍니다.")
         return
@@ -234,25 +238,26 @@ fun MixerControls(mixerPreferences: MixerPreferences?, onUpdateMixerPreferences:
                     mixerController.updateValues(PartialGlobalDataUpdate(monitorLevel = it))
                 }
             )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Spacer(modifier = Modifier.weight(1.0f))
-                FilledTonalButton(
-                    onClick = {
-                        mixerPreferences?.let {
-                            showLoadPreset = it
-                        }
-                    },
-                    enabled = mixerPreferences != null,
-                ) {
-                    Text("믹서 설정 불러오기", style = MaterialTheme.typography.bodyLarge)
-                }
-                FilledTonalButton(
-                    onClick = {
-                        showSavePreset = mixerController.snapshot()
-                    },
-                    enabled = customerId != null,
-                ) {
-                    Text("믹서 설정 저장", style = MaterialTheme.typography.bodyLarge)
+            if (customerId != null) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Spacer(modifier = Modifier.weight(1.0f))
+                    FilledTonalButton(
+                        onClick = {
+                            mixerPreferences?.let {
+                                showLoadPreset = it
+                            }
+                        },
+                        enabled = mixerPreferences != null
+                    ) {
+                        Text("믹서 설정 불러오기", style = MaterialTheme.typography.bodyLarge)
+                    }
+                    FilledTonalButton(
+                        onClick = {
+                            showSavePreset = mixerController.snapshot()
+                        },
+                    ) {
+                        Text("믹서 설정 저장", style = MaterialTheme.typography.bodyLarge)
+                    }
                 }
             }
         }

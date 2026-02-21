@@ -1,4 +1,4 @@
-package kr.dream_house.osd.views.unit_default
+package kr.dream_house.osd.views
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
@@ -14,18 +14,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import kr.dream_house.osd.R
+import kr.dream_house.osd.BuildConfig
+import kr.dream_house.osd.views.unit_default.CONTACT_INFORMATION_DEFAULT
 
 @Composable
 fun TroubleshootingContact(modifier: Modifier = Modifier, message: String) {
+    val contactResource = CONTACT_PER_UNIT[BuildConfig.UNIT_ID] ?: return
+
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Image(
                 modifier = Modifier.size(320.dp),
-                painter = painterResource(R.drawable.img_qr_telephone),
-                contentDescription = "Mobile number (+82-502-1944-5052)"
+                painter = painterResource(contactResource),
+                contentDescription = "Mobile number"
             )
             Text(
                 modifier = Modifier.padding(top = 32.dp),
@@ -36,3 +39,7 @@ fun TroubleshootingContact(modifier: Modifier = Modifier, message: String) {
         }
     }
 }
+
+private val CONTACT_PER_UNIT = mapOf(
+    "default" to CONTACT_INFORMATION_DEFAULT,
+)

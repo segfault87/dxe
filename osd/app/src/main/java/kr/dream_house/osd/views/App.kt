@@ -53,7 +53,6 @@ import kr.dream_house.osd.mqtt.topics.DoorbellRequest
 import kr.dream_house.osd.mqtt.topics.ParkingStates
 import kr.dream_house.osd.mqtt.topics.SetMixerPreferences
 import kr.dream_house.osd.mqtt.topics.SetMixerStates
-import kr.dream_house.osd.mqttConfigFlow
 import kr.dream_house.osd.navigate
 import kotlin.collections.component1
 import kotlin.collections.component2
@@ -68,7 +67,6 @@ fun App(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val mqttConfig by mqttConfigFlow(context).collectAsState(null)
     val mixerController = LocalMixerController.current
 
     val mixerState by mixerController?.state?.collectAsState() ?: remember { mutableStateOf(MixerState())  }
@@ -80,16 +78,6 @@ fun App(
     var publishMixerState by remember { mutableStateOf<suspend (MixerState) -> Unit>({}) }
     var updateMixerPreferences by remember { mutableStateOf<(MixerPreferences) -> Unit>({}) }
     var doorbellRequest by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        coroutineScope.launch {
-            // Quick hack for avoid getting initial state
-            delay(500)
-            if (mqttConfig == null) {
-                navController.navigate(navigation = Navigation.Config)
-            }
-        }
-    }
 
     LaunchedEffect(Unit) {
         snapshotFlow { mixerState }

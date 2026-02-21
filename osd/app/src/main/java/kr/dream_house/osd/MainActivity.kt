@@ -27,6 +27,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
@@ -34,7 +35,10 @@ import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kr.dream_house.osd.midi.LocalMixerController
 import kr.dream_house.osd.midi.MidiDeviceManager
 import kr.dream_house.osd.midi.MixerController
@@ -71,7 +75,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private val navigationState = mutableStateOf<String?>(null)
+    private var navigationState by mutableStateOf<String?>(null)
 
     private fun MqttService.LocalBinder.subscribeTopics() {
         val onDeviceLock = object: TopicSubscriber<ControlDevice> {
@@ -87,7 +91,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 payload.navigation?.let { navigation ->
-                    navigationState.value = navigation
+                    navigationState = navigation
                 }
                 payload.finish?.let {
                     if (it) {
@@ -118,7 +122,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleNotificationPrerequisites() {
-        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             val activityResultLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission(), { isGranted ->
                 if (!isGranted) {
                     Log.e(TAG, "Should grant permission")
@@ -153,6 +157,11 @@ class MainActivity : ComponentActivity() {
         handleNotificationPrerequisites()
 
         val startDestination = intent.getStringExtra("destination")
+        lifecycleScope.launch {
+            if (mqttConfigFlow(this@MainActivity).first() == null) {
+                navigationState = Navigation.Config.qualifiedRoute()
+            }
+        }
 
         val mqttServiceIntent = Intent(this, MqttService::class.java)
         bindService(mqttServiceIntent, mqttServiceConnection, BIND_AUTO_CREATE)
@@ -178,10 +187,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             val navController = rememberNavController()
 
-            val navigation by navigationState
-
-            LaunchedEffect(navigation) {
-                navigation?.let {
+            LaunchedEffect(navigationState) {
+                navigationState?.let {
                     navController.navigate(route = it)
 
                 }

@@ -43,7 +43,6 @@ import kr.dream_house.osd.midi.GlobalData
 import kr.dream_house.osd.midi.LocalMixerController
 import kr.dream_house.osd.midi.MixerCapability
 import kr.dream_house.osd.midi.updateFrom
-import kr.dream_house.osd.views.unit_default.TroubleshootingContact
 
 @Composable
 private fun MixerRow(
@@ -121,7 +120,7 @@ private fun GlobalControlRow(
                 activeTrackColor = MaterialTheme.colorScheme.secondary
             )
         )
-        Text(modifier = Modifier.padding(start = 24.dp, end = 8.dp), text = "모니터 음량")
+        Text(modifier = Modifier.padding(start = 24.dp, end = 8.dp), text = "개인 모니터 음량")
         Slider(
             modifier = Modifier.width(300.dp),
             enabled = capability.contains(MixerCapability.GLOBAL_MONITOR_LEVEL),

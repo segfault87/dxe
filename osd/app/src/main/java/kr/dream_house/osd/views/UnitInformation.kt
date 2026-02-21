@@ -1,4 +1,4 @@
-package kr.dream_house.osd.views.unit_default
+package kr.dream_house.osd.views
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -20,24 +20,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import kr.dream_house.osd.BuildConfig
 import kr.dream_house.osd.R
+import kr.dream_house.osd.views.unit_default.UNIT_DEFAULT_PAGES
 
-enum class Subpage(val contents: @Composable (onClose: () -> Unit) -> Unit) {
-    VOLUME_ADJUSTMENT({ VolumeAdjustment(it) }),
-    CONNECT_MOBILE({ ConnectMobile(it) }),
-    CONNECT_AUDIO_EQUIPMENT({ ConnectAudioEquipment(it) }),
-    CONTACT({ Contact(it) });
-}
+data class Subpage(
+    val title: String,
+    val contents: @Composable (onClose: () -> Unit) -> Unit,
+)
 
 @Composable
-fun MenuItemButton(onClick: () -> Unit, text: String) {
+private fun Subpage.MenuItemButton(onClick: () -> Unit) {
     Button(modifier = Modifier.width(520.dp), onClick = onClick) {
-        Text(modifier = Modifier.padding(16.dp), text = text, style = MaterialTheme.typography.bodyLarge)
+        Text(modifier = Modifier.padding(16.dp), text = title, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
 @Composable
 fun UnitInformation() {
+    val subpages = PAGES_PER_UNIT[BuildConfig.UNIT_ID] ?: return
+
     var currentPage by remember { mutableStateOf<Subpage?>(null) }
 
     if (currentPage != null) {
@@ -53,20 +55,16 @@ fun UnitInformation() {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                MenuItemButton(
-                    onClick = { currentPage = Subpage.VOLUME_ADJUSTMENT },
-                    text = "모니터링이 잘 안 돼요 / 마이크 소리가 너무 작아요"
-                )
-                MenuItemButton(
-                    onClick = { currentPage = Subpage.CONNECT_MOBILE },
-                    text = "휴대폰에 있는 음악을 재생하고 싶어요"
-                )
-                MenuItemButton(
-                    onClick = { currentPage = Subpage.CONNECT_AUDIO_EQUIPMENT },
-                    text = "건반을 추가로 연결하고 싶어요"
-                )
-                MenuItemButton(onClick = { currentPage = Subpage.CONTACT }, text = "그 외 문의사항이 있어요")
+                for (subpage in subpages) {
+                    subpage.MenuItemButton {
+                        currentPage = subpage
+                    }
+                }
             }
         }
     }
 }
+
+private val PAGES_PER_UNIT = mapOf(
+    "default" to UNIT_DEFAULT_PAGES,
+)

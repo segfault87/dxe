@@ -23,7 +23,6 @@ import kr.dream_house.osd.entities.ParkingState
 import kr.dream_house.osd.mqtt.topics.DoorLockOpenResult
 import kr.dream_house.osd.navigate
 import kr.dream_house.osd.ui.theme.WhitishYellow
-import kr.dream_house.osd.views.unit_default.UnitInformation
 
 @Composable
 fun MainScreen(

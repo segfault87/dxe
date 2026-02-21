@@ -59,8 +59,6 @@ import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.iterator
 
-const val SUBPAGE_TIMEOUT_MILLISECONDS: Long = 1000 * 60 * 5
-
 @OptIn(FlowPreview::class)
 @Composable
 fun App(

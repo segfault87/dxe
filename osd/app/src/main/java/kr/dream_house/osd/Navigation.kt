@@ -35,14 +35,21 @@ sealed class Navigation(private val route: String): Route {
         }
 
         object Mixer : MainScreen("mixer")
-
         object UnitInformation : MainScreen("unitInformation")
-
     }
 
     object Config : Navigation("config")
 }
 
-fun NavHostController.navigate(navigation: Navigation) {
-    navigate(route = navigation.qualifiedRoute())
+fun NavHostController.navigate(navigation: Navigation, nested: Boolean = false) {
+    if (nested) {
+        if (navigation !is NestedRoute) {
+            throw IllegalArgumentException("Navigation $navigation is not a nested route.")
+        } else {
+            navigate(route = navigation.route())
+        }
+    } else {
+        navigate(route = navigation.qualifiedRoute())
+    }
 }
+

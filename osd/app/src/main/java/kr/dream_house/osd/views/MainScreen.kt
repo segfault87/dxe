@@ -8,9 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -18,8 +16,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kr.dream_house.osd.Navigation
 import kr.dream_house.osd.entities.Booking
 import kr.dream_house.osd.entities.MixerPreferences
@@ -39,7 +35,6 @@ fun MainScreen(
     mixerPreferences: MixerPreferences?,
     onUpdateMixerPreferences: (MixerPreferences) -> Unit,
 ) {
-    val coroutineScope = rememberCoroutineScope()
     val nestedNavController = rememberNavController()
 
     val navBackStackEntry by nestedNavController.currentBackStackEntryAsState()
@@ -56,8 +51,8 @@ fun MainScreen(
                     activeBooking = activeBooking,
                     parkingStates = parkingStates,
                     currentRoute = currentRoute,
-                    onNavigateToMixer = { nestedNavController.navigate(navigation = Navigation.MainScreen.Mixer) },
-                    onNavigateToUnitInformation = { nestedNavController.navigate(navigation = Navigation.MainScreen.UnitInformation) }
+                    onNavigateToMixer = { nestedNavController.navigate(navigation = Navigation.MainScreen.Mixer, nested = true) },
+                    onNavigateToUnitInformation = { nestedNavController.navigate(navigation = Navigation.MainScreen.UnitInformation, nested = true) }
                 )
             }
         }
@@ -71,17 +66,6 @@ fun MainScreen(
                     )
                 }
                 composable(Navigation.MainScreen.UnitInformation.route()) {
-                    DisposableEffect(Unit) {
-                        val job = coroutineScope.launch {
-                            delay(SUBPAGE_TIMEOUT_MILLISECONDS)
-                            nestedNavController.navigate(navigation = Navigation.MainScreen.default())
-                        }
-
-                        return@DisposableEffect onDispose {
-                            job.cancel()
-                        }
-                    }
-
                     UnitInformation()
                 }
             }

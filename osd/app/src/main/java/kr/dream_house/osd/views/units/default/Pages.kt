@@ -1,4 +1,4 @@
-package kr.dream_house.osd.views.unit_default
+package kr.dream_house.osd.views.units.default
 
 import kr.dream_house.osd.R
 import kr.dream_house.osd.views.Subpage

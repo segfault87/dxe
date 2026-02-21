@@ -1,4 +1,4 @@
-package kr.dream_house.osd.views.unit_default
+package kr.dream_house.osd.views.units.default
 
 import androidx.compose.runtime.Composable
 import kr.dream_house.osd.views.TroubleshootingContact

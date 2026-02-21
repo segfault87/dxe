@@ -15,7 +15,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kr.dream_house.osd.BuildConfig
-import kr.dream_house.osd.views.unit_default.CONTACT_INFORMATION_DEFAULT
+import kr.dream_house.osd.views.units.CONTACT_PER_UNIT
 
 @Composable
 fun TroubleshootingContact(modifier: Modifier = Modifier, message: String) {
@@ -39,7 +39,3 @@ fun TroubleshootingContact(modifier: Modifier = Modifier, message: String) {
         }
     }
 }
-
-private val CONTACT_PER_UNIT = mapOf(
-    "default" to CONTACT_INFORMATION_DEFAULT,
-)

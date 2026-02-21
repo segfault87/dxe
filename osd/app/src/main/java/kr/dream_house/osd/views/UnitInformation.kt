@@ -22,7 +22,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import kr.dream_house.osd.BuildConfig
 import kr.dream_house.osd.R
-import kr.dream_house.osd.views.unit_default.UNIT_DEFAULT_PAGES
+import kr.dream_house.osd.views.units.PAGES_PER_UNIT
 
 data class Subpage(
     val title: String,
@@ -64,7 +64,3 @@ fun UnitInformation() {
         }
     }
 }
-
-private val PAGES_PER_UNIT = mapOf(
-    "default" to UNIT_DEFAULT_PAGES,
-)

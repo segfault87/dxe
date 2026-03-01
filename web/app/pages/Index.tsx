@@ -146,9 +146,12 @@ export default function Index() {
           <li>
             기타 앰프:
             <ul>
-              <li>Blackstar Series One 200W Head × Blackstar 4x12 Cabinet</li>
+              <li>
+                Blackstar Series One 200W Head + Marshall JCM2000 Head ×
+                Blackstar 4x12 Cabinet
+              </li>
               <li>Fender '65 Twin Reverb</li>
-              <li>Line 6 Powercab 112</li>
+              <li>Line 6 Powercab 112 (FRFR)</li>
             </ul>
           </li>
           <li>
@@ -168,7 +171,13 @@ export default function Index() {
               <li>Tama Iron Cobra Twin Pedal</li>
             </ul>
           </li>
-          <li>키보드: Yamaha MX88</li>
+          <li>
+            키보드:
+            <ul>
+              <li>메인: Yamaha MODX8+ (88건반)</li>
+              <li>서브: KORG KROSS2 (61건반)</li>
+            </ul>
+          </li>
           <li>
             마이크:
             <ul>

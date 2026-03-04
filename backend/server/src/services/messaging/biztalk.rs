@@ -5,7 +5,7 @@ use dxe_extern::biztalk::models::AlimTalkButtonAttachment;
 use super::MessagingBackend;
 use crate::config::{BiztalkConfig, TimeZoneConfig, UrlConfig};
 
-const MESSAGE_AUDIO_READY: &str = include_str!("biztalk/AUDIO_READY_01.txt").trim_ascii();
+const MESSAGE_AUDIO_READY: &str = include_str!("biztalk/AUDIO_READY_02.txt").trim_ascii();
 const MESSAGE_RESERVATION_CANCEL_CONFIRM: &str =
     include_str!("biztalk/RESERVATION_CANCEL_CONFIRM_01.txt").trim_ascii();
 const MESSAGE_RESERVATION_CANCEL_HRF: &str =
@@ -21,7 +21,7 @@ const MESSAGE_RESERVATION_REMINDER: &str =
 const MESSAGE_RESERVATION_AMEND: &str =
     include_str!("biztalk/RESERVATION_AMEND_01.txt").trim_ascii();
 
-const TEMPLATE_AUDIO_READY: &str = "AUDIO_READY_01";
+const TEMPLATE_AUDIO_READY: &str = "AUDIO_READY_02";
 const TEMPLATE_RESERVATION_CANCEL_CONFIRM: &str = "RESERVATION_CONFIRM_01";
 const TEMPLATE_RESERVATION_CANCEL_NO_REFUND: &str = "RESERVATION_CANCEL_NRF_01";
 const TEMPLATE_RESERVATION_CANCEL_HALF_REFUND: &str = "RESERVATION_CANCEL_HRF_01";
@@ -32,6 +32,8 @@ const TEMPLATE_RESERVATION_AMEND: &str = "RESERVATION_AMEND_01";
 
 pub type BiztalkRecipient = String;
 pub type BiztalkSender = super::MessagingSender<BiztalkRecipient>;
+
+const SURVEY_URL: &str = "https://forms.gle/dr5tp8CnFM9SjXdm9";
 
 #[derive(Debug, Clone)]
 pub(super) struct BiztalkClient {
@@ -374,12 +376,20 @@ impl MessagingBackend for BiztalkClient {
                     &recipient,
                     TEMPLATE_AUDIO_READY,
                     message.clone(),
-                    Some(vec![AlimTalkButtonAttachment {
-                        name: "음원 다운로드".to_owned(),
-                        r#type: Default::default(),
-                        url_mobile: url.to_string(),
-                        url_pc: Some(url.to_string()),
-                    }]),
+                    Some(vec![
+                        AlimTalkButtonAttachment {
+                            name: "음원 다운로드".to_owned(),
+                            r#type: Default::default(),
+                            url_mobile: url.to_string(),
+                            url_pc: Some(url.to_string()),
+                        },
+                        AlimTalkButtonAttachment {
+                            name: "설문조사 참여".to_owned(),
+                            r#type: Default::default(),
+                            url_mobile: SURVEY_URL.to_owned(),
+                            url_pc: Some(SURVEY_URL.to_owned()),
+                        },
+                    ]),
                 )
                 .await
             {

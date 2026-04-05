@@ -56,6 +56,7 @@ export default function Guide() {
               <li>Orange Dual Terror 30W Guitar Amp Head</li>
               <li>Marshall 1936 2×12 Guitar Amp Cabinet</li>
               <li>Fender Frontman 212R Guitar Amp</li>
+              <li>Aguilar Tone Hammer 350 Bass Amp Head</li>
               <li>Markbass Traveller 102P Bass Amp Cabinet</li>
             </ul>
           </li>
@@ -87,6 +88,12 @@ export default function Guide() {
           <li>
             마이크에는 커버를 씌워서 사용해주세요. 커버는 합주실 입구 앞 벽걸이
             수납장에 있습니다. 이용 후에는 벗겨서 폐기해 주세요.
+          </li>
+          <li>
+            공간상의 문제로 건반은 총 2개가 고정으로 설치되어 있으며 1개는
+            스페어로 구비되어 있습니다. 키보드 주자가 두 명일 경우 건반을 직접
+            설치하시어 사용하시면 됩니다. 설치 방법은 태블릿에 안내되어
+            있습니다.
           </li>
           <li>
             바로 다음 시간에 이용자가 있다면 5분 전에는 이용을 중단하고 정리를

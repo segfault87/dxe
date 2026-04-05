@@ -147,19 +147,14 @@ export default function Index() {
             기타 앰프:
             <ul>
               <li>
-                Blackstar Series One 200W Head + Marshall JCM2000 Head ×
+                Blackstar Series One 200W Head + Marshall JCM2000 TSL100 Head ×
                 Blackstar 4x12 Cabinet
               </li>
               <li>Fender '65 Twin Reverb</li>
               <li>Line 6 Powercab 112 (FRFR)</li>
             </ul>
           </li>
-          <li>
-            베이스 앰프: <s>Ampeg SVT-2PRO Head</s> × Ampeg SVT-810E Cabinet
-            <br />
-            (현재 헤드는 수리 중으로 임시로 Aguilar Tone Hammer 350으로
-            대체중입니다.)
-          </li>
+          <li>베이스 앰프: Ampeg SVT-2PRO Head × Ampeg SVT-810E Cabinet</li>
           <li>
             드럼세트:
             <ul>
@@ -174,8 +169,9 @@ export default function Index() {
           <li>
             키보드:
             <ul>
-              <li>메인: Yamaha MODX8+ (88건반)</li>
-              <li>서브: KORG KROSS2 (61건반)</li>
+              <li>Yamaha MODX8+ (88건반)</li>
+              <li>Nord Stage 4 Compact (73건반)</li>
+              <li>KORG KROSS2 (61건반)</li>
             </ul>
           </li>
           <li>

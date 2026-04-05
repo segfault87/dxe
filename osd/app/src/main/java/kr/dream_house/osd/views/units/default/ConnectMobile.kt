@@ -34,7 +34,7 @@ private fun ConnectMobileStep1() {
             modifier = Modifier.fractionalOffset(0.05f, 0.80f)
                 .background(Color.White).padding(horizontal = 16.dp, vertical = 8.dp),
             style = MaterialTheme.typography.bodyLarge,
-            text = "휴대폰을 믹서에 연결하려면 이 케이블을 사용해 주세요.\nUSB-C만 지원하며, 라이트닝 단자는 지원하지 않습니다.\n케이블은 입구 쪽에 걸려 있습니다.")
+            text = "휴대폰을 믹서에 연결하려면 이 케이블을 사용해 주세요.\n케이블은 태블릿 좌측 벽에 걸려 있습니다.")
     }
 }
 

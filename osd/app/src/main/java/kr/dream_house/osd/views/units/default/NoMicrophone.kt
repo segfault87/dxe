@@ -11,7 +11,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -22,68 +21,49 @@ import kr.dream_house.osd.views.IndicatorArrow
 import kr.dream_house.osd.views.InstructionPage
 
 @Composable
-private fun WiredMicStep1() {
+private fun NoMicrophoneStep1() {
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
             modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
-            painter = painterResource(R.drawable.img_wired_mic_step1),
+            painter = painterResource(R.drawable.img_no_microphone),
             contentScale = ContentScale.FillWidth,
-            contentDescription = ""
+            contentDescription = "무선 마이크 수신기"
         )
 
         Text(
-            modifier = Modifier.fractionalOffset(0.15f, 0.1f)
+            modifier = Modifier.fractionalOffset(0.1f, 0.1f)
                 .background(Color.White).padding(horizontal = 16.dp, vertical = 8.dp),
             style = MaterialTheme.typography.bodyLarge,
-            text = "유선 마이크는 태블릿 좌측에 있습니다.")
+            text = "무선 마이크 수신기의 전원이 켜져 있는지 확인해 주세요.")
+
+        IndicatorArrow(modifier = Modifier.fractionalOffset(0.8f, 0.57f, xOffset = (-48).dp))
     }
 }
 
 @Composable
-private fun WiredMicStep2() {
+private fun NoMicrophoneStep2() {
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
             modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
-            painter = painterResource(R.drawable.img_wired_mic_step2),
-            contentScale = ContentScale.FillWidth,
-            contentDescription = "믹서 설정"
-        )
-
-        IndicatorArrow(modifier = Modifier.fractionalOffset(0.31f, 0.25f).rotate(-90.0f))
-
-        Text(
-            modifier = Modifier.fractionalOffset(0.31f, 0.25f, xOffset = 64.dp, yOffset = 64.dp)
-                .background(Color.White).padding(horizontal = 16.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.bodyLarge,
-            text = "채널 1, 2의 XLR 단자에 마이크를 연결해 주세요.\n케이블은 입구 쪽에 있습니다.")
-    }
-}
-
-@Composable
-private fun WiredMicStep3() {
-    Box(modifier = Modifier.fillMaxSize()) {
-        Image(
-            modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
-            painter = painterResource(R.drawable.img_wired_mic_step3),
+            painter = painterResource(R.drawable.img_volume_step1),
             contentScale = ContentScale.FillWidth,
             contentDescription = "믹서 설정"
         )
 
         Text(
-            modifier = Modifier.fractionalOffset(0.3f, 0.65f)
+            modifier = Modifier.fractionalOffset(0.95f, 0.7f, xOffset = (-580).dp)
                 .background(Color.White).padding(horizontal = 16.dp, vertical = 8.dp),
             style = MaterialTheme.typography.bodyLarge,
-            text = "믹서 설정 화면에서 채널 1, 2번의 음량을 조정해 주세요.")
+            text = "믹서 설정 화면에서 각 마이크 채널과 마스터 볼륨을 확인해 주세요.\n너무 높으면 하울링이 발생할 수 있습니다.")
     }
 }
 
 @Composable
-fun WiredMic(onClose: () -> Unit) {
+fun NoMicrophone(onClose: () -> Unit) {
     InstructionPage(
         pages = listOf(
-            { WiredMicStep1() },
-            { WiredMicStep2() },
-            { WiredMicStep3() },
+            { NoMicrophoneStep1() },
+            { NoMicrophoneStep2() },
         ),
         onClose = onClose,
     )

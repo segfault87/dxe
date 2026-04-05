@@ -245,8 +245,10 @@ class MqttService : LifecycleService() {
                 }
 
                 if (payload.isActive) {
-                    @SuppressLint("WakelockTimeout")
-                    screenWakeLock.acquire()
+                    if (!screenWakeLock.isHeld) {
+                        @SuppressLint("WakelockTimeout")
+                        screenWakeLock.acquire()
+                    }
                 } else {
                     if (screenWakeLock.isHeld) {
                         screenWakeLock.release()

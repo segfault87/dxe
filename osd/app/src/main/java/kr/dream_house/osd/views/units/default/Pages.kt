@@ -4,6 +4,7 @@ import kr.dream_house.osd.R
 import kr.dream_house.osd.views.Subpage
 
 val UNIT_DEFAULT_PAGES = listOf(
+    Subpage(title = "마이크 소리가 안 나와요", contents = { NoMicrophone(it) }),
     Subpage(title = "모니터링이 잘 안 돼요 / 마이크 소리가 너무 작아요", contents = { VolumeAdjustment(it) }),
     Subpage(title = "개인 모니터를 연결하고 싶어요.", contents = { PersonalMonitor(onClose = it) }),
     Subpage(title = "유선 마이크를 연결하고 싶어요.", contents = { WiredMic(onClose = it) }),

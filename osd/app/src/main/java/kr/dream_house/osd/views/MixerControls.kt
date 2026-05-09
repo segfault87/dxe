@@ -28,6 +28,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -42,11 +43,34 @@ import kr.dream_house.osd.midi.ChannelData
 import kr.dream_house.osd.midi.GlobalData
 import kr.dream_house.osd.midi.LocalMixerController
 import kr.dream_house.osd.midi.MixerCapability
+import kr.dream_house.osd.midi.MixerChannelConfig
 import kr.dream_house.osd.midi.updateFrom
+import kotlin.math.log10
+import kotlin.math.pow
+
+fun convertToGain(base10: Float): Float {
+    return if (base10 < 0.1f) {
+        -128.0f
+    } else if (base10 > 10.0f) {
+        10.0f
+    } else {
+        (log10(base10) + 1.0f) * 0.5f * 138.0f - 128.0f
+    }
+}
+
+fun convertToLinear(gain: Float): Float {
+    return if (gain < -128.0f) {
+        0.0f
+    } else if (gain > 10.0f) {
+        10.0f
+    } else {
+        10.0f.pow((gain + 128.0f) / 69.0f - 1.0f)
+    }
+}
 
 @Composable
 private fun MixerRow(
-    name: String,
+    channel: MixerChannelConfig,
     capabilities: Set<MixerCapability>,
     channelData: ChannelData,
     onChangeLevel: (Float) -> Unit,
@@ -56,47 +80,80 @@ private fun MixerRow(
     onOpenEqPopup: () -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(modifier = Modifier.width(200.dp), text = name)
-        Slider(
+        Text(modifier = Modifier.width(200.dp), text = channel.name)
+        CenteredSlider(
             modifier = Modifier.weight(1.0f),
             enabled = capabilities.contains(MixerCapability.CHANNEL_LEVEL),
-            value = channelData.level,
-            valueRange = 0f..1f,
-            onValueChange = onChangeLevel,
+            value = convertToLinear(channelData.level),
+            valueRange = 0.0f..10.0f,
+            center = convertToLinear(0.0f),
+            onValueChanged = {
+                onChangeLevel(convertToGain(it))
+             },
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.tertiary,
                 activeTrackColor = MaterialTheme.colorScheme.tertiary
-            )
+            ),
         )
-        Slider(
-            modifier = Modifier.width(100.dp),
-            enabled = capabilities.contains(MixerCapability.CHANNEL_REVERB),
-            value = channelData.reverb,
-            valueRange = 0f..1f,
-            onValueChange = onChangeReverb
-        )
-        CenteredSlider(
-            modifier = Modifier.width(100.dp),
-            enabled = capabilities.contains(MixerCapability.CHANNEL_PAN),
-            value = channelData.pan,
-            centerThreshold = 0.1f,
-            valueRange = -1f..1f,
-            onValueChanged = onChangePan,
-        )
-        FilledTonalButton(
-            modifier = Modifier.width(80.dp),
-            enabled = capabilities.contains(MixerCapability.CHANNEL_THREE_BAND_EQ_LEVEL),
-            onClick = onOpenEqPopup,
-        ) {
-            Text("설정")
-        }
-        Switch(
-            checked = channelData.mute,
-            enabled = capabilities.contains(MixerCapability.CHANNEL_MUTE),
-            onCheckedChange = {
-                onChangeMute(it)
+        if (capabilities.contains(MixerCapability.CHANNEL_REVERB)) {
+            if (!channel.capabilityReverb) {
+                Spacer(modifier = Modifier.width(100.dp))
+            } else {
+                Slider(
+                    modifier = Modifier.width(100.dp),
+                    enabled = capabilities.contains(MixerCapability.CHANNEL_REVERB),
+                    value = convertToLinear(channelData.reverb),
+                    valueRange = 0.0f..10.0f,
+                    onValueChange = {
+                        onChangeReverb(convertToGain(it))
+                    },
+                )
             }
-        )
+        }
+        if (capabilities.contains(MixerCapability.CHANNEL_PAN)) {
+            if (!channel.capabilityBalance) {
+                Spacer(modifier = Modifier.width(100.dp))
+            } else {
+                CenteredSlider(
+                    modifier = Modifier.width(100.dp),
+                    enabled = capabilities.contains(MixerCapability.CHANNEL_PAN),
+                    value = channelData.pan,
+                    centerThreshold = 0.1f,
+                    valueRange = -1f..1f,
+                    onValueChanged = onChangePan,
+                    thumb = CenteredThumb,
+                )
+            }
+        }
+        if (capabilities.contains(MixerCapability.CHANNEL_THREE_BAND_EQ_LEVEL)) {
+            if (!channel.capabilityEq) {
+                Spacer(modifier = Modifier.width(80.dp))
+            } else {
+                FilledTonalButton(
+                    modifier = Modifier.width(80.dp),
+                    enabled = capabilities.contains(MixerCapability.CHANNEL_THREE_BAND_EQ_LEVEL),
+                    onClick = onOpenEqPopup,
+                ) {
+                    Text("설정")
+                }
+            }
+        }
+        if (capabilities.contains(MixerCapability.CHANNEL_MUTE)) {
+            Switch(
+                modifier = Modifier.alpha(
+                    if (channel.capabilityMute) {
+                        1.0f
+                    } else {
+                        0.0f
+                    }
+                ),
+                checked = channelData.mute,
+                enabled = capabilities.contains(MixerCapability.CHANNEL_MUTE),
+                onCheckedChange = {
+                    onChangeMute(it)
+                },
+            )
+        }
     }
 }
 
@@ -109,24 +166,30 @@ private fun GlobalControlRow(
 ) {
     Row(modifier = Modifier.padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(modifier = Modifier.padding(end = 8.dp), text = "마스터 음량")
-        Slider(
+        CenteredSlider(
             modifier = Modifier.weight(1.0f),
             enabled = capability.contains(MixerCapability.GLOBAL_MASTER_LEVEL),
-            value = globalData.masterLevel,
-            valueRange = 0f..1f,
-            onValueChange = onChangeMasterLevel,
+            value = convertToLinear(globalData.masterLevel),
+            valueRange = 0.0f..10.0f,
+            center = convertToLinear(0.0f),
+            onValueChanged = {
+                onChangeMasterLevel(convertToGain(it))
+            },
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.secondary,
                 activeTrackColor = MaterialTheme.colorScheme.secondary
             )
         )
         Text(modifier = Modifier.padding(start = 24.dp, end = 8.dp), text = "개인 모니터 음량")
-        Slider(
+        CenteredSlider(
             modifier = Modifier.width(300.dp),
             enabled = capability.contains(MixerCapability.GLOBAL_MONITOR_LEVEL),
-            value = globalData.monitorLevel,
-            valueRange = 0f..1f,
-            onValueChange = onChangeMonitorLevel,
+            value = convertToLinear(globalData.monitorLevel),
+            valueRange = 0.0f..10.0f,
+            center = convertToLinear(0.0f),
+            onValueChanged = {
+                onChangeMonitorLevel(convertToGain(it))
+            },
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.secondary,
                 activeTrackColor = MaterialTheme.colorScheme.secondary
@@ -147,13 +210,14 @@ fun MixerControls(
     }
 
     val mixerController = LocalMixerController.current!!
-    val capabilities = remember { mixerController.capabilities }
     val coroutineScope = rememberCoroutineScope()
 
     val state by mixerController.state.collectAsState()
+    val mixerConfig by mixerController.mixerConfigurations.collectAsState()
     val isMixerConnected by mixerController.isConnected.collectAsState()
+    val capabilities by mixerController.capabilities.collectAsState()
 
-    var eqPopup by remember { mutableStateOf<Int?>(null) }
+    var eqPopup by remember { mutableStateOf<MixerChannelConfig?>(null) }
     var showLoadPreset by remember { mutableStateOf<MixerPreferences?>(null) }
     var showSavePreset by remember { mutableStateOf<MixerPresets?>(null) }
 
@@ -173,57 +237,66 @@ fun MixerControls(
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Bold
                 )
-                Text(
-                    modifier = Modifier.width(100.dp),
-                    text = "리버브",
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    modifier = Modifier.width(100.dp),
-                    text = "밸런스",
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    modifier = Modifier.width(80.dp),
-                    text = "EQ",
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    modifier = Modifier.width(50.dp),
-                    text = "뮤트",
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold
-                )
+                if (capabilities.contains(MixerCapability.CHANNEL_REVERB)) {
+                    Text(
+                        modifier = Modifier.width(100.dp),
+                        text = "리버브",
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (capabilities.contains(MixerCapability.CHANNEL_PAN)) {
+                    Text(
+                        modifier = Modifier.width(100.dp),
+                        text = "밸런스",
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (capabilities.contains(MixerCapability.CHANNEL_THREE_BAND_EQ_LEVEL)) {
+                    Text(
+                        modifier = Modifier.width(80.dp),
+                        text = "EQ",
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (capabilities.contains(MixerCapability.CHANNEL_MUTE)) {
+                    Text(
+                        modifier = Modifier.width(50.dp),
+                        text = "뮤트",
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
             Column(
                 modifier = Modifier.weight(1.0f).verticalScroll(scrollState),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                mixerController.channels.mapIndexed { idx, name ->
-                    val data = state.channels[idx]
-                    MixerRow(
-                        name = name,
-                        capabilities = capabilities,
-                        channelData = data,
-                        onChangeLevel = {
-                            mixerController.updateValues(idx, PartialChannelDataUpdate(level = it))
-                        },
-                        onChangePan = {
-                            mixerController.updateValues(idx, PartialChannelDataUpdate(pan = it))
-                        },
-                        onChangeReverb = {
-                            mixerController.updateValues(idx, PartialChannelDataUpdate(reverb = it))
-                        },
-                        onChangeMute = {
-                            mixerController.updateValues(idx, PartialChannelDataUpdate(mute = it))
-                        },
-                        onOpenEqPopup = {
-                            eqPopup = idx
-                        },
-                    )
+                mixerConfig?.let { config ->
+                    config.channels.map { channel ->
+                        MixerRow(
+                            channel = channel,
+                            capabilities = capabilities,
+                            channelData = state.channels.getOrDefault(channel.id, ChannelData()),
+                            onChangeLevel = {
+                                mixerController.updateValues(channel.id, PartialChannelDataUpdate(level = it))
+                            },
+                            onChangePan = {
+                                mixerController.updateValues(channel.id, PartialChannelDataUpdate(pan = it))
+                            },
+                            onChangeReverb = {
+                                mixerController.updateValues(channel.id, PartialChannelDataUpdate(reverb = it))
+                            },
+                            onChangeMute = {
+                                mixerController.updateValues(channel.id, PartialChannelDataUpdate(mute = it))
+                            },
+                            onOpenEqPopup = {
+                                eqPopup = channel
+                            },
+                        )
+                    }
                 }
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -263,11 +336,11 @@ fun MixerControls(
 
         eqPopup?.let { channel ->
             ThreeBandEqPopup(
-                channelName = mixerController.channels[channel],
+                channel = channel,
                 capabilities = capabilities,
-                channelData = state.channels[channel],
+                channelData = state.channels[channel.id]!!,
                 onUpdateValue = {
-                    mixerController.updateValues(channel, it)
+                    mixerController.updateValues(channel.id, it)
                 },
                 onDismiss = {
                     eqPopup = null
@@ -281,7 +354,7 @@ fun MixerControls(
                 onSelectMixerPresets = { presets ->
                     coroutineScope.launch {
                         mixerController.updateInitialChannelStates(
-                            presets.channels.map { ChannelData().updateFrom(it) },
+                            presets.channels.map { (key, value) -> key to ChannelData().updateFrom(value) }.toMap(),
                             GlobalData().updateFrom(presets.globals)
                         )
                     }

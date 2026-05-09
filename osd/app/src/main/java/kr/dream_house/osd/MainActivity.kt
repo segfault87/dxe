@@ -176,7 +176,7 @@ class MainActivity : ComponentActivity() {
 
         midiDeviceManager = createMidiDeviceManager()
         val mixerController = midiDeviceManager?.let {
-            MixerController(it, Vm3100ProMixerDevice())
+            MixerController(it)
         }
 
         onBackPressedDispatcher.addCallback(this, object: OnBackPressedCallback(true) {

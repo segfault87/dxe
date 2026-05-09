@@ -1,6 +1,7 @@
 package kr.dream_house.osd.entities
 
 import kotlinx.serialization.Serializable
+import kr.dream_house.osd.MixerChannelId
 
 @Serializable
 data class PartialChannelDataUpdate(
@@ -25,7 +26,7 @@ data class PartialGlobalDataUpdate(
 
 @Serializable
 data class MixerPresets(
-    val channels: List<PartialChannelDataUpdate> = emptyList(),
+    val channels: Map<MixerChannelId, PartialChannelDataUpdate> = emptyMap(),
     val globals: PartialGlobalDataUpdate = PartialGlobalDataUpdate(),
 )
 

@@ -12,3 +12,4 @@ enum class AlertSeverity {
 typealias BookingId = String
 typealias IdentityId = String
 typealias UnitId = String
+typealias MixerChannelId = String

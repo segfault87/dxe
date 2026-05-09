@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
+import kr.dream_house.osd.MixerChannelId
 import kr.dream_house.osd.entities.MixerPresets
 import kr.dream_house.osd.entities.PartialChannelDataUpdate
 import kr.dream_house.osd.entities.PartialGlobalDataUpdate
@@ -15,9 +16,9 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 @Serializable
 data class ChannelData(
-    val level: Float = 0.0f,
+    val level: Float = Float.NEGATIVE_INFINITY,
     val pan: Float = 0.0f,
-    val reverb: Float = 0.0f,
+    val reverb: Float = Float.NEGATIVE_INFINITY,
     val mute: Boolean = false,
     val eqHighLevel: Float = 0.0f,
     val eqHighFreq: Float = 9490.0f,
@@ -60,29 +61,29 @@ fun ChannelData.updateFrom(update: PartialChannelDataUpdate): ChannelData {
     )
 }
 
-private data class TransformedChannelData(
-    var level: Byte? = null,
-    var pan: Byte? = null,
-    var reverb: Byte? = null,
-    var mute: Byte? = null,
-    var eqHighLevel: Byte? = null,
-    var eqHighFreq: Byte? = null,
-    var eqMidLevel: Byte? = null,
-    var eqMidFreq: Byte? = null,
-    var eqMidQ: Byte? = null,
-    var eqLowLevel: Byte? = null,
-    var eqLowFreq: Byte? = null,
+private class TransformedChannelData(
+    var level: ByteArray? = null,
+    var pan: ByteArray? = null,
+    var reverb: ByteArray? = null,
+    var mute: ByteArray? = null,
+    var eqHighLevel: ByteArray? = null,
+    var eqHighFreq: ByteArray? = null,
+    var eqMidLevel: ByteArray? = null,
+    var eqMidFreq: ByteArray? = null,
+    var eqMidQ: ByteArray? = null,
+    var eqLowLevel: ByteArray? = null,
+    var eqLowFreq: ByteArray? = null,
 )
 
-private fun PartialChannelDataUpdate.transform(channel: Int, data: TransformedChannelData, device: MixerDevice): List<ControlValue> {
+private fun PartialChannelDataUpdate.transform(device: MixerDevice, channel: MixerChannelConfig, data: TransformedChannelData): List<ControlValue> {
     val result = mutableListOf<ControlValue>()
 
     level?.let {
         device.translateChannelLevelValue(it)?.let { updatedValue ->
-            if (data.level != updatedValue) {
+            if (!data.level.contentEquals(updatedValue)) {
                 data.level = updatedValue
                 result.add(ControlValue.ChannelValue(
-                    channel = channel,
+                    channelId = channel.id,
                     control = ChannelControlParameter.LEVEL,
                     value = updatedValue,
                 ))
@@ -91,10 +92,10 @@ private fun PartialChannelDataUpdate.transform(channel: Int, data: TransformedCh
     }
     pan?.let {
         device.translateChannelPanValue(it)?.let { updatedValue ->
-            if (data.pan != updatedValue) {
+            if (!data.pan.contentEquals(updatedValue)) {
                 data.pan = updatedValue
                 result.add(ControlValue.ChannelValue(
-                    channel = channel,
+                    channelId = channel.id,
                     control = ChannelControlParameter.PAN,
                     value = updatedValue,
                 ))
@@ -103,10 +104,10 @@ private fun PartialChannelDataUpdate.transform(channel: Int, data: TransformedCh
     }
     reverb?.let {
         device.translateChannelReverbValue(it)?.let { updatedValue ->
-            if (data.reverb != updatedValue) {
+            if (!data.reverb.contentEquals(updatedValue)) {
                 data.reverb = updatedValue
                 result.add(ControlValue.ChannelValue(
-                    channel = channel,
+                    channelId = channel.id,
                     control = ChannelControlParameter.REVERB,
                     value = updatedValue,
                 ))
@@ -115,10 +116,10 @@ private fun PartialChannelDataUpdate.transform(channel: Int, data: TransformedCh
     }
     mute?.let {
         device.translateChannelMuteValue(it)?.let { updatedValue ->
-            if (data.mute != updatedValue) {
+            if (!data.mute.contentEquals(updatedValue)) {
                 data.mute = updatedValue
                 result.add(ControlValue.ChannelValue(
-                    channel = channel,
+                    channelId = channel.id,
                     control = ChannelControlParameter.MUTE,
                     value = updatedValue,
                 ))
@@ -127,10 +128,10 @@ private fun PartialChannelDataUpdate.transform(channel: Int, data: TransformedCh
     }
     eqHighLevel?.let {
         device.translateChannelEqLevelValue(it)?.let { updatedValue ->
-            if (data.eqHighLevel != updatedValue) {
+            if (!data.eqHighLevel.contentEquals(updatedValue)) {
                 data.eqHighLevel = updatedValue
                 result.add(ControlValue.ChannelValue(
-                    channel = channel,
+                    channelId = channel.id,
                     control = ChannelControlParameter.EQ_HIGH_LEVEL,
                     value = updatedValue,
                 ))
@@ -139,10 +140,10 @@ private fun PartialChannelDataUpdate.transform(channel: Int, data: TransformedCh
     }
     eqHighFreq?.let {
         device.translateChannelThreeBandEqHighFreqValue(it)?.let { updatedValue ->
-            if (data.eqHighFreq != updatedValue) {
+            if (!data.eqHighFreq.contentEquals(updatedValue)) {
                 data.eqHighFreq = updatedValue
                 result.add(ControlValue.ChannelValue(
-                    channel = channel,
+                    channelId = channel.id,
                     control = ChannelControlParameter.EQ_HIGH_FREQ,
                     value = updatedValue,
                 ))
@@ -151,10 +152,10 @@ private fun PartialChannelDataUpdate.transform(channel: Int, data: TransformedCh
     }
     eqMidLevel?.let {
         device.translateChannelEqLevelValue(it)?.let { updatedValue ->
-            if (data.eqMidLevel != updatedValue) {
+            if (!data.eqMidLevel.contentEquals(updatedValue)) {
                 data.eqMidLevel = updatedValue
                 result.add(ControlValue.ChannelValue(
-                    channel = channel,
+                    channelId = channel.id,
                     control = ChannelControlParameter.EQ_MID_LEVEL,
                     value = updatedValue,
                 ))
@@ -163,10 +164,10 @@ private fun PartialChannelDataUpdate.transform(channel: Int, data: TransformedCh
     }
     eqMidFreq?.let {
         device.translateChannelThreeBandEqMidFreqValue(it)?.let { updatedValue ->
-            if (data.eqMidFreq != updatedValue) {
+            if (!data.eqMidFreq.contentEquals(updatedValue)) {
                 data.eqMidFreq = updatedValue
                 result.add(ControlValue.ChannelValue(
-                    channel = channel,
+                    channelId = channel.id,
                     control = ChannelControlParameter.EQ_MID_FREQ,
                     value = updatedValue,
                 ))
@@ -175,10 +176,10 @@ private fun PartialChannelDataUpdate.transform(channel: Int, data: TransformedCh
     }
     eqMidQ?.let {
         device.translateChannelThreeBandEqMidQValue(it)?.let { updatedValue ->
-            if (data.eqMidQ != updatedValue) {
+            if (!data.eqMidQ.contentEquals(updatedValue)) {
                 data.eqMidQ = updatedValue
                 result.add(ControlValue.ChannelValue(
-                    channel = channel,
+                    channelId = channel.id,
                     control = ChannelControlParameter.EQ_MID_Q,
                     value = updatedValue,
                 ))
@@ -187,10 +188,10 @@ private fun PartialChannelDataUpdate.transform(channel: Int, data: TransformedCh
     }
     eqLowLevel?.let {
         device.translateChannelEqLevelValue(it)?.let { updatedValue ->
-            if (data.eqLowLevel != updatedValue) {
+            if (!data.eqLowLevel.contentEquals(updatedValue)) {
                 data.eqLowLevel = updatedValue
                 result.add(ControlValue.ChannelValue(
-                    channel = channel,
+                    channelId = channel.id,
                     control = ChannelControlParameter.EQ_LOW_LEVEL,
                     value = updatedValue,
                 ))
@@ -199,10 +200,10 @@ private fun PartialChannelDataUpdate.transform(channel: Int, data: TransformedCh
     }
     eqLowFreq?.let {
         device.translateChannelThreeBandEqLowFreqValue(it)?.let { updatedValue ->
-            if (data.eqLowFreq != updatedValue) {
+            if (!data.eqLowFreq.contentEquals(updatedValue)) {
                 data.eqLowFreq = updatedValue
                 result.add(ControlValue.ChannelValue(
-                    channel = channel,
+                    channelId = channel.id,
                     control = ChannelControlParameter.EQ_LOW_FREQ,
                     value = updatedValue,
                 ))
@@ -241,34 +242,34 @@ private fun ChannelData.transform(device: MixerDevice): TransformedChannelData {
     )
 }
 
-private fun TransformedChannelData.buildControlPayloads(channel: Int): List<ControlValue> {
+private fun TransformedChannelData.buildControlPayloads(channel: MixerChannelConfig): List<ControlValue> {
     val result = mutableListOf<ControlValue>()
 
     level?.let {
         result.add(ControlValue.ChannelValue(
             control = ChannelControlParameter.LEVEL,
-            channel = channel,
+            channelId = channel.id,
             value = it,
         ))
     }
     pan?.let {
         result.add(ControlValue.ChannelValue(
             control = ChannelControlParameter.PAN,
-            channel = channel,
+            channelId = channel.id,
             value = it,
         ))
     }
     reverb?.let {
         result.add(ControlValue.ChannelValue(
             control = ChannelControlParameter.REVERB,
-            channel = channel,
+            channelId = channel.id,
             value = it,
         ))
     }
     mute?.let {
         result.add(ControlValue.ChannelValue(
             control = ChannelControlParameter.MUTE,
-            channel = channel,
+            channelId = channel.id,
             value = it,
         ))
     }
@@ -276,7 +277,7 @@ private fun TransformedChannelData.buildControlPayloads(channel: Int): List<Cont
         result.add(
             ControlValue.ChannelValue(
                 control = ChannelControlParameter.EQ_HIGH_LEVEL,
-                channel = channel,
+                channelId = channel.id,
                 value = it,
             )
         )
@@ -285,7 +286,7 @@ private fun TransformedChannelData.buildControlPayloads(channel: Int): List<Cont
         result.add(
             ControlValue.ChannelValue(
                 control = ChannelControlParameter.EQ_MID_LEVEL,
-                channel = channel,
+                channelId = channel.id,
                 value = it,
             )
         )
@@ -294,7 +295,7 @@ private fun TransformedChannelData.buildControlPayloads(channel: Int): List<Cont
         result.add(
             ControlValue.ChannelValue(
                 control = ChannelControlParameter.EQ_LOW_LEVEL,
-                channel = channel,
+                channelId = channel.id,
                 value = it,
             )
         )
@@ -303,7 +304,7 @@ private fun TransformedChannelData.buildControlPayloads(channel: Int): List<Cont
         result.add(
             ControlValue.ChannelValue(
                 control = ChannelControlParameter.EQ_HIGH_FREQ,
-                channel = channel,
+                channelId = channel.id,
                 value = it,
             )
         )
@@ -312,7 +313,7 @@ private fun TransformedChannelData.buildControlPayloads(channel: Int): List<Cont
         result.add(
             ControlValue.ChannelValue(
                 control = ChannelControlParameter.EQ_MID_FREQ,
-                channel = channel,
+                channelId = channel.id,
                 value = it,
             )
         )
@@ -320,7 +321,7 @@ private fun TransformedChannelData.buildControlPayloads(channel: Int): List<Cont
     eqLowFreq?.let {
         result.add(ControlValue.ChannelValue(
             control = ChannelControlParameter.EQ_LOW_FREQ,
-            channel = channel,
+            channelId = channel.id,
             value = it,
         ))
     }
@@ -328,7 +329,7 @@ private fun TransformedChannelData.buildControlPayloads(channel: Int): List<Cont
         result.add(
             ControlValue.ChannelValue(
                 control = ChannelControlParameter.EQ_MID_Q,
-                channel = channel,
+                channelId = channel.id,
                 value = it,
             )
         )
@@ -339,8 +340,8 @@ private fun TransformedChannelData.buildControlPayloads(channel: Int): List<Cont
 
 @Serializable
 data class GlobalData(
-    val masterLevel: Float = 0.0f,
-    val monitorLevel: Float = 0.0f,
+    val masterLevel: Float = Float.NEGATIVE_INFINITY,
+    val monitorLevel: Float = Float.NEGATIVE_INFINITY,
 )
 
 private fun GlobalData.snapshot(): PartialGlobalDataUpdate {
@@ -357,17 +358,17 @@ fun GlobalData.updateFrom(update: PartialGlobalDataUpdate): GlobalData {
     )
 }
 
-private data class TransformedGlobalData(
-    var masterLevel: Byte? = null,
-    var monitorLevel: Byte? = null,
+private class TransformedGlobalData(
+    var masterLevel: ByteArray? = null,
+    var monitorLevel: ByteArray? = null,
 )
 
-private fun PartialGlobalDataUpdate.transform(data: TransformedGlobalData, device: MixerDevice): List<ControlValue> {
+private fun PartialGlobalDataUpdate.transform(device: MixerDevice, data: TransformedGlobalData): List<ControlValue> {
     val result = mutableListOf<ControlValue>()
 
     masterLevel?.let {
         device.translateGlobalMasterLevelValue(it)?.let { updatedValue ->
-            if (data.masterLevel != updatedValue) {
+            if (!data.masterLevel.contentEquals(updatedValue)) {
                 data.masterLevel = updatedValue
                 result.add(ControlValue.GlobalValue(
                     control = GlobalControlParameter.MASTER_LEVEL,
@@ -378,7 +379,7 @@ private fun PartialGlobalDataUpdate.transform(data: TransformedGlobalData, devic
     }
     monitorLevel?.let {
         device.translateGlobalMonitorLevelValue(it)?.let { updatedValue ->
-            if (data.monitorLevel != updatedValue) {
+            if (!data.monitorLevel.contentEquals(updatedValue)) {
                 data.monitorLevel = updatedValue
                 result.add(ControlValue.GlobalValue(
                     control = GlobalControlParameter.MONITOR_LEVEL,
@@ -423,48 +424,52 @@ private fun TransformedGlobalData.buildControlPayloads(): List<ControlValue> {
 
 @Serializable
 data class MixerState(
-    val channels: List<ChannelData> = emptyList(),
+    val channels: Map<MixerChannelId, ChannelData> = emptyMap(),
     val globals: GlobalData = GlobalData(),
 )
 
 private data class TransformedMixerState(
-    var channels: MutableList<TransformedChannelData>,
+    var channels: MutableMap<MixerChannelId, TransformedChannelData>,
     var globals: TransformedGlobalData
 )
 
 private fun MixerState.transform(device: MixerDevice): TransformedMixerState {
     return TransformedMixerState(
-        channels = channels.map { it.transform(device) }.toMutableList(),
+        channels = channels.map { (key, value) -> key to value.transform(device) }.toMap().toMutableMap(),
         globals = globals.transform(device)
     )
 }
 
-private fun TransformedMixerState.buildControlPayloads(): List<ControlValue> {
+private fun TransformedMixerState.buildControlPayloads(config: MixerConfigurations): List<ControlValue> {
     val result = mutableListOf<ControlValue>()
 
-    channels.forEachIndexed { idx, item ->
-        result.addAll(item.buildControlPayloads(idx))
+    channels.forEach { (key, value) ->
+        config.channelsById[key]?.let {
+            result.addAll(value.buildControlPayloads(it))
+        }
     }
     result.addAll(globals.buildControlPayloads())
 
     return result
 }
 
-class MixerController(
-    private val midiDeviceManager: MidiDeviceManager,
-    private val device: MixerDevice,
-    defaultInitialChannelStates: List<ChannelData>? = null,
-    defaultInitialGlobalStates: GlobalData? = null,
-) : MidiDeviceEventHandler {
+// TODO: make it dynamically configurable
+private fun getMixerConfigurations(device: MixerDevice): MixerConfigurations {
+    return DefaultConfig.MIXER_CONFIGURATIONS.get(device.spec.identifier) ?: MixerConfigurations(channels = emptyList())
+}
+
+class MixerController(private val midiDeviceManager: MidiDeviceManager) : MidiDeviceEventHandler {
 
     companion object {
         private const val TAG = "MixerController"
     }
 
-    private var initialChannelStates: List<ChannelData> = defaultInitialChannelStates ?: device.channelNames.map {
-        ChannelData()
-    }.toList()
-    private var initialGlobalStates: GlobalData = defaultInitialGlobalStates ?: GlobalData()
+    private var initialChannelStates: Map<MixerChannelId, ChannelData> = emptyMap()
+    private var initialGlobalStates = GlobalData()
+
+    private var mixerDevice: MixerDevice? = null
+    private val _mixerConfigurations = MutableStateFlow<MixerConfigurations?>(null)
+    val mixerConfigurations = _mixerConfigurations.asStateFlow()
 
     private val _state = MutableStateFlow(MixerState(
         channels = initialChannelStates,
@@ -472,16 +477,18 @@ class MixerController(
     ))
     val state = _state.asStateFlow()
 
-    private var transformedState = _state.value.transform(device)
+    private var transformedState: TransformedMixerState? = null
 
     private val _isConnected = MutableStateFlow(false)
     val isConnected = _isConnected.asStateFlow()
 
-    val channels: Array<String>
-        get() = device.channelNames
+    private val _capabilities = MutableStateFlow<Set<MixerCapability>>(emptySet())
+    val capabilities = _capabilities.asStateFlow()
 
-    val capabilities: Set<MixerCapability> by lazy {
-        MixerCapability.entries.filter { device.queryCapability(it) }.toSet()
+    init {
+        midiDeviceManager.currentMixer?.let {
+            onConnect(it)
+        }
     }
 
     fun attach() {
@@ -492,48 +499,61 @@ class MixerController(
         midiDeviceManager.removeHandler(this)
     }
 
-    fun updateValues(channel: Int, update: PartialChannelDataUpdate) {
-        _state.update { currentState ->
-            val updatedChannelData = currentState.channels.mapIndexed { idx, item ->
-                if (idx == channel) {
-                    item.updateFrom(update)
-                } else {
-                    item
-                }
-            }
-            currentState.copy(channels = updatedChannelData)
-        }
+    fun updateValues(channelId: MixerChannelId, update: PartialChannelDataUpdate) {
+        val device = mixerDevice ?: return
 
-        val updates = update.transform(channel, transformedState.channels[channel], device)
-        pushUpdates(updates)
+        mixerConfigurations.value?.let { config ->
+            val channel = config.channelsById[channelId] ?: return@let
+
+            _state.update { currentState ->
+                val updatedChannelData = currentState.channels.map { (key, item) ->
+                    if (key == channelId) {
+                        key to item.updateFrom(update)
+                    } else {
+                        key to item
+                    }
+                }.toMap()
+                currentState.copy(channels = updatedChannelData)
+            }
+
+            val transformedChannel = transformedState!!.channels.getOrPut(channelId) { TransformedChannelData() }
+
+            val updates = update.transform(device, channel, transformedChannel)
+            pushUpdates(updates)
+        }
     }
 
     fun updateValues(update: PartialGlobalDataUpdate) {
-        _state.update { currentState ->
-            currentState.copy(globals = currentState.globals.updateFrom(update))
-        }
+        mixerDevice?.let { device ->
+            _state.update { currentState ->
+                currentState.copy(globals = currentState.globals.updateFrom(update))
+            }
 
-        val updates = update.transform(transformedState.globals, device)
-        pushUpdates(updates)
+            val updates = update.transform(device, transformedState!!.globals)
+            pushUpdates(updates)
+        }
     }
 
     fun snapshot(): MixerPresets {
         return MixerPresets(
-            channels = _state.value.channels.map { it.snapshot() },
+            channels = _state.value.channels.map { (key, value) -> key to value.snapshot() }.toMap(),
             globals = _state.value.globals.snapshot(),
         )
     }
 
     private fun pushUpdates(updates: List<ControlValue>) {
+        val config = mixerConfigurations.value ?: return
+        val device = mixerDevice ?: return
+
         when {
             updates.isEmpty() -> {}
             updates.size <= device.maxPayloadInBatch() -> {
                 // Post small updates at once
-                val size = updates.sumOf { device.getCCPayloadSizeHint(it) }
+                val size = updates.sumOf { device.getMidiPayloadSizeHint(config, it) }
                 val payload = ByteArray(size)
                 var offset = 0
                 for (update in updates) {
-                    offset += device.buildCCPayload(update, payload, offset)
+                    offset += device.buildMidiPayload(config, update, payload, offset)
                 }
                 midiDeviceManager.send(payload, 0, size)
             }
@@ -541,8 +561,8 @@ class MixerController(
                 // Send in chunks in deferred if the payload is too big
                 val payloads = mutableListOf<ByteArray>()
                 for (update in updates) {
-                    val payload = ByteArray(device.getCCPayloadSizeHint(update))
-                    device.buildCCPayload(update, payload, 0)
+                    val payload = ByteArray(device.getMidiPayloadSizeHint(config, update))
+                    device.buildMidiPayload(config, update, payload, 0)
                     payloads.add(payload)
                 }
                 sendBulkPayloads(payloads)
@@ -551,16 +571,19 @@ class MixerController(
     }
 
     private fun updateState(state: ControlValue): Boolean {
+        val device = mixerDevice ?: return false
+        val transformedState = transformedState ?: return false
+
         when (state) {
             is ControlValue.ChannelValue -> {
-                val channel = state.channel
+                val channelId = state.channelId
                 val value = state.value
-                val channelData = _state.value.channels[channel]
-                val transformedData = transformedState.channels[channel]
+                val channelData = _state.value.channels[channelId] ?: return false
+                val transformedData = transformedState.channels[channelId] ?: return false
                 val updatedData = when (state.control) {
                     ChannelControlParameter.LEVEL -> {
                         val localValue = device.translateRemoteChannelLevelValue(value)
-                        if (localValue != null && transformedData.level != value) {
+                        if (localValue != null && !transformedData.level.contentEquals(value)) {
                             transformedData.level = value
                             channelData.copy(level = localValue)
                         } else {
@@ -569,7 +592,7 @@ class MixerController(
                     }
                     ChannelControlParameter.PAN -> {
                         val localValue = device.translateRemoteChannelPanValue(value)
-                        if (localValue != null && transformedData.pan != value) {
+                        if (localValue != null && !transformedData.pan.contentEquals(value)) {
                             transformedData.pan = value
                             channelData.copy(pan = localValue)
                         } else {
@@ -578,7 +601,7 @@ class MixerController(
                     }
                     ChannelControlParameter.REVERB -> {
                         val localValue = device.translateRemoteChannelReverbValue(value)
-                        if (localValue != null && transformedData.reverb != value) {
+                        if (localValue != null && !transformedData.reverb.contentEquals(value)) {
                             transformedData.reverb = value
                             channelData.copy(reverb = localValue)
                         } else {
@@ -587,7 +610,7 @@ class MixerController(
                     }
                     ChannelControlParameter.MUTE -> {
                         val localValue = device.translateRemoteChannelMuteValue(value)
-                        if (localValue != null && transformedData.mute != value) {
+                        if (localValue != null && !transformedData.mute.contentEquals(value)) {
                             transformedData.mute = value
                             channelData.copy(mute = localValue)
                         } else {
@@ -596,7 +619,7 @@ class MixerController(
                     }
                     ChannelControlParameter.EQ_HIGH_LEVEL -> {
                         val localValue = device.translateRemoteChannelEqLevelValue(value)
-                        if (localValue != null && transformedData.eqHighLevel != value) {
+                        if (localValue != null && !transformedData.eqHighLevel.contentEquals(value)) {
                             transformedData.eqHighLevel = value
                             channelData.copy(eqHighLevel = localValue)
                         } else {
@@ -605,7 +628,7 @@ class MixerController(
                     }
                     ChannelControlParameter.EQ_HIGH_FREQ -> {
                         val localValue = device.translateRemoteChannelThreeBandEqHighFreqValue(value)
-                        if (localValue != null && transformedData.eqHighFreq != value) {
+                        if (localValue != null && !transformedData.eqHighFreq.contentEquals(value)) {
                             transformedData.eqHighFreq = value
                             channelData.copy(eqHighFreq = localValue)
                         } else {
@@ -614,7 +637,7 @@ class MixerController(
                     }
                     ChannelControlParameter.EQ_MID_LEVEL -> {
                         val localValue = device.translateRemoteChannelEqLevelValue(value)
-                        if (localValue != null && transformedData.eqMidLevel != value) {
+                        if (localValue != null && !transformedData.eqMidLevel.contentEquals(value)) {
                             transformedData.eqMidLevel = value
                             channelData.copy(eqMidLevel = localValue)
                         } else {
@@ -623,7 +646,7 @@ class MixerController(
                     }
                     ChannelControlParameter.EQ_MID_FREQ -> {
                         val localValue = device.translateRemoteChannelThreeBandEqMidFreqValue(value)
-                        if (localValue != null && transformedData.eqMidFreq != value) {
+                        if (localValue != null && !transformedData.eqMidFreq.contentEquals(value)) {
                             transformedData.eqMidFreq = value
                             channelData.copy(eqMidFreq = localValue)
                         } else {
@@ -632,7 +655,7 @@ class MixerController(
                     }
                     ChannelControlParameter.EQ_MID_Q -> {
                         val localValue = device.translateRemoteChannelThreeBandEqMidQValue(value)
-                        if (localValue != null && transformedData.eqMidQ != value) {
+                        if (localValue != null && !transformedData.eqMidQ.contentEquals(value)) {
                             transformedData.eqMidQ = value
                             channelData.copy(eqMidQ = localValue)
                         } else {
@@ -641,7 +664,7 @@ class MixerController(
                     }
                     ChannelControlParameter.EQ_LOW_LEVEL -> {
                         val localValue = device.translateRemoteChannelEqLevelValue(value)
-                        if (localValue != null && transformedData.eqLowLevel != value) {
+                        if (localValue != null && !transformedData.eqLowLevel.contentEquals(value)) {
                             transformedData.eqLowLevel = value
                             channelData.copy(eqLowLevel = localValue)
                         } else {
@@ -650,7 +673,7 @@ class MixerController(
                     }
                     ChannelControlParameter.EQ_LOW_FREQ -> {
                         val localValue = device.translateRemoteChannelThreeBandEqLowFreqValue(value)
-                        if (localValue != null && transformedData.eqLowFreq != value) {
+                        if (localValue != null && !transformedData.eqLowFreq.contentEquals(value)) {
                             transformedData.eqLowFreq = value
                             channelData.copy(eqLowFreq = localValue)
                         } else {
@@ -661,13 +684,13 @@ class MixerController(
 
                 return if (updatedData != null) {
                     _state.update { currentState ->
-                        val updatedChannelData = currentState.channels.mapIndexed { idx, item ->
-                            if (idx == channel) {
-                                updatedData
+                        val updatedChannelData = currentState.channels.map { (key, item) ->
+                            if (key == channelId) {
+                                key to updatedData
                             } else {
-                                item
+                                key to item
                             }
-                        }
+                        }.toMap()
                         currentState.copy(channels = updatedChannelData)
                     }
                     true
@@ -682,7 +705,7 @@ class MixerController(
                 val updatedData = when (state.control) {
                     GlobalControlParameter.MASTER_LEVEL -> {
                         val localValue = device.translateRemoteGlobalMasterLevelValue(value)
-                        if (localValue != null && transformedData.masterLevel != value) {
+                        if (localValue != null && !transformedData.masterLevel.contentEquals(value)) {
                             transformedData.masterLevel = value
                             globalData.copy(masterLevel = localValue)
                         } else {
@@ -691,7 +714,7 @@ class MixerController(
                     }
                     GlobalControlParameter.MONITOR_LEVEL -> {
                         val localValue = device.translateRemoteGlobalMonitorLevelValue(value)
-                        if (localValue != null && transformedData.monitorLevel != value) {
+                        if (localValue != null && !transformedData.monitorLevel.contentEquals(value)) {
                             transformedData.monitorLevel = value
                             globalData.copy(monitorLevel = localValue)
                         } else {
@@ -740,19 +763,17 @@ class MixerController(
         }
     }
 
-    suspend fun updateInitialChannelStates(channelStates: List<ChannelData>, globalStates: GlobalData) {
-        // Truncate to configured channel count
-        val newChannelStates = channelStates.take(channels.size).toMutableList()
-        if (newChannelStates.size < channels.size) {
-            newChannelStates.addAll(List(channels.size - newChannelStates.size) { ChannelData() })
-        }
-        initialChannelStates = newChannelStates
+    suspend fun updateInitialChannelStates(channelStates: Map<MixerChannelId, ChannelData>, globalStates: GlobalData) {
+        initialChannelStates = channelStates
         initialGlobalStates = globalStates
 
         resetStates()
     }
 
     suspend fun resetStates() {
+        val device = mixerDevice ?: return
+        val config = mixerConfigurations.value ?: return
+
         _state.update {
             MixerState(
                 channels = initialChannelStates,
@@ -762,35 +783,74 @@ class MixerController(
 
         transformedState = _state.value.transform(device)
 
-        checkMixerLiveliness()
+        // checkMixerLiveliness()
 
-        val controlValues = transformedState.buildControlPayloads()
-        sendBulkPayloads(device.initializeState(controlValues))
+        val controlValues = transformedState!!.buildControlPayloads(config)
+        sendBulkPayloads(device.initializeState(config, controlValues))
     }
 
     private fun sendBulkPayloads(payloads: List<ByteArray>) {
-        // Sometimes mixer can't accept bulk messages at once and we have to schedule it by given msecs interval
-        midiDeviceManager.enqueueBulkPayloads(payloads, device.flowControlMilliseconds())
-    }
-
-    override fun onReceive(payload: ByteArray, offset: Int, count: Int) {
-        device.parseCCPayload(payload, offset, count)?.let {
-            updateState(it)
+        mixerDevice?.let { device ->
+            // Sometimes mixer can't accept bulk messages at once and we have to schedule it by given msecs interval
+            midiDeviceManager.enqueueBulkPayloads(payloads, device.flowControlMilliseconds())
         }
     }
 
-    override fun onConnect() {
+    override fun onReceive(payload: ByteArray, offset: Int, count: Int) {
+        mixerConfigurations.value?.let { config ->
+            mixerDevice?.let { device ->
+                device.parseMidiPayload(config, payload, offset, count)?.let {
+                    updateState(it)
+                }
+            }
+        }
+    }
+
+    override fun onConnect(mixer: MixerDevice) {
         _isConnected.update { true }
 
-        val controlValues = transformedState.buildControlPayloads()
+        Log.i(TAG, "Mixer connected: $mixer")
+
+        val config = getMixerConfigurations(mixer)
+
+        mixerDevice = mixer
+        transformedState = TransformedMixerState(
+            channels = config.channels.associate { it.id to TransformedChannelData() }.toMutableMap(),
+            globals = TransformedGlobalData(),
+        )
+        _mixerConfigurations.update {
+            config
+        }
+        _capabilities.update {
+            MixerCapability.entries.filter { mixer.queryCapability(it) }.toSet()
+        }
+        _state.update {
+            MixerState(
+                channels = config.channels.associate { it.id to ChannelData() },
+                globals = GlobalData(),
+            )
+        }
+
+        val controlValues = transformedState!!.buildControlPayloads(config)
         Log.i(TAG, "Connected to mixer. initializing values...")
-        sendBulkPayloads(device.initializeState(controlValues))
+        sendBulkPayloads(mixer.initializeState(config, controlValues))
     }
 
     override fun onDisconnect() {
         Log.w(TAG, "Mixer disconnected.")
 
+        mixerDevice = null
+        transformedState = null
+
+        _capabilities.update { emptySet() }
+        _mixerConfigurations.update { null }
         _isConnected.update { false }
+        _state.update {
+            MixerState(
+                channels = emptyMap(),
+                globals = GlobalData(),
+            )
+        }
     }
 
 }

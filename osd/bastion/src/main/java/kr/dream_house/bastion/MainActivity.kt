@@ -1,10 +1,15 @@
 package kr.dream_house.bastion
 
+import android.app.AlertDialog
 import android.app.KeyguardManager
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Intent
 import android.os.Bundle
+import android.provider.Settings
+import android.text.InputType
+import android.widget.EditText
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -60,6 +65,8 @@ class MainActivity : ComponentActivity() {
 
     private val isDeviceOwner = mutableStateOf(false)
 
+    private lateinit var prefs: Prefs
+
     private fun checkDeviceOwner() {
         val admin = ComponentName(applicationContext, DeviceAdminReceiver::class.java)
 
@@ -84,6 +91,53 @@ class MainActivity : ComponentActivity() {
         keyguardManager.requestDismissKeyguard(this, object: KeyguardManager.KeyguardDismissCallback() {})
     }
 
+    private fun setMasterPasswordIfNeeded() {
+        if (prefs.masterPassword != null) {
+            return
+        }
+
+        val input = EditText(this)
+        input.setInputType(InputType.TYPE_TEXT_VARIATION_PASSWORD);
+
+        AlertDialog.Builder(this)
+            .setTitle("비밀번호를 입력해 주세요")
+            .setView(input)
+            .setPositiveButton("확인", { dialog, which ->
+                prefs.masterPassword = input.text.toString()
+                dialog.dismiss()
+            })
+            .setNegativeButton("취소", { dialog, which ->
+                dialog.dismiss()
+            })
+            .show()
+    }
+
+    private fun checkMasterPassword(next: () -> Unit) {
+        if (prefs.masterPassword == null) {
+            Toast.makeText(this, "비밀번호를 설정해주세요.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val input = EditText(this)
+        input.setInputType(InputType.TYPE_TEXT_VARIATION_PASSWORD);
+
+        AlertDialog.Builder(this)
+            .setTitle("비밀번호를 입력해 주세요")
+            .setView(input)
+            .setPositiveButton("확인", { dialog, which ->
+                if (input.text.toString() != prefs.masterPassword) {
+                    Toast.makeText(this, "비밀번호가 틀립니다.", Toast.LENGTH_SHORT).show()
+                } else {
+                    next()
+                }
+                dialog.dismiss()
+            })
+            .setNegativeButton("취소", { dialog, which ->
+                dialog.dismiss()
+            })
+            .show()
+    }
+
     private fun startDxeActivity(destination: String? = null) {
         val intent = Intent().apply {
             component = OSD_COMPONENT_NAME
@@ -93,8 +147,16 @@ class MainActivity : ComponentActivity() {
         dxeActivityLauncher.launch(intent)
     }
 
+    private fun startSystemSettings() {
+        checkMasterPassword {
+            startActivity(Intent(Settings.ACTION_SETTINGS))
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        prefs = Prefs(this)
 
         dxeActivityLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult(), onDxeActivityResult)
         devicePolicyManager = getSystemService(DevicePolicyManager::class.java)
@@ -129,8 +191,15 @@ class MainActivity : ComponentActivity() {
                             FilledTonalButton(onClick = this@MainActivity::startDxeActivity) {
                                 Text("앱 시작")
                             }
-                            FilledTonalButton(onClick = { startDxeActivity("config") }) {
+                            FilledTonalButton(onClick = {
+                                checkMasterPassword {
+                                    startDxeActivity("config")
+                                }
+                            }) {
                                 Text("설정")
+                            }
+                            FilledTonalButton(onClick = { startSystemSettings() }) {
+                                Text("시스템 설정")
                             }
                         }
                     }
@@ -144,6 +213,8 @@ class MainActivity : ComponentActivity() {
 
         checkDeviceOwner()
         dismissKeyguard()
+
+        setMasterPasswordIfNeeded()
     }
 
     override fun onResume() {

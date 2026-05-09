@@ -1,6 +1,7 @@
 package kr.dream_house.osd.views
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +14,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderColors
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -42,7 +45,15 @@ fun CenteredSlider(
     enabled: Boolean = true,
     modifier: Modifier = Modifier,
     valueRange: ClosedFloatingPointRange<Float> = -1f..1f,
-    thumb: @Composable () -> Unit = DefaultThumb,
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    colors: SliderColors = SliderDefaults.colors(),
+    thumb: @Composable () -> Unit = {
+        SliderDefaults.Thumb(
+            interactionSource = interactionSource,
+            colors = colors,
+            enabled = enabled,
+        )
+    },
     center: Float = 0f,
     centerThreshold: Float = .05f,
     centerIndicator: @Composable () -> Unit = DefaultCenterIndicator,
@@ -66,6 +77,7 @@ fun CenteredSlider(
                 thumb()
             }
         },
+        colors = colors,
         track = { sliderState ->
             val fraction by remember {
                 derivedStateOf {
@@ -124,7 +136,7 @@ fun CenteredSlider(
     )
 }
 
-private val DefaultThumb = @Composable {
+val CenteredThumb = @Composable {
     Box(
         Modifier
             .size(24.dp)

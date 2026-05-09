@@ -3,38 +3,23 @@ package kr.dream_house.osd.midi.devices
 import kr.dream_house.osd.midi.ChannelControlParameter
 import kr.dream_house.osd.midi.ControlValue
 import kr.dream_house.osd.midi.GlobalControlParameter
+import kr.dream_house.osd.midi.MidiCCParameter
+import kr.dream_house.osd.midi.MidiDeviceIdentifier
+import kr.dream_house.osd.midi.MidiMixerSpec
+import kr.dream_house.osd.midi.MixerChannelConfig
+import kr.dream_house.osd.midi.MixerConfigurations
 import kr.dream_house.osd.midi.MixerDevice
-import kotlin.experimental.and
-import kotlin.experimental.or
 import kotlin.math.ceil
 
+// Interface for Roland VM-3100 Pro Mixer Interface
 class Vm3100ProMixerDevice : MixerDevice {
-    companion object {
-        private val CHANNEL_MAPPINGS = arrayOf(
-            arrayOf(2),
-            arrayOf(3),
-            arrayOf(10, 11),
-            arrayOf(8, 9),
-            arrayOf(0),
-            arrayOf(1),
-            arrayOf(4),
-            arrayOf(5),
-            arrayOf(6),
-            arrayOf(7)
-        )
+    companion object : MidiMixerSpec {
 
-        private val CHANNEL_REVERSE_MAPPINGS = mapOf(
-            2 to 0,
-            3 to 1,
-            10 to 2,
-            8 to 3,
-            0 to 4,
-            1 to 5,
-            4 to 6,
-            5 to 7,
-            6 to 8,
-            7 to 9,
-        )
+        override val identifier: String = "roland_vm3100pro"
+
+        override fun probe(identifier: MidiDeviceIdentifier): Vm3100ProMixerDevice? {
+            return null
+        }
 
         private val EQ_GAIN_TABLE = mapOf<Int, Byte>(
             -12 to 0,
@@ -309,8 +294,7 @@ class Vm3100ProMixerDevice : MixerDevice {
         )
     }
 
-    override val channelNames: Array<String>
-        get() = arrayOf("무선마이크 1", "무선마이크 2", "건반 (채널 11/12)", "채널 9/10", "채널 1", "채널 2", "채널 5", "채널 6", "채널 7", "채널 8")
+    override val spec: MidiMixerSpec = Vm3100ProMixerDevice
 
     private fun tableSearch(value: Float, table: List<Pair<Float, Byte>>): Byte {
         val index = table.binarySearchBy(value) { it.first }
@@ -329,104 +313,116 @@ class Vm3100ProMixerDevice : MixerDevice {
         }
     }
 
-    override fun translateChannelLevelValue(level: Float): Byte {
-        return (level.coerceIn(0.0f, 1.0f) * 127.0f).toInt().toByte()
+    override fun translateChannelLevelValue(level: Float): ByteArray {
+        return byteArrayOf(((level.coerceIn(-128.0f, 10.0f) + 128.0f) / 138.0f * 127.0f).toInt().toByte())
     }
 
-    override fun translateRemoteChannelLevelValue(value: Byte): Float {
-        return value.toFloat() / 127.0f
+    override fun translateRemoteChannelLevelValue(value: ByteArray): Float {
+        val level = value[0]
+
+        return level.toFloat() / 127.0f * 138.0f - 128.0f
     }
 
-    override fun translateChannelPanValue(pan: Float): Byte {
-        return ceil((pan.coerceIn(-1.0f, 1.0f) + 1.0f) * 0.5f * 127.0f).toInt().toByte()
+    override fun translateChannelPanValue(pan: Float): ByteArray {
+        return byteArrayOf(ceil((pan.coerceIn(-1.0f, 1.0f) + 1.0f) * 0.5f * 127.0f).toInt().toByte())
     }
 
-    override fun translateRemoteChannelPanValue(value: Byte): Float {
-        return value.toFloat() / 127.0f * 2.0f - 1.0f;
+    override fun translateRemoteChannelPanValue(value: ByteArray): Float {
+        return value[0].toFloat() / 127.0f * 2.0f - 1.0f;
     }
 
-    override fun translateChannelReverbValue(reverb: Float): Byte {
-        return (reverb.coerceIn(0.0f, 1.0f) * 127.0f).toInt().toByte()
+    override fun translateChannelReverbValue(reverb: Float): ByteArray {
+        if (reverb <= -100.0f) {
+            return byteArrayOf(0)
+        }
+
+        return byteArrayOf(((reverb.coerceIn(-100.0f, 10.0f) + 100.0f) / 110.0f * 127.0f).toInt().toByte())
     }
 
-    override fun translateRemoteChannelReverbValue(value: Byte): Float {
-        return value.toFloat() / 127.0f
+    override fun translateRemoteChannelReverbValue(value: ByteArray): Float {
+        val reverb = value[0]
+
+        if (reverb == 0.toByte()) {
+            return Float.NEGATIVE_INFINITY
+        }
+
+        return reverb.toFloat() / 127.0f * 110.0f - 100.0f
     }
 
-    override fun translateChannelMuteValue(mute: Boolean): Byte {
+    override fun translateChannelMuteValue(mute: Boolean): ByteArray {
         return if (mute) {
-            1
+            byteArrayOf(1)
         } else {
-            0
+            byteArrayOf(0)
         }
     }
 
-    override fun translateRemoteChannelMuteValue(value: Byte): Boolean? {
-        return when (value) {
+    override fun translateRemoteChannelMuteValue(value: ByteArray): Boolean? {
+        return when (value[0]) {
             0.toByte() -> false
             1.toByte() -> true
             else -> null
         }
     }
 
-    override fun translateChannelEqLevelValue(level: Float): Byte? {
-        return EQ_GAIN_TABLE[level.coerceIn(-12.0f, 12.0f).toInt()]
+    override fun translateChannelEqLevelValue(level: Float): ByteArray? {
+        return EQ_GAIN_TABLE[level.coerceIn(-12.0f, 12.0f).toInt()]?.let { byteArrayOf(it) }
     }
 
-    override fun translateRemoteChannelEqLevelValue(value: Byte): Float? {
-        return EQ_GAIN_REVERSE_TABLE[value]?.toFloat()
+    override fun translateRemoteChannelEqLevelValue(value: ByteArray): Float? {
+        return EQ_GAIN_REVERSE_TABLE[value[0]]?.toFloat()
     }
 
-    override fun translateChannelThreeBandEqHighFreqValue(freq: Float): Byte {
-        return tableSearch(freq, EQ_HIGH_MAPPINGS)
+    override fun translateChannelThreeBandEqHighFreqValue(freq: Float): ByteArray {
+        return byteArrayOf(tableSearch(freq, EQ_HIGH_MAPPINGS))
     }
 
-    override fun translateRemoteChannelThreeBandEqHighFreqValue(value: Byte): Float? {
-        return EQ_HIGH_REVERSE_MAPPINGS[value]
+    override fun translateRemoteChannelThreeBandEqHighFreqValue(value: ByteArray): Float? {
+        return EQ_HIGH_REVERSE_MAPPINGS[value[0]]
     }
 
-    override fun translateChannelThreeBandEqMidFreqValue(freq: Float): Byte {
-        return tableSearch(freq, EQ_MID_MAPPINGS)
+    override fun translateChannelThreeBandEqMidFreqValue(freq: Float): ByteArray {
+        return byteArrayOf(tableSearch(freq, EQ_MID_MAPPINGS))
     }
 
-    override fun translateRemoteChannelThreeBandEqMidFreqValue(value: Byte): Float? {
-        return EQ_MID_REVERSE_MAPPINGS[value]
+    override fun translateRemoteChannelThreeBandEqMidFreqValue(value: ByteArray): Float? {
+        return EQ_MID_REVERSE_MAPPINGS[value[0]]
     }
 
-    override fun translateChannelThreeBandEqLowFreqValue(freq: Float): Byte {
-        return tableSearch(freq, EQ_LOW_MAPPINGS)
+    override fun translateChannelThreeBandEqLowFreqValue(freq: Float): ByteArray {
+        return byteArrayOf(tableSearch(freq, EQ_LOW_MAPPINGS))
     }
 
-    override fun translateRemoteChannelThreeBandEqLowFreqValue(value: Byte): Float? {
-        return EQ_LOW_REVERSE_MAPPINGS[value]
+    override fun translateRemoteChannelThreeBandEqLowFreqValue(value: ByteArray): Float? {
+        return EQ_LOW_REVERSE_MAPPINGS[value[0]]
     }
 
-    override fun translateChannelThreeBandEqMidQValue(q: Float): Byte {
-        return tableSearch(q, EQ_MID_Q_MAPPINGS)
+    override fun translateChannelThreeBandEqMidQValue(q: Float): ByteArray {
+        return byteArrayOf(tableSearch(q, EQ_MID_Q_MAPPINGS))
     }
 
-    override fun translateRemoteChannelThreeBandEqMidQValue(value: Byte): Float? {
-        return EQ_MID_Q_REVERSE_MAPPINGS[value]
+    override fun translateRemoteChannelThreeBandEqMidQValue(value: ByteArray): Float? {
+        return EQ_MID_Q_REVERSE_MAPPINGS[value[0]]
     }
 
-    override fun translateGlobalMasterLevelValue(level: Float): Byte {
-        return (level.coerceIn(0.0f, 1.0f) * 127.0f).toInt().toByte()
+    override fun translateGlobalMasterLevelValue(level: Float): ByteArray {
+        return byteArrayOf((level.coerceIn(0.0f, 1.0f) * 127.0f).toInt().toByte())
     }
 
-    override fun translateRemoteGlobalMasterLevelValue(value: Byte): Float {
-        return value.toFloat() / 127.0f
+    override fun translateRemoteGlobalMasterLevelValue(value: ByteArray): Float {
+        return value[0].toFloat() / 127.0f
     }
 
-    override fun translateGlobalMonitorLevelValue(level: Float): Byte {
-        return (level.coerceIn(0.0f, 1.0f) * 127.0f).toInt().toByte()
+    override fun translateGlobalMonitorLevelValue(level: Float): ByteArray {
+        return byteArrayOf((level.coerceIn(0.0f, 1.0f) * 127.0f).toInt().toByte())
     }
 
-    override fun translateRemoteGlobalMonitorLevelValue(value: Byte): Float {
-        return value.toFloat() / 127.0f
+    override fun translateRemoteGlobalMonitorLevelValue(value: ByteArray): Float {
+        return value[0].toFloat() / 127.0f
     }
 
-    private fun getChannelParameterNumber(parameter: ChannelControlParameter, channel: Byte): Byte? {
-        return if ((0..15).contains(channel)) {
+    private fun getChannelParameterNumber(parameter: ChannelControlParameter, channel: MixerChannelConfig): Byte? {
+        return if ((0..15).contains(channel.index)) {
             when (parameter) {
                 ChannelControlParameter.MUTE -> 25
                 ChannelControlParameter.LEVEL -> 7
@@ -440,7 +436,7 @@ class Vm3100ProMixerDevice : MixerDevice {
                 ChannelControlParameter.EQ_HIGH_FREQ -> 17
                 ChannelControlParameter.EQ_HIGH_LEVEL -> 18
             }
-        } else if ((16..19).contains(channel)) {
+        } else if ((16..19).contains(channel.index)) {
             when (parameter) {
                 ChannelControlParameter.MUTE -> 84
                 ChannelControlParameter.LEVEL -> 68
@@ -466,21 +462,39 @@ class Vm3100ProMixerDevice : MixerDevice {
         }
     }
 
-    private fun parseCCValue(parameter: Byte, channel: Byte, value: Byte): ControlValue? {
-        if (channel == 0x0f.toByte()) {
-            when (parameter.toInt()) {
+    override fun initializeState(config: MixerConfigurations, initialStates: List<ControlValue>): List<ByteArray> {
+        val buffers = mutableListOf<ByteArray>()
+
+        for (value in initialStates) {
+            val buffer = ByteArray(getMidiPayloadSizeHint(config, value))
+            buildMidiPayload(config, value, buffer, 0)
+            buffers.add(buffer)
+        }
+
+        for (payload in FIXED_DEFAULT_PAYLOADS) {
+            buffers.add(payload)
+        }
+
+        return buffers
+    }
+
+    override fun parseMidiPayload(config: MixerConfigurations, packet: ByteArray, offset: Int, size: Int): ControlValue? {
+        val cc = MidiCCParameter.parse(packet, offset) ?: return null
+
+        if (cc.channel == 0x0f.toByte()) {
+            when (cc.parameter.toInt()) {
                 68 -> return ControlValue.GlobalValue(
                     control = GlobalControlParameter.MASTER_LEVEL,
-                    value = value,
+                    value = byteArrayOf(cc.value),
                 )
                 71 -> return ControlValue.GlobalValue(
                     control = GlobalControlParameter.MONITOR_LEVEL,
-                    value = value,
+                    value = byteArrayOf(cc.value),
                 )
             }
         }
 
-        val (control, base) = when (parameter.toInt()) {
+        val (control, base) = when (cc.parameter.toInt()) {
             25 -> ChannelControlParameter.MUTE to 0
             7 -> ChannelControlParameter.LEVEL to 0
             19 -> ChannelControlParameter.REVERB to 0
@@ -505,62 +519,38 @@ class Vm3100ProMixerDevice : MixerDevice {
             77 -> ChannelControlParameter.EQ_HIGH_LEVEL to 16
             else -> return null
         }
-        val channelSeq = CHANNEL_REVERSE_MAPPINGS[channel.toInt() + base] ?: return null
+
+        val channel = config.channelsByIndex[cc.channel.toInt() + base] ?: return null
 
         return ControlValue.ChannelValue(
             control = control,
-            channel = channelSeq,
-            value = value,
+            channelId = channel.id,
+            value = byteArrayOf(cc.value),
         )
     }
 
-    override fun initializeState(initialStates: List<ControlValue>): List<ByteArray> {
-        val buffers = mutableListOf<ByteArray>()
-
-        for (value in initialStates) {
-            val buffer = ByteArray(getCCPayloadSizeHint(value))
-            buildCCPayload(value, buffer, 0)
-            buffers.add(buffer)
-        }
-
-        for (payload in FIXED_DEFAULT_PAYLOADS) {
-            buffers.add(payload)
-        }
-
-        return buffers
-    }
-
-    override fun parseCCPayload(packet: ByteArray, offset: Int, size: Int): ControlValue? {
-        if (size != 3) {
-            return null
-        }
-
-        val status = packet[offset]
-        if (status and 0xB0.toByte() != 0xB0.toByte()) {
-            return null
-        }
-
-        val channel = status and 0x0F.toByte()
-
-        return parseCCValue(packet[offset + 1], channel, packet[offset + 2])
-    }
-
-    override fun buildCCPayload(value: ControlValue, output: ByteArray, offset: Int): Int {
+    override fun buildMidiPayload(config: MixerConfigurations, value: ControlValue, output: ByteArray, offset: Int): Int {
         return when (value) {
             is ControlValue.ChannelValue -> {
-                val channels = CHANNEL_MAPPINGS[value.channel]
-
                 var count = 0
 
-                channels.forEachIndexed { index, channel ->
-                    val channel = channel.toByte()
-                    val parameterNumber = getChannelParameterNumber(value.control, channel) ?: return@forEachIndexed
+                config.channels.forEach { channel ->
+                    val parameterNumber = getChannelParameterNumber(value.control, channel) ?: return@forEach
 
-                    output[offset + index * 3] = 0xb0.toByte() or (channel and 0xf)
-                    output[offset + index * 3 + 1] = parameterNumber
-                    output[offset + index * 3 + 2] = value.value
-
+                    MidiCCParameter(
+                        channel = channel.index.toByte(),
+                        parameter = parameterNumber,
+                        value = value.value[0]
+                    ).buildInto(output, offset + count)
                     count += 3
+                    if (channel.stereo) {
+                        MidiCCParameter(
+                            channel = (channel.index + 1).toByte(),
+                            parameter = parameterNumber,
+                            value = value.value[0]
+                        ).buildInto(output, offset + count)
+                        count += 3
+                    }
                 }
 
                 count
@@ -568,23 +558,29 @@ class Vm3100ProMixerDevice : MixerDevice {
             is ControlValue.GlobalValue -> {
                 val parameterNumber = getGlobalParameterNumber(value.control)
 
-                output[offset] = 0xbf.toByte()
-                output[offset + 1] = parameterNumber
-                output[offset + 2] = value.value
+                MidiCCParameter(
+                    channel = 0x0f,
+                    parameter = parameterNumber,
+                    value = value.value[0]
+                ).buildInto(output, offset)
 
                 3
             }
         }
     }
 
-    override fun getCCPayloadSizeHint(value: ControlValue): Int {
+    override fun getMidiPayloadSizeHint(config: MixerConfigurations, value: ControlValue): Int {
         return when (value) {
             is ControlValue.ChannelValue -> {
-                val channels = CHANNEL_MAPPINGS[value.channel]
-                channels.size * 3
+                val channel = config.channelsById[value.channelId] ?: return 0
+                if (channel.stereo) {
+                    MidiCCParameter.LENGTH * 2
+                } else {
+                    MidiCCParameter.LENGTH
+                }
             }
             is ControlValue.GlobalValue -> {
-                3
+                MidiCCParameter.LENGTH
             }
         }
     }

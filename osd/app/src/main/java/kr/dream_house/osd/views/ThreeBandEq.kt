@@ -49,6 +49,7 @@ import androidx.core.graphics.ColorUtils
 import kr.dream_house.osd.entities.PartialChannelDataUpdate
 import kr.dream_house.osd.midi.ChannelData
 import kr.dream_house.osd.midi.MixerCapability
+import kr.dream_house.osd.midi.MixerChannelConfig
 import kr.dream_house.osd.utils.ThreeBandEq
 import kotlin.math.log2
 import kotlin.math.pow
@@ -258,7 +259,7 @@ private fun ThreeBandEqView(
 
 @Composable
 fun ThreeBandEqPopup(
-    channelName: String,
+    channel: MixerChannelConfig,
     capabilities: Set<MixerCapability>,
     channelData: ChannelData,
     onUpdateValue: (PartialChannelDataUpdate) -> Unit,
@@ -278,7 +279,7 @@ fun ThreeBandEqPopup(
             color = Color.White,
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
-                Text(modifier = Modifier.fillMaxWidth(), text = "$channelName - EQ 설정", textAlign = TextAlign.Center, style = MaterialTheme.typography.headlineSmall)
+                Text(modifier = Modifier.fillMaxWidth(), text = "${channel.name} - EQ 설정", textAlign = TextAlign.Center, style = MaterialTheme.typography.headlineSmall)
                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
                 ThreeBandEqView(
                     eq = eq,

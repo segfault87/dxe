@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonNull
 import kr.dream_house.osd.BuildConfig
+import kr.dream_house.osd.MixerChannelId
 import kr.dream_house.osd.Navigation
 import kr.dream_house.osd.Navigation.MainScreen.Companion.getSubroute
 import kr.dream_house.osd.entities.AlertData
@@ -42,6 +43,7 @@ import kr.dream_house.osd.entities.ParkingState
 import kr.dream_house.osd.midi.ChannelData
 import kr.dream_house.osd.midi.GlobalData
 import kr.dream_house.osd.midi.LocalMixerController
+import kr.dream_house.osd.midi.MixerConfigurations
 import kr.dream_house.osd.midi.MixerState
 import kr.dream_house.osd.midi.updateFrom
 import kr.dream_house.osd.mqtt.MqttService
@@ -56,7 +58,6 @@ import kr.dream_house.osd.mqtt.topics.SetMixerStates
 import kr.dream_house.osd.navigate
 import kotlin.collections.component1
 import kotlin.collections.component2
-import kotlin.collections.iterator
 
 @OptIn(FlowPreview::class)
 @Composable
@@ -70,6 +71,9 @@ fun App(
     val mixerController = LocalMixerController.current
 
     val mixerState by mixerController?.state?.collectAsState() ?: remember { mutableStateOf(MixerState())  }
+    val mixerConfigurations by mixerController?.mixerConfigurations?.collectAsState() ?: remember { mutableStateOf(
+        MixerConfigurations(channels = emptyList())
+    ) }
     var activeBooking by remember { mutableStateOf<Booking?>(null) }
     var mixerPreferences by remember { mutableStateOf<MixerPreferences?>(null) }
     var parkingStates by remember { mutableStateOf<List<ParkingState>>(emptyList()) }
@@ -148,21 +152,28 @@ fun App(
             }
             val onSetMixerStates = object: TopicSubscriber<SetMixerStates> {
                 override fun onPayload(topic: String, payload: SetMixerStates) {
+                    val configurations = mixerConfigurations ?: return
+
                     mixerController?.let { controller ->
                         if (payload.overwrite) {
-                            val initialChannelStates = mutableListOf<ChannelData>()
-                            for (i in 0 until controller.channels.size) {
-                                initialChannelStates.add(payload.channels[i.toString()]?.let {
-                                    ChannelData().updateFrom(it)
-                                } ?: ChannelData())
+                            val initialChannelStates = mutableMapOf<MixerChannelId, ChannelData>()
+                            for (channel in configurations.channels) {
+                                val entry = payload.channels.get(channel.id)
+                                val data = if (entry != null) {
+                                    ChannelData().updateFrom(entry)
+                                } else {
+                                    ChannelData()
+                                }
+
+                                initialChannelStates[channel.id] = data
                             }
                             val initialGlobalStates = GlobalData().updateFrom(payload.globals)
                             coroutineScope.launch {
                                 controller.updateInitialChannelStates(initialChannelStates, initialGlobalStates)
                             }
                         } else {
-                            for ((channel, data) in payload.channels) {
-                                controller.updateValues(channel.toInt(), data)
+                            payload.channels.forEach { (channelId, data) ->
+                                controller.updateValues(channelId, data)
                             }
                             controller.updateValues(payload.globals)
                         }
@@ -172,20 +183,21 @@ fun App(
             }
             val onSetMixerPreferences = object: TopicSubscriber<SetMixerPreferences> {
                 override fun onPayload(topic: String, payload: SetMixerPreferences) {
-                    mixerController?.let { controller ->
-                        val prefs = payload.prefs
-                        mixerPreferences = prefs
-                        val default = prefs.default
-                        val initialChannelStates = mutableListOf<ChannelData>()
-                        for (i in 0 until controller.channels.size) {
-                            initialChannelStates.add(default.channels.getOrNull(i)?.let {
-                                ChannelData().updateFrom(it)
-                            } ?: ChannelData())
-                        }
-                        val initialGlobalStates = GlobalData().updateFrom(default.globals)
-                        coroutineScope.launch {
-                            controller.updateInitialChannelStates(initialChannelStates, initialGlobalStates)
-                        }
+                    val configurations = mixerConfigurations ?: return
+                    val controller = mixerController ?: return
+
+                    val prefs = payload.prefs
+                    mixerPreferences = prefs
+                    val default = prefs.default
+                    val initialChannelStates = mutableMapOf<MixerChannelId, ChannelData>()
+                    for (channel in configurations.channels) {
+                        initialChannelStates[channel.id] = default.channels[channel.id]?.let {
+                            ChannelData().updateFrom(it)
+                        } ?: ChannelData()
+                    }
+                    val initialGlobalStates = GlobalData().updateFrom(default.globals)
+                    coroutineScope.launch {
+                        controller.updateInitialChannelStates(initialChannelStates, initialGlobalStates)
                     }
                 }
             }

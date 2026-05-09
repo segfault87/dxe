@@ -1,5 +1,8 @@
 package kr.dream_house.osd.midi
 
+import android.os.Bundle
+import kr.dream_house.osd.MixerChannelId
+
 enum class MixerCapability {
     CHANNEL_LEVEL,
     CHANNEL_PAN,
@@ -36,47 +39,67 @@ enum class GlobalControlParameter {
 sealed class ControlValue {
     data class ChannelValue(
         val control: ChannelControlParameter,
-        val channel: Int,
-        val value: Byte,
-    ) : ControlValue()
+        val channelId: MixerChannelId,
+        val value: ByteArray,
+    ) : ControlValue() {
+        override fun equals(other: Any?): Boolean {
+            val other = other as? ChannelValue ?: return false
+
+            return control == other.control && channelId == other.channelId && value.contentEquals(other.value)
+        }
+
+        override fun hashCode(): Int {
+            return control.hashCode() xor channelId.hashCode() xor value.contentHashCode()
+        }
+    }
 
     data class GlobalValue(
         val control: GlobalControlParameter,
-        val value: Byte,
-    ) : ControlValue()
+        val value: ByteArray,
+    ) : ControlValue() {
+        override fun equals(other: Any?): Boolean {
+            val other = other as? GlobalValue ?: return false
+
+            return control == other.control && value.contentEquals(other.value)
+        }
+
+        override fun hashCode(): Int {
+            return control.hashCode() xor value.contentHashCode()
+        }
+    }
 }
 
 interface MixerDevice {
-    val channelNames: Array<String>
+    val spec: MidiMixerSpec
 
-    fun translateChannelLevelValue(level: Float): Byte? = null
-    fun translateRemoteChannelLevelValue(value: Byte): Float? = null
-    fun translateChannelPanValue(pan: Float): Byte? = null
-    fun translateRemoteChannelPanValue(value: Byte): Float? = null
-    fun translateChannelReverbValue(reverb: Float): Byte? = null
-    fun translateRemoteChannelReverbValue(value: Byte): Float? = null
-    fun translateChannelMuteValue(mute: Boolean): Byte? = null
-    fun translateRemoteChannelMuteValue(value: Byte): Boolean? = null
-    fun translateChannelEqLevelValue(level: Float): Byte? = null
-    fun translateRemoteChannelEqLevelValue(value: Byte): Float? = null
-    fun translateChannelThreeBandEqHighFreqValue(freq: Float): Byte? = null
-    fun translateRemoteChannelThreeBandEqHighFreqValue(value: Byte): Float? = null
-    fun translateChannelThreeBandEqMidFreqValue(freq: Float): Byte? = null
-    fun translateRemoteChannelThreeBandEqMidFreqValue(value: Byte): Float? = null
-    fun translateChannelThreeBandEqLowFreqValue(freq: Float): Byte? = null
-    fun translateRemoteChannelThreeBandEqLowFreqValue(value: Byte): Float? = null
-    fun translateChannelThreeBandEqMidQValue(q: Float): Byte? = null
-    fun translateRemoteChannelThreeBandEqMidQValue(value: Byte): Float? = null
+    fun translateChannelLevelValue(level: Float): ByteArray? = null
+    fun translateRemoteChannelLevelValue(value: ByteArray): Float? = null
+    fun translateChannelPanValue(pan: Float): ByteArray? = null
+    fun translateRemoteChannelPanValue(value: ByteArray): Float? = null
+    fun translateChannelReverbValue(reverb: Float): ByteArray? = null
+    fun translateRemoteChannelReverbValue(value: ByteArray): Float? = null
+    fun translateChannelMuteValue(mute: Boolean): ByteArray? = null
+    fun translateRemoteChannelMuteValue(value: ByteArray): Boolean? = null
+    fun translateChannelEqLevelValue(level: Float): ByteArray? = null
+    fun translateRemoteChannelEqLevelValue(value: ByteArray): Float? = null
+    fun translateChannelThreeBandEqHighFreqValue(freq: Float): ByteArray? = null
+    fun translateRemoteChannelThreeBandEqHighFreqValue(value: ByteArray): Float? = null
+    fun translateChannelThreeBandEqMidFreqValue(freq: Float): ByteArray? = null
+    fun translateRemoteChannelThreeBandEqMidFreqValue(value: ByteArray): Float? = null
+    fun translateChannelThreeBandEqLowFreqValue(freq: Float): ByteArray? = null
+    fun translateRemoteChannelThreeBandEqLowFreqValue(value: ByteArray): Float? = null
+    fun translateChannelThreeBandEqMidQValue(q: Float): ByteArray? = null
+    fun translateRemoteChannelThreeBandEqMidQValue(value: ByteArray): Float? = null
 
-    fun translateGlobalMasterLevelValue(level: Float): Byte? = null
-    fun translateRemoteGlobalMasterLevelValue(value: Byte): Float? = null
-    fun translateGlobalMonitorLevelValue(level: Float): Byte? = null
-    fun translateRemoteGlobalMonitorLevelValue(value: Byte): Float? = null
+    fun translateGlobalMasterLevelValue(level: Float): ByteArray? = null
+    fun translateRemoteGlobalMasterLevelValue(value: ByteArray): Float? = null
+    fun translateGlobalMonitorLevelValue(level: Float): ByteArray? = null
+    fun translateRemoteGlobalMonitorLevelValue(value: ByteArray): Float? = null
 
-    fun initializeState(initialStates: List<ControlValue>): List<ByteArray>
-    fun parseCCPayload(packet: ByteArray, offset: Int, size: Int): ControlValue?
-    fun buildCCPayload(value: ControlValue, output: ByteArray, offset: Int): Int
-    fun getCCPayloadSizeHint(value: ControlValue): Int
+    fun initializeState(config: MixerConfigurations, initialStates: List<ControlValue>): List<ByteArray>
+    fun parseMidiPayload(config: MixerConfigurations, packet: ByteArray, offset: Int, size: Int): ControlValue?
+    fun buildMidiPayload(config: MixerConfigurations, value: ControlValue, output: ByteArray, offset: Int): Int
+    fun getMidiPayloadSizeHint(config: MixerConfigurations, value: ControlValue): Int
 
     fun flowControlMilliseconds(): Long
     fun maxPayloadInBatch(): Int
@@ -96,4 +119,17 @@ fun MixerDevice.queryCapability(capability: MixerCapability): Boolean {
         MixerCapability.GLOBAL_MASTER_LEVEL -> translateGlobalMasterLevelValue(0.0f) != null
         MixerCapability.GLOBAL_MONITOR_LEVEL -> translateGlobalMonitorLevelValue(0.0f) != null
     }
+}
+
+class MidiDeviceIdentifier(
+    val manufacturerId: ByteArray,
+    val deviceFamily: ByteArray,
+    val familyMember: ByteArray,
+    val revision: ByteArray,
+)
+
+interface MidiMixerSpec {
+    val identifier: String
+    fun probe(properties: Bundle): MixerDevice? = null
+    fun probe(identifier: MidiDeviceIdentifier): MixerDevice? = null
 }

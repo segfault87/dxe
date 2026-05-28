@@ -239,7 +239,11 @@ impl OsdController {
             }
         });
 
-        let mut receiver = event_sender.subscribe(arc_self.alerts.keys().cloned());
+        let mut keys = arc_self.alerts.keys().cloned().collect::<Vec<_>>();
+        if let Some(doorbell_request) = &arc_self.doorbell_event_id {
+            keys.push(doorbell_request.clone());
+        }
+        let mut receiver = event_sender.subscribe(keys.into_iter());
         let arc_self_inner = arc_self.clone();
         let event_receiver_task = tokio::task::spawn(async move {
             while let Some(item) = receiver.next().await {

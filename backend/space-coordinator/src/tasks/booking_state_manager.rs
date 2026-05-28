@@ -274,7 +274,10 @@ impl BookingStateManager {
             .filter(|(k, _)| !self.pending_tasks.lock().contains_key(k))
         {
             let task_name = key.to_string();
-            log::info!("Scheduling booking task {task_name} at {}...", value.time);
+            log::info!(
+                "Scheduling booking task {task_name} at {}...",
+                value.time.with_timezone(&Local).format("%H:%M:%S")
+            );
 
             let task_name_cloned = task_name.clone();
             let booking_cloned = value.booking.clone();
@@ -314,12 +317,7 @@ impl BookingStateManager {
                 Ok(())
             })
             .daily()
-            .at(value
-                .time
-                .with_timezone(&Local)
-                .format("%H:%M:%S")
-                .to_string()
-                .as_str())
+            .at(value.time.format("%H:%M:%S").to_string().as_str())
             .unwrap()
             .build();
 

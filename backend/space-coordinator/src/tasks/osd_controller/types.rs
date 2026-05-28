@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use dxe_types::BookingId;
 use dxe_types::IdentityId;
+use dxe_types::MixerChannelId;
 use dxe_types::entities;
 use serde::{Deserialize, Serialize};
 
@@ -128,7 +129,7 @@ impl From<entities::MixerGlobalData> for MixerGlobalData {
 #[serde(rename_all = "camelCase")]
 pub struct MixerPresets {
     #[serde(default)]
-    pub channels: Vec<MixerChannelData>,
+    pub channels: HashMap<MixerChannelId, MixerChannelData>,
     #[serde(default)]
     pub globals: MixerGlobalData,
 }
@@ -136,7 +137,11 @@ pub struct MixerPresets {
 impl From<MixerPresets> for entities::MixerPresets {
     fn from(value: MixerPresets) -> Self {
         Self {
-            channels: value.channels.into_iter().map(Into::into).collect(),
+            channels: value
+                .channels
+                .into_iter()
+                .map(|(k, v)| (k, v.into()))
+                .collect(),
             globals: value.globals.into(),
         }
     }
@@ -145,7 +150,11 @@ impl From<MixerPresets> for entities::MixerPresets {
 impl From<entities::MixerPresets> for MixerPresets {
     fn from(value: entities::MixerPresets) -> Self {
         Self {
-            channels: value.channels.into_iter().map(Into::into).collect(),
+            channels: value
+                .channels
+                .into_iter()
+                .map(|(k, v)| (k, v.into()))
+                .collect(),
             globals: value.globals.into(),
         }
     }

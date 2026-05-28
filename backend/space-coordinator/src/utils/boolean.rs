@@ -84,9 +84,7 @@ impl<K: Eq + Hash + Clone> Expression<K> {
                 .iter()
                 .map(|v| v.test(table))
                 .any(|v| matches!(v, Ok(true)))),
-            Self::Not { not: expression } => Ok(
-                !expression.test(table)?
-            ),
+            Self::Not { not: expression } => Ok(!expression.test(table)?),
         }
     }
 

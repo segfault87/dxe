@@ -226,3 +226,6 @@ impl ForeignPaymentId {
         Self(Uuid::new_v4())
     }
 }
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Deserialize, Serialize)]
+pub struct MixerChannelId(String);

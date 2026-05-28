@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::error::Error;
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -9,12 +8,10 @@ use dxe_types::BookingId;
 use parking_lot::Mutex;
 use tokio_task_scheduler::{Task, TaskBuilder};
 
-use crate::callback::EventStateCallback;
 use crate::client::DxeClient;
 use crate::config::NotificationPriority;
 use crate::services::carpark_exemption::CarparkExemptionService;
 use crate::services::notification::NotificationService;
-use crate::tasks::booking_state_manager::BookingStates;
 use crate::tasks::osd_controller::OsdController;
 use crate::tasks::osd_controller::topics::ParkingStates;
 use crate::tasks::osd_controller::types::ParkingState;
@@ -22,33 +19,31 @@ use crate::tasks::unit_fetcher::UnitsState;
 
 pub struct CarparkExempter {
     client: DxeClient,
-    booking_states: Arc<Mutex<BookingStates>>,
     service: CarparkExemptionService,
     notification_service: NotificationService,
     osd_controller: Arc<OsdController>,
 
     units_state: UnitsState,
-    active_bookings: Mutex<HashSet<BookingId>>,
+    current_bookings: Arc<Mutex<HashMap<BookingId, BookingWithUsers>>>,
 }
 
 impl CarparkExempter {
     pub fn new(
         client: DxeClient,
-        booking_states: Arc<Mutex<BookingStates>>,
         service: CarparkExemptionService,
         osd_controller: Arc<OsdController>,
         notification_service: NotificationService,
         units_state: UnitsState,
+        current_bookings: Arc<Mutex<HashMap<BookingId, BookingWithUsers>>>,
     ) -> Self {
         Self {
             client,
-            booking_states,
             service,
             notification_service,
             osd_controller,
 
             units_state,
-            active_bookings: Mutex::new(HashSet::new()),
+            current_bookings,
         }
     }
 
@@ -77,28 +72,22 @@ impl CarparkExempter {
         }
 
         {
-            let active_bookings = self.active_bookings.lock();
-
             let now = Utc::now();
 
-            for bookings in self.booking_states.lock().bookings_1d.values() {
-                for booking in bookings {
-                    let is_current_booking = now >= booking.booking.date_start.to_utc()
-                        && booking.booking.date_end.to_utc() > now;
-                    if active_bookings.contains(&booking.booking.id) {
-                        for user in booking.users.iter() {
-                            if let Some(license_plate_number) = &user.license_plate_number
-                                && !license_plate_number.is_empty()
-                            {
-                                license_plate_numbers.insert((
-                                    Some(booking.booking.unit_id.clone()),
-                                    booking.booking.customer_name.clone(),
-                                    user.name.clone(),
-                                    license_plate_number.clone(),
-                                    is_current_booking,
-                                ));
-                            }
-                        }
+            for booking in self.current_bookings.lock().values() {
+                let is_current_booking = now >= booking.booking.date_start.to_utc()
+                    && booking.booking.date_end.to_utc() > now;
+                for user in booking.users.iter() {
+                    if let Some(license_plate_number) = &user.license_plate_number
+                        && !license_plate_number.is_empty()
+                    {
+                        license_plate_numbers.insert((
+                            Some(booking.booking.unit_id.clone()),
+                            booking.booking.customer_name.clone(),
+                            user.name.clone(),
+                            license_plate_number.clone(),
+                            is_current_booking,
+                        ));
                     }
                 }
             }
@@ -197,32 +186,5 @@ impl CarparkExempter {
             .every_minutes(10)
             .build(),
         )
-    }
-}
-
-#[async_trait::async_trait]
-impl EventStateCallback<BookingWithUsers> for CarparkExempter {
-    async fn on_event_start(
-        self: Arc<Self>,
-        event: &BookingWithUsers,
-        buffered: bool,
-    ) -> Result<(), Box<dyn Error>> {
-        if buffered {
-            self.active_bookings.lock().insert(event.booking.id);
-        }
-
-        Ok(())
-    }
-
-    async fn on_event_end(
-        self: Arc<Self>,
-        event: &BookingWithUsers,
-        buffered: bool,
-    ) -> Result<(), Box<dyn Error>> {
-        if buffered {
-            self.active_bookings.lock().remove(&event.booking.id);
-        }
-
-        Ok(())
     }
 }

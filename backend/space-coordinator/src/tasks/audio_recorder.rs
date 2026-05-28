@@ -3,6 +3,7 @@ use std::error::Error as StdError;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
+use std::time::Duration;
 
 use chrono::{TimeDelta, Utc};
 use dxe_extern::google_cloud::drive::{Error as DriveError, GoogleDriveClient};
@@ -17,12 +18,14 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process;
 use tokio_task_scheduler::{Task, TaskBuilder};
 
-use crate::callback::EventStateCallback;
+use crate::callback::LifecycleEventCallback;
 use crate::client::DxeClient;
 use crate::config::{AudioRecorderConfig, GoogleApiConfig};
 use crate::tables::{TablePublisher, TableUpdateReceiver};
 use crate::tasks::sound_meter_controller::SoundMeterPath;
 use crate::types::{DeviceId, DeviceRef, PublishKey};
+
+static UPLOAD_RETRIES_COUNT: usize = 3;
 
 struct RecorderProcess {
     recorder: process::Child,
@@ -32,7 +35,7 @@ struct RecorderProcess {
     presence_watcher: Option<tokio::task::JoinHandle<()>>,
 
     has_stopped: Arc<Mutex<bool>>,
-    presence_flag: Arc<Mutex<bool>>,
+    presence_flag: Arc<Mutex<Option<bool>>>,
 }
 
 impl RecorderProcess {
@@ -103,9 +106,8 @@ impl RecorderProcess {
 
         let (presence_watcher, presence_flag) =
             if let Some((mut subscription, publish_key, threshold)) = sound_meter_subscription {
-                let presence_flag = Arc::new(Mutex::new(true));
+                let presence_flag = Arc::new(Mutex::new(None));
 
-                let mut initial = false;
                 let mut flag = false;
 
                 let cloned_presence_flag = presence_flag.clone();
@@ -116,19 +118,18 @@ impl RecorderProcess {
                         {
                             if value >= threshold {
                                 if !flag {
-                                    *cloned_presence_flag.clone().lock() = true;
+                                    *cloned_presence_flag.clone().lock() = Some(true);
                                     flag = true;
                                 }
-                            } else if !initial {
-                                *cloned_presence_flag.clone().lock() = false;
-                                initial = true;
+                            } else if cloned_presence_flag.lock().is_none() {
+                                *cloned_presence_flag.clone().lock() = Some(false);
                             }
                         }
                     }
                 });
                 (Some(task), presence_flag)
             } else {
-                (None, Arc::new(Mutex::new(true)))
+                (None, Arc::new(Mutex::new(Some(true))))
             };
 
         Ok(RecorderProcess {
@@ -147,7 +148,7 @@ impl RecorderProcess {
         *self.has_stopped.lock()
     }
 
-    pub async fn stop(&mut self) -> Result<bool, Error> {
+    pub async fn stop(&mut self) -> Result<Option<bool>, Error> {
         let Some(stream_feeder) = self.stream_feeder.take() else {
             return Err(Error::AlreadyStopped);
         };
@@ -199,14 +200,14 @@ impl AudioRecorder {
         })
     }
 
-    async fn start(
-        &self,
-        config: &AudioRecorderConfig,
-        booking: &BookingWithUsers,
-    ) -> Result<(), Error> {
+    async fn start(&self, booking: &BookingWithUsers) -> Result<(), Error> {
         if self.tasks.lock().contains_key(&booking.booking.id) {
             return Ok(());
         }
+
+        let Some(config) = self.config.get(&booking.booking.unit_id) else {
+            return Err(Error::NotConfigured(booking.booking.unit_id.clone()));
+        };
 
         let mut path = config.path_prefix.clone();
         path.push(format!("{}.mp3", booking.booking.id));
@@ -229,30 +230,24 @@ impl AudioRecorder {
         Ok(())
     }
 
-    async fn stop(&self, config: &AudioRecorderConfig, booking: &BookingWithUsers) {
+    async fn stop(&self, booking: &BookingWithUsers) -> Result<bool, Error> {
         let Some(mut child) = self.tasks.lock().remove(&booking.booking.id) else {
-            return;
+            return Ok(false);
         };
 
-        let presence = match child.stop().await {
-            Ok(presence) => presence,
-            Err(e) => {
-                log::warn!("Cannot stop recorder process: {e}");
-                false
-            }
+        let Some(config) = self.config.get(&booking.booking.unit_id) else {
+            return Err(Error::NotConfigured(booking.booking.unit_id.clone()));
         };
+
+        let presence = child.stop().await?.unwrap_or(true);
 
         let mut path = config.path_prefix.clone();
         path.push(format!("{}.mp3", booking.booking.id));
-        if !path.exists() {
-            log::warn!("File {path:?} not exists.");
-            return;
-        }
 
         if !presence {
             log::info!("No presence detected. Skipping upload...");
             let _ = tokio::fs::remove_file(path).await;
-            return;
+            return Ok(false);
         }
 
         log::info!(
@@ -264,12 +259,23 @@ impl AudioRecorder {
         let dxe_client = self.dxe_client.clone();
         let booking_id = booking.booking.id;
         tokio::task::spawn(async move {
-            let url = match drive_client.upload(path.clone(), "audio/mp3").await {
-                Ok(v) => v,
-                Err(e) => {
-                    log::error!("Couldn't upload file to Google Drive: {e}");
+            let url = loop {
+                let mut retries = 0;
+
+                match drive_client.upload(path.clone(), "audio/mp3").await {
+                    Ok(v) => break v,
+                    Err(e) => {
+                        log::warn!("Could not upload to Google Drive: {e}");
+                    }
+                };
+
+                retries += 1;
+                if retries >= UPLOAD_RETRIES_COUNT {
+                    log::error!("Maximum retries count exceeded. Skipping upload...");
                     return;
                 }
+
+                tokio::time::sleep(Duration::from_secs(1)).await;
             };
 
             let expires_in = Utc::now() + TimeDelta::days(7);
@@ -291,6 +297,8 @@ impl AudioRecorder {
 
             let _ = tokio::fs::remove_file(path).await;
         });
+
+        Ok(true)
     }
 
     async fn update(self: Arc<Self>) {
@@ -327,29 +335,16 @@ impl AudioRecorder {
 }
 
 #[async_trait::async_trait]
-impl EventStateCallback<BookingWithUsers> for AudioRecorder {
-    async fn on_event_start(
-        self: Arc<Self>,
-        event: &BookingWithUsers,
-        buffered: bool,
-    ) -> Result<(), Box<dyn StdError>> {
-        if !buffered
-            && let Some(config) = self.config.get(&event.booking.unit_id)
-            && let Err(e) = self.start(config, event).await
-        {
-            log::warn!("Could not create audio recorder task: {e}");
-        }
+impl LifecycleEventCallback<BookingWithUsers> for AudioRecorder {
+    async fn on_start(self: Arc<Self>, event: &BookingWithUsers) -> Result<(), Box<dyn StdError>> {
+        self.start(event).await?;
 
         Ok(())
     }
 
-    async fn on_event_end(
-        self: Arc<Self>,
-        event: &BookingWithUsers,
-        buffered: bool,
-    ) -> Result<(), Box<dyn StdError>> {
-        if !buffered && let Some(config) = self.config.get(&event.booking.unit_id) {
-            self.stop(config, event).await;
+    async fn on_end(self: Arc<Self>, event: &BookingWithUsers) -> Result<(), Box<dyn StdError>> {
+        if !self.stop(event).await? {
+            log::warn!("Audio is not recorded with booking {}", event.booking.id);
         }
 
         Ok(())
@@ -366,4 +361,6 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error("Recorder process has been already stopped.")]
     AlreadyStopped,
+    #[error("Unit {0} is not configured for audio recording.")]
+    NotConfigured(UnitId),
 }

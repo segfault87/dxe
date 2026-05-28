@@ -1,53 +1,47 @@
 use std::collections::{HashMap, HashSet};
-use std::error::Error as StdError;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use dxe_s2s_shared::entities::BookingWithUsers;
-use dxe_types::{BookingId, UnitId};
 use futures::StreamExt;
 use futures::stream::select_all;
 use parking_lot::Mutex;
 use tokio::task::JoinHandle;
 
-use crate::callback::{AlertCallback, EventStateCallback, PresenceCallback};
-use crate::config::alert::Alert;
+use crate::config::events::AlertConfig;
+use crate::events::{Event, EventSender};
 use crate::services::table_manager::{TableManager, TableSnapshot};
-use crate::types::AlertId;
+use crate::types::{AlertId, EventId};
 
 pub struct AlertPublisher {
-    alerts: HashMap<AlertId, Alert>,
-    presence: Mutex<bool>,
-    active_units: Mutex<HashMap<UnitId, HashSet<BookingId>>>,
+    alerts: HashMap<AlertId, AlertConfig>,
 
+    sender: EventSender,
     tasks: Mutex<HashMap<AlertId, JoinHandle<()>>>,
-    callbacks: Vec<Arc<dyn AlertCallback + Send + Sync + 'static>>,
+}
+
+impl Drop for AlertPublisher {
+    fn drop(&mut self) {
+        for (_, task) in self.tasks.lock().drain() {
+            task.abort();
+        }
+    }
 }
 
 impl AlertPublisher {
-    pub fn new<'a>(configs: impl Iterator<Item = &'a Alert>, is_present: bool) -> Self {
-        let alerts = configs
-            .map(|v| (v.id.clone(), v.clone()))
-            .collect::<HashMap<_, _>>();
-
+    pub fn new(configs: &HashMap<AlertId, AlertConfig>, sender: EventSender) -> Self {
         Self {
-            alerts,
-            presence: Mutex::new(is_present),
-            active_units: Mutex::new(HashMap::new()),
-
+            alerts: configs.clone(),
+            sender,
             tasks: Mutex::new(HashMap::new()),
-            callbacks: Vec::new(),
         }
     }
 
-    pub fn add_callback<T>(&mut self, callback: Arc<T>)
-    where
-        T: AlertCallback + Send + Sync + 'static,
-    {
-        self.callbacks.push(callback);
-    }
-
-    async fn alert_monitor_loop(self: Arc<Self>, alert: Alert, table_manager: TableManager) {
+    async fn alert_monitor_loop(
+        self: Arc<Self>,
+        alert_id: AlertId,
+        alert: AlertConfig,
+        table_manager: TableManager,
+    ) {
         let keys = alert.condition.keys();
         let endpoints = keys
             .iter()
@@ -74,25 +68,9 @@ impl AlertPublisher {
             if let Ok((endpoint, table)) = item {
                 snapshot.update(&endpoint, table);
 
-                if let Some(presence) = alert.presence
-                    && *self.presence.lock() != presence
-                {
-                    continue;
-                }
-
-                if let Some(unit_ids) = &alert.bookings
-                    && unit_ids
-                        .iter()
-                        .filter(|id| self.clone().is_unit_active(id))
-                        .count()
-                        == 0
-                {
-                    continue;
-                }
-
                 let now = Utc::now();
-                if let Some(snooze) = alert.snooze
-                    && now - last_alert_at < snooze
+                if let Some(debounce) = alert.debounce
+                    && now - last_alert_at < debounce
                 {
                     continue;
                 }
@@ -100,7 +78,7 @@ impl AlertPublisher {
                 let result = match alert.condition.test(&snapshot) {
                     Ok(v) => v,
                     Err(e) => {
-                        log::warn!("Could not test alert condition {}: {e}", alert.id);
+                        log::warn!("Could not test alert condition {alert_id}: {e}");
                         continue;
                     }
                 };
@@ -116,7 +94,7 @@ impl AlertPublisher {
                                     continue;
                                 }
                             } else {
-                                log::info!("alert {} will be started after grace...", alert.id);
+                                log::info!("alert {alert_id} will be started after grace...");
 
                                 grace_time = Some(now);
                                 continue;
@@ -127,26 +105,23 @@ impl AlertPublisher {
 
                         alert_fired = true;
 
-                        log::info!("Firing alert {}", alert.id);
+                        log::info!("Firing alert {}", alert_id);
 
-                        for callback in self.callbacks.iter() {
-                            if let Err(e) = callback.on_alert(alert.id.clone(), true).await {
-                                log::warn!("Could not invoke alert callback for {}: {e}", alert.id);
-                            }
-                        }
+                        self.sender.publish(
+                            EventId::Alert(alert_id.clone()),
+                            Event::Alert {
+                                grace: alert.grace,
+                                debounce: alert.debounce,
+                                unit_ids: alert.unit_ids.clone(),
+                            },
+                        );
                     }
                 } else if alert_fired {
                     alert_fired = false;
-
-                    for callback in self.callbacks.iter() {
-                        if let Err(e) = callback.on_alert(alert.id.clone(), false).await {
-                            log::warn!("Could not invoke alert callback for {}: {e}", alert.id);
-                        }
-                    }
                 } else if grace_time.is_some() {
                     grace_time = None;
 
-                    log::info!("Cancelling alert {}", alert.id);
+                    log::info!("Cancelling alert {alert_id}");
                 }
             }
         }
@@ -155,73 +130,19 @@ impl AlertPublisher {
     pub fn start(self, table_manager: TableManager) -> Arc<Self> {
         let arc_self = Arc::new(self);
 
-        for alert in arc_self.clone().alerts.values() {
-            let task = tokio::task::spawn(
-                arc_self
+        for (id, alert) in arc_self.alerts.clone().into_iter() {
+            let cloned_id = id.clone();
+            let cloned_arc_self = arc_self.clone();
+            let cloned_table_manager = table_manager.clone();
+            let task = tokio::task::spawn(async move {
+                cloned_arc_self
                     .clone()
-                    .alert_monitor_loop(alert.clone(), table_manager.clone()),
-            );
-
-            arc_self.clone().tasks.lock().insert(alert.id.clone(), task);
+                    .alert_monitor_loop(cloned_id, alert, cloned_table_manager)
+                    .await;
+            });
+            arc_self.tasks.lock().insert(id, task);
         }
 
         arc_self
-    }
-
-    pub fn is_unit_active(self: Arc<Self>, unit_id: &UnitId) -> bool {
-        self.active_units
-            .lock()
-            .get(unit_id)
-            .map(|v| !v.is_empty())
-            .unwrap_or(false)
-    }
-}
-
-#[async_trait::async_trait]
-impl EventStateCallback<BookingWithUsers> for AlertPublisher {
-    async fn on_event_start(
-        self: Arc<Self>,
-        event: &BookingWithUsers,
-        buffered: bool,
-    ) -> Result<(), Box<dyn StdError>> {
-        if !buffered {
-            self.active_units
-                .lock()
-                .entry(event.booking.unit_id.clone())
-                .or_default()
-                .insert(event.booking.id);
-        }
-
-        Ok(())
-    }
-
-    async fn on_event_end(
-        self: Arc<Self>,
-        event: &BookingWithUsers,
-        buffered: bool,
-    ) -> Result<(), Box<dyn StdError>> {
-        if !buffered {
-            self.active_units
-                .lock()
-                .get_mut(&event.booking.unit_id)
-                .map(|v| v.remove(&event.booking.id));
-        }
-
-        Ok(())
-    }
-}
-
-#[async_trait::async_trait]
-impl PresenceCallback for AlertPublisher {
-    async fn on_enter(&self) -> Result<(), Box<dyn StdError>> {
-        *self.presence.lock() = true;
-
-        Ok(())
-    }
-
-    async fn on_leave(&self) -> Result<(), Box<dyn StdError>> {
-        *self.presence.lock() = false;
-
-        Ok(())
     }
 }

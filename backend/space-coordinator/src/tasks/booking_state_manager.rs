@@ -1,71 +1,108 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+use std::fmt::Display;
 use std::sync::Arc;
 
-use chrono::{DateTime, Local, Utc};
+use chrono::{DateTime, Local, TimeDelta, Utc};
+use dxe_s2s_shared::Timestamp;
 use dxe_s2s_shared::entities::BookingWithUsers;
 use dxe_s2s_shared::handlers::{BookingType, GetBookingsResponse};
 use dxe_types::{BookingId, UnitId};
 use parking_lot::Mutex;
-use tokio_task_scheduler::{Scheduler, SchedulerError, Task, TaskBuilder};
+use tokio_task_scheduler::{Scheduler, Task, TaskBuilder};
 
-use crate::callback::EventStateCallback;
 use crate::client::DxeClient;
+use crate::config::events::{BookingEventConfig, BookingEventType};
+use crate::events::{Event, EventSender};
+use crate::tables::{QualifiedPath, TablePublisher};
+use crate::types::{BookingEventId, Endpoint, EventId, PublishKey};
 
-#[derive(Default)]
-pub struct BookingStates {
-    pub bookings_1d: HashMap<UnitId, Vec<BookingWithUsers>>,
-    pub has_initialized: bool,
+static PUBLISH_KEY_IS_ACTIVE: PublishKey = PublishKey::new_const("is_active");
+static PUBLISH_KEY_IS_ACTIVE_INCL_OFFSETS: PublishKey =
+    PublishKey::new_const("is_active_incl_offsets");
+
+pub struct BookingsPath;
+
+impl QualifiedPath for BookingsPath {
+    type TableKey = UnitId;
+    type Path = Endpoint;
+
+    fn path(table_key: &Self::TableKey) -> Self::Path {
+        Endpoint::Bookings(table_key.clone())
+    }
+}
+
+#[derive(Clone, Hash, Eq, PartialEq)]
+struct BookingTaskKey(BookingEventId, BookingId);
+
+impl Display for BookingTaskKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}/{}", self.1, self.0)
+    }
+}
+
+struct BookingTask {
+    booking: BookingWithUsers,
+    time: DateTime<Utc>,
+    r#type: BookingEventType,
+    is_active: Option<bool>,
+    is_active_offset_edge: Option<bool>,
 }
 
 pub struct BookingStateManager {
-    states: Arc<Mutex<BookingStates>>,
+    config: HashMap<BookingEventId, BookingEventConfig>,
+    offsets: HashMap<UnitId, (TimeDelta, TimeDelta)>,
 
+    event_sender: EventSender,
     scheduler: Scheduler,
     client: DxeClient,
-    callbacks: Vec<Arc<dyn EventStateCallback<BookingWithUsers> + Send + Sync + 'static>>,
-    pending_tasks: Mutex<HashMap<String, (String, DateTime<Utc>)>>,
-}
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum BookingPhase {
-    StartWithBuffer,
-    Start,
-    End,
-    EndWithBuffer,
-}
-
-fn create_task_name(booking_id: &BookingId, phase: BookingPhase) -> String {
-    let task_name = match phase {
-        BookingPhase::StartWithBuffer => "start_with_buffer",
-        BookingPhase::Start => "start",
-        BookingPhase::End => "end",
-        BookingPhase::EndWithBuffer => "end_with_buffer",
-    };
-
-    format!("booking_{booking_id}_{task_name}")
+    booking_entries: Arc<Mutex<HashMap<BookingId, BookingWithUsers>>>,
+    pending_tasks: Mutex<HashMap<BookingTaskKey, BookingTask>>,
+    table: TablePublisher<UnitId, Endpoint, BookingsPath>,
 }
 
 impl BookingStateManager {
-    pub fn new(client: DxeClient, scheduler: Scheduler) -> (Arc<Mutex<BookingStates>>, Self) {
-        let states = Arc::new(Mutex::new(Default::default()));
+    pub fn new(
+        config: &HashMap<BookingEventId, BookingEventConfig>,
+        event_sender: EventSender,
+        client: DxeClient,
+        scheduler: Scheduler,
+    ) -> Self {
+        let mut offsets = HashMap::new();
 
-        (
-            states.clone(),
-            Self {
-                states,
-                scheduler,
-                client,
-                callbacks: Vec::new(),
-                pending_tasks: Mutex::new(HashMap::new()),
-            },
-        )
+        for config in config.values() {
+            for unit_id in config.unit_ids.iter() {
+                let entry: &mut (TimeDelta, TimeDelta) =
+                    offsets.entry(unit_id.clone()).or_default();
+                match config.r#type {
+                    BookingEventType::OnStart => {
+                        if entry.0 > config.offset {
+                            entry.0 = config.offset;
+                        }
+                    }
+                    BookingEventType::OnEnd => {
+                        if entry.1 < config.offset {
+                            entry.1 = config.offset;
+                        }
+                    }
+                }
+            }
+        }
+
+        Self {
+            config: config.clone(),
+            offsets,
+            event_sender,
+            scheduler,
+            client,
+            booking_entries: Arc::new(Mutex::new(HashMap::new())),
+            pending_tasks: Mutex::new(HashMap::new()),
+            table: TablePublisher::new(),
+        }
     }
 
-    pub fn add_callback<T>(&mut self, callback: Arc<T>)
-    where
-        T: EventStateCallback<BookingWithUsers> + Send + Sync + 'static,
-    {
-        self.callbacks.push(callback);
+    pub fn get_states(&self) -> Arc<Mutex<HashMap<BookingId, BookingWithUsers>>> {
+        self.booking_entries.clone()
     }
 
     async fn update(self: Arc<Self>) {
@@ -86,391 +123,230 @@ impl BookingStateManager {
 
         let now = Utc::now();
 
-        let mut bookings_to_add = vec![];
-        let mut bookings_to_delete = vec![];
+        let mut current_entries: HashMap<BookingId, BookingWithUsers> = HashMap::new();
+        let mut tasks: HashMap<BookingTaskKey, BookingTask> = HashMap::new();
+        let mut prev_entries: HashMap<UnitId, Timestamp> = HashMap::new();
+        for (unit_id, mut bookings) in response.bookings.into_iter() {
+            let Some((offset_start, offset_end)) = self.offsets.get(&unit_id).cloned() else {
+                continue;
+            };
+            bookings.sort_by_key(|v| v.booking.date_start.clone());
 
-        {
-            let mut states = self.states.lock();
+            let mut is_active = false;
+            let mut is_active_incl_offsets = false;
 
-            // Remove outdated events
-            for bookings in states.bookings_1d.values_mut() {
-                bookings.retain(|v| v.booking.date_end_w_buffer.to_utc() > now);
-            }
+            for booking in bookings {
+                let start = booking.booking.date_start.to_utc();
+                let end = booking.booking.date_end.to_utc();
 
-            for (unit_id, bookings) in response.bookings.into_iter() {
-                let current_bookings = states.bookings_1d.entry(unit_id.clone()).or_default();
+                if !is_active && now >= start && end > now {
+                    is_active = true;
+                }
+                if now >= start + std::cmp::min(offset_start, TimeDelta::zero())
+                    && end + std::cmp::max(offset_end, TimeDelta::zero()) > now
+                {
+                    if !is_active_incl_offsets {
+                        is_active_incl_offsets = true;
+                    }
 
-                let mut previous_keys = current_bookings
-                    .iter()
-                    .map(|v| v.booking.id)
-                    .collect::<HashSet<_>>();
-                for booking in bookings {
-                    let delta = booking.booking.date_start_w_buffer.to_utc() - now;
-                    if delta.num_days() != 0 {
+                    current_entries.insert(booking.booking.id, booking.clone());
+                }
+
+                let is_continous = if let Some(prev) = prev_entries.get(&unit_id) {
+                    prev == &booking.booking.date_start
+                } else {
+                    false
+                };
+
+                for (event_id, config) in self.config.iter() {
+                    if !config.unit_ids.contains(&unit_id) {
                         continue;
                     }
 
-                    previous_keys.remove(&booking.booking.id);
-                    if let Some(previous_booking) = current_bookings
-                        .iter_mut()
-                        .find(|b| b.booking.id == booking.booking.id)
-                    {
-                        if &booking != previous_booking {
-                            *previous_booking = booking;
+                    let (is_active, is_active_offset_edge, time) = match config.r#type {
+                        BookingEventType::OnStart => {
+                            let is_active = if config.offset.is_zero() {
+                                Some(true)
+                            } else {
+                                None
+                            };
+                            let is_active_offset_edge = if config.offset == offset_start {
+                                Some(true)
+                            } else {
+                                None
+                            };
+                            (
+                                is_active,
+                                is_active_offset_edge,
+                                booking.booking.date_start.to_utc() + config.offset,
+                            )
                         }
-                    } else {
-                        bookings_to_add.push(booking.clone());
-                        current_bookings.push(booking);
+                        BookingEventType::OnEnd => {
+                            let is_active = if config.offset.is_zero() {
+                                Some(false)
+                            } else {
+                                None
+                            };
+                            let is_active_offset_edge = if config.offset == offset_start {
+                                Some(false)
+                            } else {
+                                None
+                            };
+                            (
+                                is_active,
+                                is_active_offset_edge,
+                                booking.booking.date_end.to_utc() + config.offset,
+                            )
+                        }
+                    };
+
+                    let delta = time - now;
+                    if delta.num_seconds() < 0 || delta.num_days() >= 1 {
+                        continue;
                     }
-                }
-
-                for booking in current_bookings
-                    .iter()
-                    .filter(|v| previous_keys.contains(&v.booking.id))
-                {
-                    bookings_to_delete.push(booking.clone());
-                }
-                current_bookings.retain(|v| !previous_keys.contains(&v.booking.id));
-            }
-
-            if !states.has_initialized {
-                states.has_initialized = true;
-
-                for callback in self.callbacks.iter() {
-                    callback.on_initialized();
-                }
-            }
-        }
-
-        for booking in bookings_to_add {
-            Arc::clone(&self).on_new_booking(booking, &now).await;
-        }
-        for booking in bookings_to_delete {
-            let booking_start_with_buffer =
-                create_task_name(&booking.booking.id, BookingPhase::StartWithBuffer);
-            let booking_start = create_task_name(&booking.booking.id, BookingPhase::Start);
-            let booking_end = create_task_name(&booking.booking.id, BookingPhase::End);
-            let booking_end_with_buffer =
-                create_task_name(&booking.booking.id, BookingPhase::EndWithBuffer);
-
-            let mut tasks_to_remove = vec![];
-
-            {
-                let mut pending_tasks = self.pending_tasks.lock();
-
-                if let Some(id) = pending_tasks.remove(&booking_start_with_buffer) {
-                    tasks_to_remove.push(id);
-                }
-                if let Some(id) = pending_tasks.remove(&booking_start) {
-                    tasks_to_remove.push(id);
-                }
-                if let Some(id) = pending_tasks.remove(&booking_end) {
-                    tasks_to_remove.push(id);
-                }
-                if let Some(id) = pending_tasks.remove(&booking_end_with_buffer) {
-                    tasks_to_remove.push(id);
-                }
-            }
-
-            for (task, _) in tasks_to_remove {
-                let _ = self.scheduler.remove(&task).await;
-            }
-
-            Arc::clone(&self).on_booking_removed(booking, &now).await;
-        }
-
-        // Schedule task under 24 hours time frame (if not scheduled)
-        let bookings_1d = self.states.lock().bookings_1d.clone();
-
-        for (_, bookings) in bookings_1d {
-            for booking in bookings {
-                let start_with_buffer_task =
-                    create_task_name(&booking.booking.id, BookingPhase::StartWithBuffer);
-                let start_with_buffer = booking.booking.date_start_w_buffer.to_utc();
-
-                let start_task = create_task_name(&booking.booking.id, BookingPhase::Start);
-                let start = booking.booking.date_start.to_utc();
-
-                let end_task = create_task_name(&booking.booking.id, BookingPhase::End);
-                let end = booking.booking.date_end.to_utc();
-
-                let end_with_buffer_task =
-                    create_task_name(&booking.booking.id, BookingPhase::EndWithBuffer);
-                let end_with_buffer = booking.booking.date_end_w_buffer.to_utc();
-
-                {
-                    let arc_self = Arc::clone(&self);
-                    let booking = booking.clone();
-                    let task_name = start_with_buffer_task.clone();
-
-                    Arc::clone(&self)
-                        .schedule_task_if_required(
-                            start_with_buffer_task.as_str(),
-                            start_with_buffer,
-                            now,
-                            move || {
-                                log::info!("booking_start_with_buffer event triggered.");
-                                let arc_self = arc_self.clone();
-                                let booking = booking.clone();
-                                let task_name = task_name.clone();
-                                tokio::task::spawn(async move {
-                                    Arc::clone(&arc_self).on_booking_start(booking, true).await;
-                                    let task_id = Arc::clone(&arc_self)
-                                        .pending_tasks
-                                        .lock()
-                                        .remove(&task_name);
-                                    if let Some((task_id, _)) = task_id {
-                                        let _ = arc_self.scheduler.remove(&task_id).await;
-                                    }
-                                });
-
-                                Ok(())
-                            },
-                        )
-                        .await;
-                }
-
-                {
-                    let arc_self = Arc::clone(&self);
-                    let booking = booking.clone();
-                    let task_name = start_task.clone();
-
-                    Arc::clone(&self)
-                        .schedule_task_if_required(start_task.as_str(), start, now, move || {
-                            log::info!("booking_start event triggered.");
-                            let arc_self = arc_self.clone();
-                            let booking = booking.clone();
-                            let task_name = task_name.clone();
-                            tokio::task::spawn(async move {
-                                Arc::clone(&arc_self).on_booking_start(booking, false).await;
-                                let task_id = Arc::clone(&arc_self)
-                                    .pending_tasks
-                                    .lock()
-                                    .remove(&task_name);
-                                if let Some((task_id, _)) = task_id {
-                                    let _ = arc_self.scheduler.remove(&task_id).await;
-                                }
-                            });
-
-                            Ok(())
-                        })
-                        .await;
-                }
-
-                {
-                    let arc_self = Arc::clone(&self);
-                    let booking = booking.clone();
-                    let task_name = end_task.clone();
-
-                    Arc::clone(&self)
-                        .schedule_task_if_required(end_task.as_str(), end, now, move || {
-                            log::info!("booking_end event triggered.");
-                            let arc_self = arc_self.clone();
-                            let booking = booking.clone();
-                            let task_name = task_name.clone();
-                            tokio::task::spawn(async move {
-                                Arc::clone(&arc_self).on_booking_end(booking, false).await;
-                                let task_id = Arc::clone(&arc_self)
-                                    .pending_tasks
-                                    .lock()
-                                    .remove(&task_name);
-                                if let Some((task_id, _)) = task_id {
-                                    let _ = arc_self.scheduler.remove(&task_id).await;
-                                }
-                            });
-
-                            Ok(())
-                        })
-                        .await;
-                }
-
-                {
-                    let arc_self = Arc::clone(&self);
-                    let booking = booking.clone();
-                    let task_name = end_with_buffer_task.clone();
-
-                    Arc::clone(&self)
-                        .schedule_task_if_required(
-                            end_with_buffer_task.as_str(),
-                            end_with_buffer,
-                            now,
-                            move || {
-                                log::info!("booking_end_with_buffer event triggered.");
-                                let arc_self = arc_self.clone();
-                                let booking = booking.clone();
-                                let task_name = task_name.clone();
-                                tokio::task::spawn(async move {
-                                    Arc::clone(&arc_self).on_booking_end(booking, true).await;
-                                    let task_id = Arc::clone(&arc_self)
-                                        .pending_tasks
-                                        .lock()
-                                        .remove(&task_name);
-                                    if let Some((task_id, _)) = task_id {
-                                        let _ = arc_self.scheduler.remove(&task_id).await;
-                                    }
-                                });
-
-                                Ok(())
-                            },
-                        )
-                        .await;
-                }
-            }
-        }
-    }
-
-    async fn schedule_task_if_required<F>(
-        self: Arc<Self>,
-        task_name: &str,
-        date: DateTime<Utc>,
-        now: DateTime<Utc>,
-        f: F,
-    ) -> bool
-    where
-        F: Fn() -> Result<(), SchedulerError> + Send + Sync + 'static,
-    {
-        let delta = date - now;
-        if delta.num_seconds() > 0 && delta.num_days() == 0 {
-            let prev_task = {
-                let guard = self.pending_tasks.lock();
-                guard.get(task_name).cloned()
-            };
-
-            if let Some((prev_task, prev_date)) = prev_task {
-                if prev_date != date {
-                    if let Err(e) = self.scheduler.remove(&prev_task).await {
-                        log::warn!("Could not remove previous task {task_name}: {e}");
+                    if let Some(continuation) = config.continuation
+                        && continuation != is_continous
+                    {
+                        continue;
                     }
-                } else {
-                    return false;
-                }
-            }
 
-            let task = TaskBuilder::new(task_name, f)
-                .daily()
-                .at(date.format("%H:%M:%S").to_string().as_str())
-                .unwrap()
-                .build();
-
-            match self.scheduler.add_task(task).await {
-                Ok(id) => {
-                    log::info!(
-                        "Task {task_name} scheduled at {}",
-                        date.with_timezone(&Local).format("%H:%M:%S")
+                    tasks.insert(
+                        BookingTaskKey(event_id.clone(), booking.booking.id),
+                        BookingTask {
+                            booking: booking.clone(),
+                            time,
+                            r#type: config.r#type,
+                            is_active,
+                            is_active_offset_edge,
+                        },
                     );
-                    self.pending_tasks
-                        .lock()
-                        .insert(task_name.to_owned(), (id, date));
-                    true
                 }
-                Err(e) => {
-                    log::error!("Could not schedule {task_name}: {e}");
-                    false
-                }
+
+                prev_entries.insert(unit_id.clone(), booking.booking.date_end.clone());
             }
-        } else {
-            false
+
+            self.table.update_value(
+                unit_id.clone(),
+                PUBLISH_KEY_IS_ACTIVE.clone(),
+                serde_json::Value::Bool(is_active),
+            );
+            self.table.update_value(
+                unit_id.clone(),
+                PUBLISH_KEY_IS_ACTIVE_INCL_OFFSETS.clone(),
+                serde_json::Value::Bool(is_active_incl_offsets),
+            );
         }
-    }
+        drop(prev_entries);
 
-    async fn on_booking_start(self: Arc<Self>, booking: BookingWithUsers, buffered: bool) {
-        for callback in self.callbacks.iter() {
-            if let Err(e) = callback.clone().on_event_start(&booking, buffered).await {
-                log::error!("Error while start booking {}: {e}", booking.booking.id);
-            }
-        }
-    }
+        *self.booking_entries.lock() = current_entries;
 
-    async fn on_booking_end(self: Arc<Self>, booking: BookingWithUsers, buffered: bool) {
-        for callback in self.callbacks.iter() {
-            if let Err(e) = callback.clone().on_event_end(&booking, buffered).await {
-                log::error!("Error while end booking {}: {e}", booking.booking.id);
-            }
-        }
-    }
+        let tasks_to_remove = {
+            let mut pending_tasks = self.pending_tasks.lock();
 
-    async fn on_new_booking(self: Arc<Self>, booking: BookingWithUsers, now: &DateTime<Utc>) {
-        let start_w_buffer = booking.booking.date_start_w_buffer.to_utc();
-        let start = booking.booking.date_start.to_utc();
-        let end = booking.booking.date_end.to_utc();
-        let end_w_buffer = booking.booking.date_end_w_buffer.to_utc();
+            pending_tasks
+                .extract_if(|k, v| {
+                    if matches!(v.r#type, BookingEventType::OnEnd)
+                        && v.time - now
+                            < self
+                                .offsets
+                                .get(&v.booking.booking.unit_id)
+                                .map(|v| v.1)
+                                .unwrap_or_default()
+                    {
+                        return false;
+                    }
+                    tasks
+                        .get(k)
+                        .map(|new_v| new_v.time != v.time)
+                        .unwrap_or(true)
+                })
+                .collect::<HashMap<_, _>>()
+        };
 
-        let is_in_progress = &start_w_buffer <= now && now < &end_w_buffer;
-
-        if is_in_progress {
-            let has_started = &start < now && now < &end;
-
-            for callback in self.callbacks.iter() {
-                if let Err(e) = callback.clone().on_event_start(&booking, true).await {
-                    log::error!("Error while starting booking {}: {e}", booking.booking.id);
-                }
-                if has_started
-                    && let Err(e) = callback.clone().on_event_start(&booking, false).await
-                {
-                    log::error!("Error while starting booking {}: {e}", booking.booking.id);
-                }
-            }
-        }
-    }
-
-    async fn on_booking_removed(self: Arc<Self>, booking: BookingWithUsers, now: &DateTime<Utc>) {
-        let start_w_buffer = booking.booking.date_start_w_buffer.to_utc();
-        let end = booking.booking.date_end.to_utc();
-        let end_w_buffer = booking.booking.date_end_w_buffer.to_utc();
-
-        let is_in_progress = &start_w_buffer <= now && now < &end_w_buffer;
-
-        if is_in_progress {
-            let is_in_buffer = now >= &end;
-
-            for callback in self.callbacks.iter() {
-                if !is_in_buffer
-                    && let Err(e) = callback.clone().on_event_end(&booking, false).await
-                {
-                    log::error!("Error while stopping booking {}: {e}", booking.booking.id);
-                }
-                if let Err(e) = callback.clone().on_event_end(&booking, true).await {
-                    log::error!("Error while stopping booking {}: {e}", booking.booking.id);
-                }
-            }
+        for key in tasks_to_remove.keys() {
+            let task_name = key.to_string();
+            log::info!("Removing booking task {task_name}...");
+            let _ = Arc::clone(&self).scheduler.remove(task_name.as_str()).await;
         }
 
-        let _ = self
-            .scheduler
-            .remove(&create_task_name(&booking.booking.id, BookingPhase::Start))
-            .await;
-        let _ = self
-            .scheduler
-            .remove(&create_task_name(
-                &booking.booking.id,
-                BookingPhase::StartWithBuffer,
-            ))
-            .await;
-        let _ = self
-            .scheduler
-            .remove(&create_task_name(&booking.booking.id, BookingPhase::End))
-            .await;
-        let _ = self
-            .scheduler
-            .remove(&create_task_name(
-                &booking.booking.id,
-                BookingPhase::EndWithBuffer,
-            ))
-            .await;
+        for (key, value) in tasks
+            .iter()
+            .filter(|(k, _)| !self.pending_tasks.lock().contains_key(k))
+        {
+            let task_name = key.to_string();
+            log::info!("Scheduling booking task {task_name} at {}...", value.time);
+
+            let task_name_cloned = task_name.clone();
+            let booking_cloned = value.booking.clone();
+            let arc_self = Arc::clone(&self);
+            let key_cloned = key.0.clone();
+            let is_active = value.is_active;
+            let is_active_offset_edge = value.is_active_offset_edge;
+            let task = TaskBuilder::new(task_name.as_str(), move || {
+                if let Some(is_active) = is_active {
+                    arc_self.clone().table.update_value(
+                        booking_cloned.booking.unit_id.clone(),
+                        PUBLISH_KEY_IS_ACTIVE.clone(),
+                        serde_json::Value::Bool(is_active),
+                    );
+                }
+                if let Some(is_active_offset_edge) = is_active_offset_edge {
+                    arc_self.clone().table.update_value(
+                        booking_cloned.booking.unit_id.clone(),
+                        PUBLISH_KEY_IS_ACTIVE_INCL_OFFSETS.clone(),
+                        serde_json::Value::Bool(is_active_offset_edge),
+                    );
+                }
+
+                arc_self.clone().event_sender.publish(
+                    EventId::Booking(key_cloned.clone()),
+                    Event::Booking {
+                        booking: booking_cloned.clone(),
+                    },
+                );
+
+                let scheduler = arc_self.scheduler.clone();
+                let task_name = task_name_cloned.clone();
+                tokio::task::spawn(async move {
+                    let _ = scheduler.remove(task_name.as_str()).await;
+                });
+
+                Ok(())
+            })
+            .daily()
+            .at(value
+                .time
+                .with_timezone(&Local)
+                .format("%H:%M:%S")
+                .to_string()
+                .as_str())
+            .unwrap()
+            .build();
+
+            if let Err(e) = self.scheduler.add_task(task).await {
+                log::error!("Could not schedule {task_name}: {e}");
+            }
+        }
+
+        *Arc::clone(&self).pending_tasks.lock() = tasks;
     }
 
     pub fn task(self) -> Task {
         let arc_self = Arc::new(self);
 
         TaskBuilder::new("booking_state_manager", move || {
-            let arc_self = arc_self.clone();
+            let cloned_arc_self = arc_self.clone();
             tokio::task::spawn(async move {
-                arc_self.update().await;
+                cloned_arc_self.update().await;
             });
 
             Ok(())
         })
-        .every_minutes(10)
+        .every_minutes(5)
         .build()
+    }
+
+    pub fn publisher(&self) -> TablePublisher<UnitId, Endpoint, BookingsPath> {
+        self.table.clone()
     }
 }

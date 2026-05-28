@@ -22,14 +22,12 @@ fn convert_user(user: &RawUser) -> User {
     }
 }
 
-fn convert_booking(booking: &RawBooking, booking_config: &BookingConfig) -> Booking {
+fn convert_booking(booking: &RawBooking) -> Booking {
     Booking {
         id: booking.id,
         unit_id: booking.unit_id.clone(),
-        date_start_w_buffer: (booking.time_from - booking_config.buffer_time.0).into(),
         date_start: booking.time_from.into(),
         date_end: booking.time_to.into(),
-        date_end_w_buffer: (booking.time_to + booking_config.buffer_time.1).into(),
         customer_id: booking.customer.id(),
         customer_name: booking.customer.name().to_owned(),
     }
@@ -81,7 +79,7 @@ pub async fn get(
             };
 
             bookings.push(BookingWithUsers {
-                booking: convert_booking(&booking, &booking_config),
+                booking: convert_booking(&booking),
                 users,
             });
         }

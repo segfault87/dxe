@@ -1,18 +1,19 @@
-pub mod alert;
+pub mod events;
 pub mod metrics;
 pub mod osd;
+pub mod presence;
 pub mod telemetry;
+pub mod triggers;
 pub mod z2m;
 
-use std::collections::HashMap;
-use std::net::IpAddr;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use chrono::TimeDelta;
 use dxe_types::{SpaceId, UnitId};
 use serde::Deserialize;
 
-use crate::types::{AlertId, DeviceId, PublishKey};
+use crate::types::{DeviceId, EventId, PublishKey};
 use crate::utils::deserializers::deserialize_time_delta_seconds;
 
 #[derive(Debug, Deserialize)]
@@ -51,16 +52,6 @@ pub enum CarparkExemptionBackend {
 pub struct CarparkExemptionConfig {
     pub backend: CarparkExemptionBackend,
     pub amano: Option<AmanoConfig>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct PresenceMonitorConfig {
-    pub scan_ips: Vec<IpAddr>,
-    #[serde(
-        rename = "away_interval_secs",
-        deserialize_with = "deserialize_time_delta_seconds"
-    )]
-    pub away_interval: TimeDelta,
 }
 
 #[derive(Debug, Deserialize)]
@@ -109,7 +100,7 @@ pub enum NotificationPriority {
 
 #[derive(Clone, Deserialize, Debug)]
 pub struct NotificationAlert {
-    pub alert_id: AlertId,
+    pub event_ids: HashSet<EventId>,
     pub message: String,
     pub priority: NotificationPriority,
 }
@@ -207,15 +198,17 @@ pub struct Config {
     pub mqtt: MqttConfig,
     pub notifications: NotificationConfig,
     pub carpark_exemption: Option<CarparkExemptionConfig>,
-    pub presence_monitor: PresenceMonitorConfig,
+    pub presence_monitor: presence::Config,
     pub google_apis: GoogleApiConfig,
     pub audio_recorder: HashMap<UnitId, AudioRecorderConfig>,
     pub z2m: z2m::Config,
+    #[serde(default)]
     pub sound_meters: Vec<SoundMeterConfig>,
     pub metrics: Vec<metrics::Metric>,
-    pub alerts: Vec<alert::Alert>,
     pub osd: osd::Config,
     pub telemetry: telemetry::Config,
+    pub events: events::Config,
+    pub triggers: Vec<triggers::Trigger>,
 }
 
 impl Config {

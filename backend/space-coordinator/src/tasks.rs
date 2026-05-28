@@ -1,3 +1,4 @@
+pub mod action_controller;
 pub mod alert_publisher;
 pub mod audio_recorder;
 pub mod booking_reminder;

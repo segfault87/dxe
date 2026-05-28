@@ -1,22 +1,11 @@
-use std::collections::HashSet;
-use std::{collections::HashMap, fmt::Display};
+use std::collections::{HashMap, HashSet};
 
 use chrono::TimeDelta;
-use dxe_types::UnitId;
 use serde::Deserialize;
 
 use crate::types::{PublishKey, PublishedValues, Z2mDeviceId};
 use crate::utils::boolean::{ComparisonOperator, Condition, Expression};
 use crate::utils::deserializers::deserialize_time_delta_seconds;
-
-#[derive(Copy, Clone, Debug, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum SwitchPolicy {
-    #[default]
-    Uncontrolled,
-    StayOn,
-    Off,
-}
 
 fn default_power_meter_state_keys() -> Vec<PublishKey> {
     vec![String::from("energy").into(), String::from("power").into()]
@@ -28,29 +17,13 @@ pub struct DeviceClassPowerMeter {
     pub state_keys: Vec<PublishKey>,
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum SwitchState {
-    On,
-    Off,
-}
-
-impl Display for SwitchState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::On => write!(f, "ON"),
-            Self::Off => write!(f, "OFF"),
-        }
-    }
-}
-
 #[derive(Clone, Debug, Deserialize)]
-pub struct SwitchStates {
+pub struct Z2mSwitchStates {
     pub on: Vec<PublishedValues>,
     pub off: Vec<PublishedValues>,
 }
 
-impl Default for SwitchStates {
+impl Default for Z2mSwitchStates {
     fn default() -> Self {
         Self {
             on: vec![HashMap::from([(
@@ -80,11 +53,7 @@ fn default_switch_state_keys() -> Vec<PublishKey> {
 #[derive(Clone, Debug, Deserialize)]
 pub struct DeviceClassSwitch {
     #[serde(default)]
-    pub presence_policy: SwitchPolicy,
-    #[serde(default)]
-    pub booking_policy: SwitchPolicy,
-    #[serde(default)]
-    pub states: SwitchStates,
+    pub states: Z2mSwitchStates,
     #[serde(default = "default_switch_condition")]
     pub is_on: Expression<PublishKey>,
     #[serde(default = "default_switch_state_keys")]
@@ -126,34 +95,6 @@ impl Device {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Default)]
-pub struct Hook {
-    #[serde(default)]
-    pub switches: HashMap<Z2mDeviceId, SwitchState>,
-}
-
-#[derive(Clone, Debug, Deserialize, Default)]
-pub struct PerUnitHooks {
-    #[serde(default)]
-    pub on_booking_start: Hook,
-    #[serde(default)]
-    pub on_booking_end: Hook,
-}
-
-#[derive(Clone, Debug, Deserialize, Default)]
-pub struct PresenceHooks {
-    #[serde(default)]
-    pub on_enter: Hook,
-    #[serde(default)]
-    pub on_leave: Hook,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct Hooks {
-    pub units: HashMap<UnitId, PerUnitHooks>,
-    pub presence: PresenceHooks,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct Config {
     #[serde(
@@ -162,5 +103,4 @@ pub struct Config {
     )]
     pub command_timeout: TimeDelta,
     pub devices: Vec<Device>,
-    pub hooks: Hooks,
 }

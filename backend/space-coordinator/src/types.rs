@@ -1,7 +1,9 @@
+use std::convert::Infallible;
 use std::fmt::Display;
 use std::str::FromStr;
 use std::{collections::HashMap, hash::Hash};
 
+use dxe_types::UnitId;
 use serde::{Deserialize, Serialize};
 use serde_with::{DeserializeFromStr, SerializeDisplay};
 
@@ -190,10 +192,39 @@ impl Display for MetricId {
     }
 }
 
+#[derive(Clone, Debug, DeserializeFromStr, SerializeDisplay, Eq, PartialEq, Hash)]
+pub enum PresenceRef {
+    Global,
+    Tenant(TenantId),
+}
+
+impl FromStr for PresenceRef {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.is_empty() {
+            Ok(Self::Global)
+        } else {
+            Ok(Self::Tenant(s.to_owned().into()))
+        }
+    }
+}
+
+impl Display for PresenceRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Global => write!(f, ""),
+            Self::Tenant(id) => write!(f, "{id}"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash, DeserializeFromStr, SerializeDisplay)]
 pub enum Endpoint {
     Metric(MetricId),
     Device(DeviceRef),
+    Presence(PresenceRef),
+    Bookings(UnitId),
 }
 
 impl Display for Endpoint {
@@ -201,6 +232,8 @@ impl Display for Endpoint {
         match self {
             Self::Metric(id) => write!(f, "metric:{id}"),
             Self::Device(device) => write!(f, "device:{device}"),
+            Self::Presence(presence) => write!(f, "presence:{presence}"),
+            Self::Bookings(id) => write!(f, "bookings:{id}"),
         }
     }
 }
@@ -209,13 +242,13 @@ impl FromStr for Endpoint {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (key, value) = s
-            .split_once(':')
-            .ok_or(ParseError::Endpoint(s.to_owned()))?;
+        let (key, value) = s.split_once(':').unwrap_or((s, ""));
 
         match key {
             "metric" => Ok(Self::Metric(value.to_owned().into())),
             "device" => Ok(Self::Device(DeviceRef::from_str(value)?)),
+            "presence" => Ok(Self::Presence(PresenceRef::from_str(value).unwrap())),
+            "bookings" => Ok(Self::Bookings(value.to_owned().into())),
             other => Err(ParseError::Endpoint(other.to_owned())),
         }
     }
@@ -258,6 +291,17 @@ impl From<String> for Z2mDeviceId {
     }
 }
 
+impl TryFrom<DeviceRef> for Z2mDeviceId {
+    type Error = ParseError;
+
+    fn try_from(value: DeviceRef) -> Result<Self, Self::Error> {
+        match value.r#type {
+            DeviceType::Z2m => Ok(Self(value.id.0.clone())),
+            _ => Err(ParseError::NotZ2mDeviceId),
+        }
+    }
+}
+
 impl From<Z2mDeviceId> for DeviceId {
     fn from(value: Z2mDeviceId) -> Self {
         value.0.into()
@@ -267,6 +311,109 @@ impl From<Z2mDeviceId> for DeviceId {
 impl Display for Z2mDeviceId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq, Hash)]
+#[serde(transparent)]
+pub struct TenantId(String);
+
+impl From<String> for TenantId {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+impl Display for TenantId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize)]
+#[serde(transparent)]
+pub struct BookingEventId(String);
+
+impl From<String> for BookingEventId {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+impl Display for BookingEventId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PresenceEvent {
+    Enter,
+    Leave,
+}
+
+impl FromStr for PresenceEvent {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "enter" => Ok(Self::Enter),
+            "leave" => Ok(Self::Leave),
+            _ => Err(ParseError::InvalidPresenceEvent(s.to_string())),
+        }
+    }
+}
+
+impl Display for PresenceEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Enter => write!(f, "enter"),
+            Self::Leave => write!(f, "leave"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, DeserializeFromStr, SerializeDisplay)]
+pub enum EventId {
+    Booking(BookingEventId),
+    Presence(TenantId, PresenceEvent),
+    Alert(AlertId),
+}
+
+impl FromStr for EventId {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some((prefix, remaining)) = s.split_once(":") {
+            match prefix {
+                "bookings" => Ok(EventId::Booking(remaining.to_owned().into())),
+                "presence" => {
+                    if let Some((tenant_id, event)) = remaining.split_once(":") {
+                        Ok(EventId::Presence(
+                            tenant_id.to_owned().into(),
+                            PresenceEvent::from_str(event)?,
+                        ))
+                    } else {
+                        Err(ParseError::EventPresenceType(remaining.to_owned()))
+                    }
+                }
+                "alerts" => Ok(EventId::Alert(remaining.to_owned().into())),
+                _ => Err(ParseError::EventType(s.to_owned())),
+            }
+        } else {
+            Err(ParseError::EventType(s.to_owned()))
+        }
+    }
+}
+
+impl Display for EventId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Booking(id) => write!(f, "bookings:{}", id),
+            Self::Presence(tenant_id, event) => write!(f, "presence:{}:{}", tenant_id, event),
+            Self::Alert(id) => write!(f, "alerts:{}", id),
+        }
     }
 }
 
@@ -280,4 +427,12 @@ pub enum ParseError {
     Endpoint(String),
     #[error("Invalid endpoint reference value: {0}")]
     EndpointRef(String),
+    #[error("Invalid presence event: {0}")]
+    InvalidPresenceEvent(String),
+    #[error("Invalid event type: {0}")]
+    EventType(String),
+    #[error("Invalid presence event type: {0}")]
+    EventPresenceType(String),
+    #[error("Expecting Z2M device reference")]
+    NotZ2mDeviceId,
 }

@@ -18,7 +18,7 @@ use reqwest::multipart::{Form, Part};
 use serde::Serialize;
 use tokio::sync::broadcast;
 
-use crate::callback::EventStateCallback;
+use crate::callback::LifecycleEventCallback;
 use crate::client::DxeClient;
 use crate::config::telemetry::{Config, Table, TableClass};
 use crate::services::table_manager::TableManager;
@@ -257,27 +257,15 @@ impl TelemetryManager {
 }
 
 #[async_trait::async_trait]
-impl EventStateCallback<BookingWithUsers> for TelemetryManager {
-    async fn on_event_start(
-        self: Arc<Self>,
-        event: &BookingWithUsers,
-        buffered: bool,
-    ) -> Result<(), Box<dyn StdError>> {
-        if !buffered {
-            let _ = self.event_state_handler.send((event.booking.id, true));
-        }
+impl LifecycleEventCallback<BookingWithUsers> for TelemetryManager {
+    async fn on_start(self: Arc<Self>, event: &BookingWithUsers) -> Result<(), Box<dyn StdError>> {
+        let _ = self.event_state_handler.send((event.booking.id, true));
 
         Ok(())
     }
 
-    async fn on_event_end(
-        self: Arc<Self>,
-        event: &BookingWithUsers,
-        buffered: bool,
-    ) -> Result<(), Box<dyn StdError>> {
-        if !buffered {
-            let _ = self.event_state_handler.send((event.booking.id, false));
-        }
+    async fn on_end(self: Arc<Self>, event: &BookingWithUsers) -> Result<(), Box<dyn StdError>> {
+        let _ = self.event_state_handler.send((event.booking.id, false));
 
         Ok(())
     }

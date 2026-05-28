@@ -9,21 +9,21 @@ use dxe_s2s_shared::entities::BookingWithUsers;
 use dxe_s2s_shared::handlers::{GetMixerConfigResponse, UpdateMixerConfigRequest};
 use dxe_types::entities::MixerPresets;
 use dxe_types::{BookingId, IdentityId, UnitId};
+use futures::StreamExt;
 use parking_lot::Mutex;
 use rumqttc::Publish;
 use serde::Serialize;
 use tokio::task::JoinHandle;
-use tokio_task_scheduler::{Scheduler, Task, TaskBuilder, TaskStatus};
+use tokio_task_scheduler::{Task, TaskBuilder};
 
-use crate::callback::{AlertCallback, EventStateCallback};
+use crate::callback::LifecycleEventCallback;
 use crate::client::DxeClient;
-use crate::config::osd::{AlertConfig, AlertKind, Config as OsdConfig};
+use crate::config::osd::Config as OsdConfig;
+use crate::events::{Event, EventSender};
 use crate::services::mqtt::{Error as MqttError, MqttService, MqttTopicPrefix};
-use crate::tasks::osd_controller::topics::DoorLockOpenResult;
-use crate::tasks::unit_fetcher::UnitsState;
-use crate::types::AlertId;
-
-type BookingEntry = (Option<types::Booking>, HashSet<BookingId>);
+use crate::tasks::osd_controller::topics::{Alert, DoorLockOpenResult};
+use crate::tasks::osd_controller::types::AlertData;
+use crate::types::EventId;
 
 pub trait OsdTopic: Serialize {
     fn topic_name(&self) -> String;
@@ -32,40 +32,41 @@ pub trait OsdTopic: Serialize {
 #[derive(Debug)]
 pub struct OsdController {
     client: DxeClient,
-    scheduler: Scheduler,
     mqtt_service: MqttService,
 
     topic_prefix: MqttTopicPrefix,
-    alerts: Vec<AlertConfig>,
+    alerts: HashMap<EventId, Vec<AlertData>>,
     mixer_configs: HashMap<UnitId, MixerPresets>,
-    doorbell_alert_id: Option<AlertId>,
+    doorbell_event_id: Option<EventId>,
 
-    units: UnitsState,
-    current_bookings: Mutex<HashMap<UnitId, BookingEntry>>,
-    sign_off_tasks: Mutex<Vec<String>>,
+    event_receiver: Mutex<Option<JoinHandle<()>>>,
+    active_sessions: Mutex<HashMap<UnitId, HashSet<BookingId>>>,
 }
 
 impl OsdController {
-    pub fn new(
-        client: DxeClient,
-        mqtt_service: MqttService,
-        units: UnitsState,
-        scheduler: Scheduler,
-        config: &OsdConfig,
-    ) -> Self {
+    pub fn new(client: DxeClient, mqtt_service: MqttService, config: &OsdConfig) -> Self {
+        let mut alerts: HashMap<EventId, Vec<AlertData>> = HashMap::new();
+
+        for alert in config.alerts.iter() {
+            for event_id in alert.event_ids.iter() {
+                alerts
+                    .entry(event_id.clone())
+                    .or_default()
+                    .push(alert.data.clone());
+            }
+        }
+
         Self {
             client,
-            scheduler,
             mqtt_service,
 
             topic_prefix: config.topic_prefix.clone(),
-            alerts: config.alerts.clone(),
+            alerts,
             mixer_configs: config.mixers.clone(),
-            doorbell_alert_id: config.doorbell_alert_id.clone(),
+            doorbell_event_id: config.doorbell_event_id.clone(),
 
-            units,
-            current_bookings: Mutex::new(HashMap::new()),
-            sign_off_tasks: Mutex::new(Vec::new()),
+            event_receiver: Mutex::new(None),
+            active_sessions: Mutex::new(HashMap::new()),
         }
     }
 
@@ -163,17 +164,13 @@ impl OsdController {
     }
 
     async fn push_current_states(&self) {
-        let bookings_per_units = self.current_bookings.lock().clone();
-        for (unit_id, (booking, ids)) in bookings_per_units {
+        let bookings_per_units = self.active_sessions.lock().clone();
+        for (unit_id, booking_ids) in bookings_per_units {
             let _ = self
                 .publish(&topics::SetScreenState {
                     unit_id: unit_id.clone(),
-                    is_active: !ids.is_empty(),
+                    is_active: !booking_ids.is_empty(),
                 })
-                .await;
-
-            let _ = self
-                .publish(&topics::CurrentSession { unit_id, booking })
                 .await;
         }
     }
@@ -194,17 +191,18 @@ impl OsdController {
             }
         };
 
-        let prefs = prefs
-            .map(|v| types::MixerPreferences::from(v))
-            .unwrap_or_else(|| types::MixerPreferences {
-                default: self
-                    .mixer_configs
-                    .get(&unit_id)
-                    .cloned()
-                    .unwrap_or_else(Default::default)
-                    .into(),
-                scenes: Default::default(),
-            });
+        let prefs =
+            prefs
+                .map(types::MixerPreferences::from)
+                .unwrap_or_else(|| types::MixerPreferences {
+                    default: self
+                        .mixer_configs
+                        .get(&unit_id)
+                        .cloned()
+                        .unwrap_or_else(Default::default)
+                        .into(),
+                    scenes: Default::default(),
+                });
 
         let topic = topics::SetMixerPreferences {
             unit_id: unit_id.clone(),
@@ -218,23 +216,12 @@ impl OsdController {
 
     async fn update(self: Arc<Self>) {
         self.push_current_states().await;
-
-        let mut tasks_to_retain = vec![];
-        let sign_off_tasks = self.sign_off_tasks.lock().clone();
-        for task in sign_off_tasks {
-            if matches!(
-                self.scheduler.get_task_status(&task).await,
-                Ok(TaskStatus::Completed)
-            ) {
-                let _ = self.scheduler.remove(&task).await;
-            } else {
-                tasks_to_retain.push(task);
-            }
-        }
-        *self.sign_off_tasks.lock() = tasks_to_retain;
     }
 
-    pub async fn task(self) -> Result<(Arc<Self>, JoinHandle<()>, Task), Error> {
+    pub async fn start(
+        self,
+        event_sender: EventSender,
+    ) -> Result<(Arc<Self>, JoinHandle<()>, Task), Error> {
         self.mqtt_service
             .subscribe(&self.topic_prefix.topic("doorlock/set"))
             .await?;
@@ -251,6 +238,58 @@ impl OsdController {
                 arc_self_inner.clone().handle_message(message).await;
             }
         });
+
+        let mut receiver = event_sender.subscribe(arc_self.alerts.keys().cloned());
+        let arc_self_inner = arc_self.clone();
+        let event_receiver_task = tokio::task::spawn(async move {
+            while let Some(item) = receiver.next().await {
+                if let Ok((event_id, event)) = item {
+                    if let Some(doorbell_event_id) = &arc_self_inner.doorbell_event_id
+                        && &event_id == doorbell_event_id
+                    {
+                        if let Err(e) = arc_self_inner
+                            .publish(&topics::DoorbellRequest { unit_id: None })
+                            .await
+                        {
+                            log::error!("Could not publish doorbell request: {e}");
+                        }
+                    } else if let Some(alerts) = arc_self_inner.clone().alerts.get(&event_id) {
+                        let unit_ids = match event {
+                            Event::Alert { unit_ids, .. } => unit_ids,
+                            Event::Booking { booking } => {
+                                Some(HashSet::from([booking.booking.unit_id.clone()]))
+                            }
+                            _ => None,
+                        }
+                        .unwrap_or_else(|| {
+                            arc_self_inner
+                                .clone()
+                                .active_sessions
+                                .lock()
+                                .keys()
+                                .cloned()
+                                .collect()
+                        });
+                        for unit_id in unit_ids {
+                            for alert in alerts.iter() {
+                                if let Err(e) = arc_self_inner
+                                    .publish(&Alert {
+                                        unit_id: unit_id.clone(),
+                                        alert: Some(alert.clone()),
+                                    })
+                                    .await
+                                {
+                                    log::error!(
+                                        "Could not send notification for event {event_id}: {e}"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        *arc_self.clone().event_receiver.lock() = Some(event_receiver_task);
 
         let arc_self_inner = arc_self.clone();
         let task = TaskBuilder::new("osd_controller", move || {
@@ -269,259 +308,88 @@ impl OsdController {
 }
 
 #[async_trait::async_trait]
-impl AlertCallback for OsdController {
-    async fn on_alert(&self, alert_id: AlertId, started: bool) -> Result<(), Box<dyn StdError>> {
-        if let Some(doorbell_alert_id) = &self.doorbell_alert_id
-            && doorbell_alert_id == &alert_id
+impl LifecycleEventCallback<BookingWithUsers> for OsdController {
+    async fn on_start(self: Arc<Self>, event: &BookingWithUsers) -> Result<(), Box<dyn StdError>> {
+        if let Err(e) = self
+            .publish(&topics::SetScreenState {
+                unit_id: event.booking.unit_id.clone(),
+                is_active: true,
+            })
+            .await
         {
-            if let Err(e) = self
-                .publish(&topics::DoorbellRequest { unit_id: None })
-                .await
-            {
-                log::warn!("Could not publish doorbell alert: {e}");
-            }
-            return Ok(());
+            log::warn!("Could not send SetScreenState to OSD: {e}");
         }
 
-        for (alert, unit_id) in self.alerts.iter().filter_map(|v| {
-            if let AlertKind::Alert { alert_id: id } = &v.kind
-                && &alert_id == id
-            {
-                Some((v.data.clone(), v.unit_id.clone()))
-            } else {
-                None
-            }
-        }) {
-            for available_unit_id in self.units.get() {
-                let alert = if started { Some(alert.clone()) } else { None };
+        self.clone()
+            .send_mixer_states(event.booking.unit_id.clone(), event.booking.customer_id)
+            .await;
 
-                if unit_id.as_ref().is_none_or(|v| v == &available_unit_id)
-                    && let Err(e) = self
-                        .publish(&topics::Alert {
-                            unit_id: available_unit_id.clone(),
-                            alert,
-                        })
-                        .await
-                {
-                    log::warn!("Could not publish alert {alert_id} on {available_unit_id}: {e}");
-                }
-            }
+        let booking = types::Booking {
+            booking_id: event.booking.id,
+            customer_id: event.booking.customer_id,
+            customer_name: event.booking.customer_name.clone(),
+            time_from: event.booking.date_start.to_utc(),
+            time_to: event.booking.date_end.to_utc(),
+        };
+
+        self.clone()
+            .send_mixer_states(event.booking.unit_id.clone(), event.booking.customer_id)
+            .await;
+
+        if let Err(e) = self
+            .publish(&topics::CurrentSession {
+                unit_id: event.booking.unit_id.clone(),
+                booking: Some(booking.clone()),
+            })
+            .await
+        {
+            log::warn!("Could not send current session to OSD: {e}");
         }
+
+        self.clone()
+            .active_sessions
+            .lock()
+            .entry(event.booking.unit_id.clone())
+            .or_default()
+            .insert(event.booking.id);
 
         Ok(())
     }
-}
 
-#[async_trait::async_trait]
-impl EventStateCallback<BookingWithUsers> for OsdController {
-    async fn on_event_start(
-        self: Arc<Self>,
-        event: &BookingWithUsers,
-        buffered: bool,
-    ) -> Result<(), Box<dyn StdError>> {
-        if buffered {
-            if let Err(e) = self
-                .publish(&topics::SetScreenState {
+    async fn on_end(self: Arc<Self>, event: &BookingWithUsers) -> Result<(), Box<dyn StdError>> {
+        let count = {
+            let active_sessions = self.active_sessions.lock();
+            active_sessions
+                .get(&event.booking.unit_id)
+                .map(|v| v.len())
+                .unwrap_or_default()
+        };
+
+        if count == 0 {
+            let _ = self
+                .publish(&topics::Alert {
                     unit_id: event.booking.unit_id.clone(),
-                    is_active: true,
+                    alert: None,
                 })
-                .await
-            {
-                log::warn!("Could not send SetScreenState to OSD: {e}");
-            }
-
-            if self
-                .current_bookings
-                .lock()
-                .entry(event.booking.unit_id.clone())
-                .or_default()
-                .1
-                .is_empty()
-            {
-                self.clone()
-                    .send_mixer_states(event.booking.unit_id.clone(), event.booking.customer_id)
-                    .await;
-
-                if let Some(on_sign_in) = self.alerts.iter().find(|v| {
-                    matches!(v.kind, AlertKind::OnSignOn)
-                        && v.unit_id
-                            .as_ref()
-                            .is_none_or(|unit_id| unit_id == &event.booking.unit_id)
-                }) && let Err(e) = self
-                    .publish(&topics::Alert {
-                        unit_id: event.booking.unit_id.clone(),
-                        alert: Some(on_sign_in.data.clone()),
-                    })
-                    .await
-                {
-                    log::warn!("Could not send sign in alert to OSD: {e}");
-                }
-            }
-
-            self.current_bookings
-                .lock()
-                .get_mut(&event.booking.unit_id)
-                .unwrap()
-                .1
-                .insert(event.booking.id);
-        } else {
-            let booking = types::Booking {
-                booking_id: event.booking.id,
-                customer_id: event.booking.customer_id,
-                customer_name: event.booking.customer_name.clone(),
-                time_from: event.booking.date_start.to_utc(),
-                time_to: event.booking.date_end.to_utc(),
-            };
-
-            if self
-                .current_bookings
-                .lock()
-                .entry(event.booking.unit_id.clone())
-                .or_default()
-                .1
-                .len()
-                > 1
-            {
-                self.clone()
-                    .send_mixer_states(event.booking.unit_id.clone(), event.booking.customer_id)
-                    .await;
-
-                if let Some(on_sign_in) = self.alerts.iter().find(|v| {
-                    matches!(v.kind, AlertKind::OnSignOn)
-                        && v.unit_id
-                            .as_ref()
-                            .is_none_or(|unit_id| unit_id == &event.booking.unit_id)
-                }) && let Err(e) = self
-                    .publish(&topics::Alert {
-                        unit_id: event.booking.unit_id.clone(),
-                        alert: Some(on_sign_in.data.clone()),
-                    })
-                    .await
-                {
-                    log::warn!("Could not send sign in alert to OSD: {e}");
-                }
-            }
-
-            if let Err(e) = self
+                .await;
+            let _ = self
                 .publish(&topics::CurrentSession {
                     unit_id: event.booking.unit_id.clone(),
-                    booking: Some(booking.clone()),
+                    booking: None,
                 })
-                .await
-            {
-                log::warn!("Could not send current session to OSD: {e}");
-            }
-
-            self.current_bookings
-                .lock()
-                .entry(event.booking.unit_id.clone())
-                .or_default()
-                .0 = Some(booking);
-
-            if let Some((on_sign_off, before)) = self.alerts.iter().find_map(|v| {
-                if let AlertKind::OnSignOff { before } = v.kind
-                    && v.unit_id
-                        .as_ref()
-                        .is_none_or(|unit_id| unit_id == &event.booking.unit_id)
-                {
-                    Some((v, before))
-                } else {
-                    None
-                }
-            }) {
-                let arc_self = self.clone();
-                let unit_id = event.booking.unit_id.clone();
-                let time = event.booking.date_end.to_utc() - before;
-                let task_name = format!("osd_sign_off_notification_{unit_id}");
-                let on_sign_off = on_sign_off.data.clone();
-                let task = move || {
-                    let arc_self = self.clone();
-                    let unit_id = unit_id.clone();
-                    let on_sign_off = on_sign_off.clone();
-                    tokio::task::spawn(async move {
-                        if let Err(e) = arc_self
-                            .publish(&topics::Alert {
-                                unit_id,
-                                alert: Some(on_sign_off),
-                            })
-                            .await
-                        {
-                            log::warn!("Could not send sign off alert to OSD: {e}");
-                        }
-                    });
-                    Ok(())
-                };
-                let task = TaskBuilder::new(&task_name, task)
-                    .daily()
-                    .at(time.format("%H:%M:%S").to_string().as_str())
-                    .unwrap()
-                    .build();
-
-                log::info!(
-                    "Scheduling sign off notification task at {}",
-                    time.format("%H:%M:%S")
-                );
-
-                arc_self.sign_off_tasks.lock().push(task.id().to_owned());
-                let _ = arc_self.scheduler.add_task(task).await;
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn on_event_end(
-        self: Arc<Self>,
-        event: &BookingWithUsers,
-        buffered: bool,
-    ) -> Result<(), Box<dyn StdError>> {
-        if !buffered {
-            let remaining_count = self
-                .current_bookings
-                .lock()
-                .get(&event.booking.unit_id)
-                .unwrap()
-                .1
-                .len();
-
-            if remaining_count == 1 {
-                let _ = self
-                    .publish(&topics::Alert {
-                        unit_id: event.booking.unit_id.clone(),
-                        alert: None,
-                    })
-                    .await;
-                let _ = self
-                    .publish(&topics::CurrentSession {
-                        unit_id: event.booking.unit_id.clone(),
-                        booking: None,
-                    })
-                    .await;
-                let _ = self
-                    .publish(&topics::SetScreenState {
-                        unit_id: event.booking.unit_id.clone(),
-                        is_active: false,
-                    })
-                    .await;
-                let _ = self
-                    .publish(&topics::ParkingStates {
-                        unit_id: event.booking.unit_id.clone(),
-                        states: vec![],
-                    })
-                    .await;
-                self.current_bookings
-                    .lock()
-                    .get_mut(&event.booking.unit_id)
-                    .unwrap()
-                    .0 = None;
-            }
-        } else {
-            self.current_bookings
-                .lock()
-                .get_mut(&event.booking.unit_id)
-                .unwrap()
-                .1
-                .remove(&event.booking.id);
+                .await;
+            let _ = self
+                .publish(&topics::SetScreenState {
+                    unit_id: event.booking.unit_id.clone(),
+                    is_active: false,
+                })
+                .await;
+            let _ = self
+                .publish(&topics::ParkingStates {
+                    unit_id: event.booking.unit_id.clone(),
+                    states: vec![],
+                })
+                .await;
         }
 
         Ok(())

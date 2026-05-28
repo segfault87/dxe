@@ -5,7 +5,7 @@ pub mod handlers;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize, de};
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Timestamp(DateTime<Utc>);
 
 impl Timestamp {

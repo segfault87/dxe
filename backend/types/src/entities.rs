@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::MixerChannelId;
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct MixerChannelData {
     pub level: Option<f64>,
@@ -25,7 +27,7 @@ pub struct MixerGlobalData {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct MixerPresets {
-    pub channels: Vec<MixerChannelData>,
+    pub channels: HashMap<MixerChannelId, MixerChannelData>,
     pub globals: MixerGlobalData,
 }
 

@@ -1,6 +1,8 @@
 mod callback;
 mod client;
 mod config;
+mod device;
+mod events;
 mod services;
 mod tables;
 mod tasks;
@@ -11,11 +13,13 @@ use clap::Parser;
 
 use crate::client::DxeClient;
 use crate::config::Config;
+use crate::events::EventSender;
 use crate::services::carpark_exemption::CarparkExemptionService;
 use crate::services::mqtt::MqttService;
 use crate::services::notification::NotificationService;
 use crate::services::table_manager::TableManager;
 use crate::tasks::TaskContext;
+use crate::tasks::action_controller::{ActionController, DeviceController};
 use crate::tasks::alert_publisher::AlertPublisher;
 use crate::tasks::audio_recorder::AudioRecorder;
 use crate::tasks::booking_reminder::BookingReminder;
@@ -60,19 +64,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut task_context = TaskContext::new().await?;
 
-    let (booking_states, mut booking_state_manager) =
-        BookingStateManager::new(client.clone(), task_context.scheduler.clone());
+    let event_sender = EventSender::new();
 
-    let (mut presence_monitor, presence_state) =
-        PresenceMonitor::new(&config.presence_monitor).await;
+    let booking_state_manager = BookingStateManager::new(
+        &config.events.bookings,
+        event_sender.clone(),
+        client.clone(),
+        task_context.scheduler.clone(),
+    );
 
-    let mut alert_publisher =
-        AlertPublisher::new(config.alerts.iter(), presence_state.lock().is_present);
+    let presence_monitor =
+        PresenceMonitor::new(&config.presence_monitor, event_sender.clone()).await;
+    let alert_publisher = AlertPublisher::new(&config.events.alerts, event_sender.clone());
+
+    let action_controller = ActionController::new(config.triggers.clone());
 
     let (mqtt_service, mqtt_service_task) = MqttService::new(&config.mqtt);
 
-    let mut z2m_controller =
-        Z2mController::new(&config.z2m, mqtt_service.clone(), presence_state.clone());
+    let mut z2m_controller = Z2mController::new(&config.z2m, mqtt_service.clone());
     z2m_controller.start().await;
 
     let (sound_meter_controller, sound_meter_tasks) =
@@ -84,22 +93,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         z2m_controller.publisher(),
         sound_meter_controller.publisher(),
         metrics_publisher.publisher(),
+        presence_monitor.publisher(),
+        booking_state_manager.publisher(),
     );
 
-    metrics_publisher.start(table_manager.clone());
+    let booking_reminder = BookingReminder::new(client.clone());
 
-    let osd_controller = OsdController::new(
-        client.clone(),
-        mqtt_service.clone(),
-        unit_fetcher.state(),
-        task_context.scheduler.clone(),
-        &config.osd,
-    );
+    let osd_controller = OsdController::new(client.clone(), mqtt_service.clone(), &config.osd);
 
     let telemetry_manager =
         TelemetryManager::new(&config.telemetry, client.clone(), table_manager.clone())?;
 
     let (z2m_controller, z2m_consumer_task, z2m_controller_task) = z2m_controller.task();
+    let mut device_controller =
+        DeviceController::new(booking_reminder.clone(), z2m_controller.clone());
+
+    metrics_publisher.start(table_manager.clone());
 
     let audio_recorder = AudioRecorder::new(
         &config.google_apis,
@@ -110,43 +119,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
     let (audio_recorder, audio_recorder_task) = audio_recorder.task();
 
-    let (osd_controller, osd_message_handler_task, osd_task) = osd_controller.task().await?;
+    let (osd_controller, osd_message_handler_task, osd_task) =
+        osd_controller.start(event_sender.clone()).await?;
 
-    let notification_publisher = NotificationPublisher::new(
+    let _alert_publisher = alert_publisher.start(table_manager.clone());
+
+    let _notification_publisher = NotificationPublisher::new(
         notification_service.clone(),
         config.notifications.alerts.iter(),
-    );
+    )
+    .start(event_sender.clone());
 
-    alert_publisher.add_callback(osd_controller.clone());
-    alert_publisher.add_callback(notification_publisher.clone());
+    device_controller.add_booking_state_callback(audio_recorder);
+    device_controller.add_booking_state_callback(telemetry_manager.clone());
+    device_controller.add_osd_state_callback(osd_controller.clone());
 
-    let alert_publisher = alert_publisher.start(table_manager.clone());
+    let device_controller = device_controller.build();
 
-    let booking_reminder = BookingReminder::new(client.clone());
-
-    booking_state_manager.add_callback(alert_publisher.clone());
-    booking_state_manager.add_callback(z2m_controller.clone());
-    booking_state_manager.add_callback(audio_recorder);
-    booking_state_manager.add_callback(telemetry_manager.clone());
-    booking_state_manager.add_callback(osd_controller.clone());
-    booking_state_manager.add_callback(booking_reminder);
-
-    presence_monitor.add_callback(alert_publisher.clone());
-    presence_monitor.add_callback(z2m_controller);
+    action_controller
+        .start(
+            device_controller,
+            event_sender.clone(),
+            table_manager.clone(),
+        )
+        .await;
 
     if let Some(carpark_exemption) = &config.carpark_exemption {
         let carpark_exempter = CarparkExempter::new(
             client.clone(),
-            booking_states.clone(),
             CarparkExemptionService::new(carpark_exemption),
             osd_controller.clone(),
             notification_service.clone(),
             unit_fetcher.state(),
+            booking_state_manager.get_states(),
         );
 
-        let (carpark_exempter, task) = carpark_exempter.task();
+        let (_carpark_exempter, task) = carpark_exempter.task();
 
-        booking_state_manager.add_callback(carpark_exempter);
         task_context.add_task(task).await?;
     }
 

@@ -14,10 +14,8 @@ pub struct Unit {
 pub struct Booking {
     pub id: BookingId,
     pub unit_id: UnitId,
-    pub date_start_w_buffer: Timestamp,
     pub date_start: Timestamp,
     pub date_end: Timestamp,
-    pub date_end_w_buffer: Timestamp,
     pub customer_id: IdentityId,
     pub customer_name: String,
 }

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use chrono::{DateTime, TimeDelta, Utc};
@@ -12,6 +13,7 @@ use crate::tables::{QualifiedPath, TablePublisher};
 use crate::types::{Endpoint, EventId, PresenceEvent, PresenceRef, PublishKey, TenantId};
 
 static PUBLISH_KEY_IS_PRESENT: PublishKey = PublishKey::new_const("is_present");
+static PUBLISH_KEY_COUNT: PublishKey = PublishKey::new_const("count");
 
 pub struct PresencePath;
 
@@ -39,6 +41,7 @@ pub struct PresenceMonitor {
     identities: HashMap<TenantId, PresenceIdentityConfig>,
     away_interval: TimeDelta,
     table: TablePublisher<PresenceRef, Endpoint, PresencePath>,
+    tenant_count: AtomicUsize,
 }
 
 impl PresenceMonitor {
@@ -52,6 +55,7 @@ impl PresenceMonitor {
             identities: config.identities.clone(),
             away_interval: config.away_interval,
             table: TablePublisher::new(),
+            tenant_count: AtomicUsize::new(0),
         };
 
         monitor.ping().await;
@@ -105,6 +109,8 @@ impl PresenceMonitor {
                             PUBLISH_KEY_IS_PRESENT.clone(),
                             serde_json::Value::Bool(true),
                         );
+                        self.tenant_count
+                            .update(Ordering::Release, Ordering::Acquire, |v| v + 1);
                     }
 
                     return;
@@ -151,7 +157,16 @@ impl PresenceMonitor {
                     PUBLISH_KEY_IS_PRESENT.clone(),
                     serde_json::Value::Bool(false),
                 );
+                self.tenant_count
+                    .update(Ordering::Release, Ordering::Acquire, |v| v - 1);
             }
+
+            let tenants = self.tenant_count.load(Ordering::Relaxed);
+            self.table.update_value(
+                PresenceRef::Global,
+                PUBLISH_KEY_COUNT.clone(),
+                serde_json::Value::Number(serde_json::Number::from(tenants)),
+            );
         }
     }
 

@@ -108,8 +108,6 @@ impl RecorderProcess {
             if let Some((mut subscription, publish_key, threshold)) = sound_meter_subscription {
                 let presence_flag = Arc::new(Mutex::new(None));
 
-                let mut flag = false;
-
                 let cloned_presence_flag = presence_flag.clone();
                 let task = tokio::task::spawn(async move {
                     while let Some(Ok(table)) = subscription.next().await {
@@ -117,10 +115,7 @@ impl RecorderProcess {
                             && let Some(value) = value.as_f64()
                         {
                             if value >= threshold {
-                                if !flag {
-                                    *cloned_presence_flag.clone().lock() = Some(true);
-                                    flag = true;
-                                }
+                                *cloned_presence_flag.clone().lock() = Some(true);
                             } else if cloned_presence_flag.lock().is_none() {
                                 *cloned_presence_flag.clone().lock() = Some(false);
                             }

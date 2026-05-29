@@ -247,7 +247,7 @@ impl BookingStateManager {
                 .extract_if(|k, v| {
                     if matches!(v.r#type, BookingEventType::OnEnd)
                         && v.time - now
-                            < self
+                            <= self
                                 .offsets
                                 .get(&v.booking.booking.unit_id)
                                 .map(|v| v.1)

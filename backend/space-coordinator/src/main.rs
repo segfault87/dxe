@@ -71,6 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         event_sender.clone(),
         client.clone(),
         task_context.scheduler.clone(),
+        unit_fetcher.state(),
     );
 
     let presence_monitor =

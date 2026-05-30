@@ -14,6 +14,7 @@ use crate::client::DxeClient;
 use crate::config::events::{BookingEventConfig, BookingEventType};
 use crate::events::{Event, EventSender};
 use crate::tables::{QualifiedPath, TablePublisher};
+use crate::tasks::unit_fetcher::UnitsState;
 use crate::types::{BookingEventId, Endpoint, EventId, PublishKey};
 
 static PUBLISH_KEY_IS_ACTIVE: PublishKey = PublishKey::new_const("is_active");
@@ -51,6 +52,7 @@ struct BookingTask {
 pub struct BookingStateManager {
     config: HashMap<BookingEventId, BookingEventConfig>,
     offsets: HashMap<UnitId, (TimeDelta, TimeDelta)>,
+    units: UnitsState,
 
     event_sender: EventSender,
     scheduler: Scheduler,
@@ -67,11 +69,12 @@ impl BookingStateManager {
         event_sender: EventSender,
         client: DxeClient,
         scheduler: Scheduler,
+        units: UnitsState,
     ) -> Self {
         let mut offsets = HashMap::new();
 
-        for config in config.values() {
-            for unit_id in config.unit_ids.iter() {
+        for unit_id in units.get() {
+            for config in config.values() {
                 let entry: &mut (TimeDelta, TimeDelta) =
                     offsets.entry(unit_id.clone()).or_default();
                 match config.r#type {
@@ -92,6 +95,7 @@ impl BookingStateManager {
         Self {
             config: config.clone(),
             offsets,
+            units,
             event_sender,
             scheduler,
             client,
@@ -106,7 +110,7 @@ impl BookingStateManager {
     }
 
     async fn update(self: Arc<Self>) {
-        let response = match self
+        let mut response = match self
             .client
             .get::<GetBookingsResponse>(
                 "/pending-bookings",
@@ -122,6 +126,10 @@ impl BookingStateManager {
         };
 
         let now = Utc::now();
+
+        for unit_id in self.units.get() {
+            response.bookings.entry(unit_id).or_default();
+        }
 
         let mut current_entries: HashMap<BookingId, BookingWithUsers> = HashMap::new();
         let mut tasks: HashMap<BookingTaskKey, BookingTask> = HashMap::new();

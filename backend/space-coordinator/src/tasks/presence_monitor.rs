@@ -158,7 +158,9 @@ impl PresenceMonitor {
                     serde_json::Value::Bool(false),
                 );
                 self.tenant_count
-                    .update(Ordering::Release, Ordering::Acquire, |v| v - 1);
+                    .update(Ordering::Release, Ordering::Acquire, |v| {
+                        if v > 0 { v - 1 } else { 0 }
+                    });
             }
 
             let tenants = self.tenant_count.load(Ordering::Relaxed);

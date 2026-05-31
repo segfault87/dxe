@@ -375,13 +375,16 @@ impl LifecycleEventCallback<BookingWithUsers> for OsdController {
     }
 
     async fn on_end(self: Arc<Self>, event: &BookingWithUsers) -> Result<(), Box<dyn StdError>> {
-        let empty = if let Some(booking) = self.active_sessions.lock().get(&event.booking.unit_id)
-            && booking.booking.id == event.booking.id
-        {
-            self.active_sessions.lock().remove(&event.booking.unit_id);
-            true
-        } else {
-            false
+        let empty = {
+            let mut active_sessions = self.active_sessions.lock();
+            if let Some(booking) = active_sessions.get(&event.booking.unit_id)
+                && booking.booking.id == event.booking.id
+            {
+                active_sessions.remove(&event.booking.unit_id);
+                true
+            } else {
+                false
+            }
         };
 
         if empty {

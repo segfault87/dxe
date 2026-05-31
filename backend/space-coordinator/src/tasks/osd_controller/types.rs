@@ -38,6 +38,18 @@ pub struct Booking {
     pub time_to: DateTime<Utc>,
 }
 
+impl From<dxe_s2s_shared::entities::Booking> for Booking {
+    fn from(value: dxe_s2s_shared::entities::Booking) -> Self {
+        Self {
+            booking_id: value.id,
+            customer_id: value.customer_id,
+            customer_name: value.customer_name.clone(),
+            time_from: value.date_start.to_utc(),
+            time_to: value.date_end.to_utc(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ParkingState {

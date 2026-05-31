@@ -8,7 +8,7 @@ use std::sync::Arc;
 use dxe_s2s_shared::entities::BookingWithUsers;
 use dxe_s2s_shared::handlers::{GetMixerConfigResponse, UpdateMixerConfigRequest};
 use dxe_types::entities::MixerPresets;
-use dxe_types::{BookingId, IdentityId, UnitId};
+use dxe_types::{IdentityId, UnitId};
 use futures::StreamExt;
 use parking_lot::Mutex;
 use rumqttc::Publish;
@@ -23,6 +23,7 @@ use crate::events::{Event, EventSender};
 use crate::services::mqtt::{Error as MqttError, MqttService, MqttTopicPrefix};
 use crate::tasks::osd_controller::topics::{Alert, DoorLockOpenResult};
 use crate::tasks::osd_controller::types::AlertData;
+use crate::tasks::unit_fetcher::UnitsState;
 use crate::types::EventId;
 
 pub trait OsdTopic: Serialize {
@@ -33,6 +34,7 @@ pub trait OsdTopic: Serialize {
 pub struct OsdController {
     client: DxeClient,
     mqtt_service: MqttService,
+    units: UnitsState,
 
     topic_prefix: MqttTopicPrefix,
     alerts: HashMap<EventId, Vec<AlertData>>,
@@ -40,11 +42,16 @@ pub struct OsdController {
     doorbell_event_id: Option<EventId>,
 
     event_receiver: Mutex<Option<JoinHandle<()>>>,
-    active_sessions: Mutex<HashMap<UnitId, HashSet<BookingId>>>,
+    active_sessions: Mutex<HashMap<UnitId, BookingWithUsers>>,
 }
 
 impl OsdController {
-    pub fn new(client: DxeClient, mqtt_service: MqttService, config: &OsdConfig) -> Self {
+    pub fn new(
+        config: &OsdConfig,
+        client: DxeClient,
+        mqtt_service: MqttService,
+        units: UnitsState,
+    ) -> Self {
         let mut alerts: HashMap<EventId, Vec<AlertData>> = HashMap::new();
 
         for alert in config.alerts.iter() {
@@ -59,6 +66,7 @@ impl OsdController {
         Self {
             client,
             mqtt_service,
+            units,
 
             topic_prefix: config.topic_prefix.clone(),
             alerts,
@@ -164,12 +172,20 @@ impl OsdController {
     }
 
     async fn push_current_states(&self) {
-        let bookings_per_units = self.active_sessions.lock().clone();
-        for (unit_id, booking_ids) in bookings_per_units {
+        let bookings = self.active_sessions.lock().clone();
+
+        for unit_id in self.units.get() {
+            let booking = bookings.get(&unit_id);
             let _ = self
                 .publish(&topics::SetScreenState {
                     unit_id: unit_id.clone(),
-                    is_active: !booking_ids.is_empty(),
+                    is_active: booking.is_some(),
+                })
+                .await;
+            let _ = self
+                .publish(&topics::CurrentSession {
+                    unit_id: unit_id.clone(),
+                    booking: booking.map(|v| v.booking.clone().into()),
                 })
                 .await;
         }
@@ -353,23 +369,22 @@ impl LifecycleEventCallback<BookingWithUsers> for OsdController {
         self.clone()
             .active_sessions
             .lock()
-            .entry(event.booking.unit_id.clone())
-            .or_default()
-            .insert(event.booking.id);
+            .insert(event.booking.unit_id.clone(), event.clone());
 
         Ok(())
     }
 
     async fn on_end(self: Arc<Self>, event: &BookingWithUsers) -> Result<(), Box<dyn StdError>> {
-        let count = {
-            let active_sessions = self.active_sessions.lock();
-            active_sessions
-                .get(&event.booking.unit_id)
-                .map(|v| v.len())
-                .unwrap_or_default()
+        let empty = if let Some(booking) = self.active_sessions.lock().get(&event.booking.unit_id)
+            && booking.booking.id == event.booking.id
+        {
+            self.active_sessions.lock().remove(&event.booking.unit_id);
+            true
+        } else {
+            false
         };
 
-        if count == 0 {
+        if empty {
             let _ = self
                 .publish(&topics::Alert {
                     unit_id: event.booking.unit_id.clone(),

@@ -100,7 +100,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let booking_reminder = BookingReminder::new(client.clone());
 
-    let osd_controller = OsdController::new(client.clone(), mqtt_service.clone(), &config.osd);
+    let osd_controller = OsdController::new(
+        &config.osd,
+        client.clone(),
+        mqtt_service.clone(),
+        unit_fetcher.state(),
+    );
 
     let telemetry_manager =
         TelemetryManager::new(&config.telemetry, client.clone(), table_manager.clone())?;

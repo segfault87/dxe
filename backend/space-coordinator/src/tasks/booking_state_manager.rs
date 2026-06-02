@@ -3,7 +3,6 @@ use std::fmt::Display;
 use std::sync::Arc;
 
 use chrono::{DateTime, Local, TimeDelta, Utc};
-use dxe_s2s_shared::Timestamp;
 use dxe_s2s_shared::entities::BookingWithUsers;
 use dxe_s2s_shared::handlers::{BookingType, GetBookingsResponse};
 use dxe_types::{BookingId, UnitId};
@@ -132,7 +131,6 @@ impl BookingStateManager {
 
         let mut current_entries: HashMap<BookingId, BookingWithUsers> = HashMap::new();
         let mut tasks: HashMap<BookingTaskKey, BookingTask> = HashMap::new();
-        let mut prev_entries: HashMap<UnitId, Timestamp> = HashMap::new();
         for (unit_id, mut bookings) in response.bookings.into_iter() {
             let Some((offset_start, offset_end)) = self.offsets.get(&unit_id).cloned() else {
                 continue;
@@ -142,7 +140,7 @@ impl BookingStateManager {
             let mut is_active = false;
             let mut is_active_incl_offsets = false;
 
-            for booking in bookings {
+            for (index, booking) in bookings.iter().enumerate() {
                 let start = booking.booking.date_start.to_utc();
                 let end = booking.booking.date_end.to_utc();
 
@@ -159,8 +157,15 @@ impl BookingStateManager {
                     current_entries.insert(booking.booking.id, booking.clone());
                 }
 
-                let is_continous = if let Some(prev) = prev_entries.get(&unit_id) {
-                    prev == &booking.booking.date_start
+                let is_continuous_prev = if index > 0
+                    && let Some(prev) = bookings.get(index - 1)
+                {
+                    booking.booking.date_start == prev.booking.date_end
+                } else {
+                    false
+                };
+                let is_continuous_next = if let Some(next) = bookings.get(index + 1) {
+                    booking.booking.date_end == next.booking.date_start
                 } else {
                     false
                 };
@@ -211,8 +216,12 @@ impl BookingStateManager {
                     if delta.num_seconds() < 0 || delta.num_days() >= 1 {
                         continue;
                     }
+                    let is_continuous = match config.r#type {
+                        BookingEventType::OnStart => is_continuous_prev,
+                        BookingEventType::OnEnd => is_continuous_next,
+                    };
                     if let Some(continuation) = config.continuation
-                        && continuation != is_continous
+                        && continuation != is_continuous
                     {
                         continue;
                     }
@@ -227,8 +236,6 @@ impl BookingStateManager {
                         },
                     );
                 }
-
-                prev_entries.insert(unit_id.clone(), booking.booking.date_end.clone());
             }
 
             self.table.update_value(
@@ -242,7 +249,6 @@ impl BookingStateManager {
                 serde_json::Value::Bool(is_active_incl_offsets),
             );
         }
-        drop(prev_entries);
 
         *self.booking_entries.lock() = current_entries;
 

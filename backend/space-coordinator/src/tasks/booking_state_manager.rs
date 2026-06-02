@@ -44,7 +44,6 @@ impl Display for BookingTaskKey {
 struct BookingTask {
     booking: BookingWithUsers,
     time: DateTime<Utc>,
-    r#type: BookingEventType,
     is_active: Option<bool>,
     is_active_offset_edge: Option<bool>,
 }
@@ -223,7 +222,6 @@ impl BookingStateManager {
                         BookingTask {
                             booking: booking.clone(),
                             time,
-                            r#type: config.r#type,
                             is_active,
                             is_active_offset_edge,
                         },
@@ -253,13 +251,13 @@ impl BookingStateManager {
 
             pending_tasks
                 .extract_if(|k, v| {
-                    if matches!(v.r#type, BookingEventType::OnEnd)
-                        && v.time - now
-                            <= self
-                                .offsets
-                                .get(&v.booking.booking.unit_id)
-                                .map(|v| v.1)
-                                .unwrap_or_default()
+                    let (offset_s, offset_e) = self
+                        .offsets
+                        .get(&v.booking.booking.unit_id)
+                        .cloned()
+                        .unwrap_or_default();
+                    if now >= v.booking.booking.date_start.to_utc() + offset_s
+                        && v.booking.booking.date_end.to_utc() + offset_e > now
                     {
                         return false;
                     }

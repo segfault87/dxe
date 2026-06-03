@@ -41,6 +41,7 @@ impl Display for BookingTaskKey {
 }
 
 struct BookingTask {
+    task_id: Arc<Mutex<Option<String>>>,
     booking: BookingWithUsers,
     time: DateTime<Utc>,
     is_active: Option<bool>,
@@ -229,6 +230,7 @@ impl BookingStateManager {
                     tasks.insert(
                         BookingTaskKey(event_id.clone(), booking.booking.id),
                         BookingTask {
+                            task_id: Arc::new(Mutex::new(None)),
                             booking: booking.clone(),
                             time,
                             is_active,
@@ -257,16 +259,6 @@ impl BookingStateManager {
 
             pending_tasks
                 .extract_if(|k, v| {
-                    let (offset_s, offset_e) = self
-                        .offsets
-                        .get(&v.booking.booking.unit_id)
-                        .cloned()
-                        .unwrap_or_default();
-                    if now >= v.booking.booking.date_start.to_utc() + offset_s
-                        && v.booking.booking.date_end.to_utc() + offset_e > now
-                    {
-                        return false;
-                    }
                     tasks
                         .get(k)
                         .map(|new_v| new_v.time != v.time)
@@ -275,10 +267,14 @@ impl BookingStateManager {
                 .collect::<HashMap<_, _>>()
         };
 
-        for key in tasks_to_remove.keys() {
+        for (key, value) in tasks_to_remove.iter() {
             let task_name = key.to_string();
-            log::info!("Removing booking task {task_name}...");
-            let _ = Arc::clone(&self).scheduler.remove(task_name.as_str()).await;
+            let task_id = value.task_id.lock().clone();
+            if let Some(task_id) = task_id
+                && let Ok(_) = Arc::clone(&self).scheduler.remove(task_id.as_str()).await
+            {
+                log::info!("Booking task {task_name} removed");
+            }
         }
 
         for (key, value) in tasks
@@ -297,6 +293,7 @@ impl BookingStateManager {
             let key_cloned = key.0.clone();
             let is_active = value.is_active;
             let is_active_offset_edge = value.is_active_offset_edge;
+            let task_id = value.task_id.clone();
             let task = TaskBuilder::new(task_name.as_str(), move || {
                 if let Some(is_active) = is_active {
                     arc_self.clone().table.update_value(
@@ -322,8 +319,16 @@ impl BookingStateManager {
 
                 let scheduler = arc_self.scheduler.clone();
                 let task_name = task_name_cloned.clone();
+                let task_id = task_id.clone();
                 tokio::task::spawn(async move {
-                    let _ = scheduler.remove(task_name.as_str()).await;
+                    let task_id = task_id.lock().clone();
+                    if let Some(task_id) = task_id
+                        && let Err(e) = scheduler.remove(task_id.as_str()).await
+                    {
+                        log::warn!("Could not remove completed task {task_name}: {e}");
+                    } else {
+                        log::info!("Booking task {task_name} complete.");
+                    }
                 });
 
                 Ok(())
@@ -333,8 +338,13 @@ impl BookingStateManager {
             .unwrap()
             .build();
 
-            if let Err(e) = self.scheduler.add_task(task).await {
-                log::error!("Could not schedule {task_name}: {e}");
+            match self.scheduler.add_task(task).await {
+                Ok(id) => {
+                    *value.task_id.lock() = Some(id);
+                }
+                Err(e) => {
+                    log::error!("Could not schedule {task_name}: {e}");
+                }
             }
         }
 

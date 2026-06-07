@@ -64,7 +64,7 @@ impl PresenceMonitor {
     }
 
     async fn ping(&self) {
-        for (tenant_id, config) in self.identities.iter() {
+        'outer: for (tenant_id, config) in self.identities.iter() {
             for address in config.scan_ips.iter() {
                 let address = *address;
                 let result = tokio::task::spawn_blocking(move || {
@@ -113,7 +113,7 @@ impl PresenceMonitor {
                             .update(Ordering::Release, Ordering::Acquire, |v| v + 1);
                     }
 
-                    return;
+                    continue 'outer;
                 }
             }
 
@@ -162,14 +162,14 @@ impl PresenceMonitor {
                         if v > 0 { v - 1 } else { 0 }
                     });
             }
-
-            let tenants = self.tenant_count.load(Ordering::Relaxed);
-            self.table.update_value(
-                PresenceRef::Global,
-                PUBLISH_KEY_COUNT.clone(),
-                serde_json::Value::Number(serde_json::Number::from(tenants)),
-            );
         }
+
+        let tenants = self.tenant_count.load(Ordering::Relaxed);
+        self.table.update_value(
+            PresenceRef::Global,
+            PUBLISH_KEY_COUNT.clone(),
+            serde_json::Value::Number(serde_json::Number::from(tenants)),
+        );
     }
 
     pub fn task(self) -> Task {

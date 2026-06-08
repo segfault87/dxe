@@ -99,7 +99,7 @@ pub async fn post(
                 &now,
                 &id,
                 &session.user_id,
-                Some(&temporary_reservation_id),
+                Some(&new_temporary_reservation_id),
                 None,
                 price,
             )

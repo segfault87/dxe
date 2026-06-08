@@ -22,11 +22,13 @@ export interface CheckRequest {
   timeFrom: DateTime;
   desiredHours: number;
   additionalHours?: number;
+  customerId?: IdentityId;
   excludeBookingId?: BookingId;
   excludeAdhocReservationId?: AdhocReservationId;
 }
 
 export interface CheckResponse {
+  amendReservation?: Booking;
   totalPrice: number;
 }
 

@@ -16,6 +16,119 @@ use crate::utils::is_in_effect;
 
 const MAX_ARBITRARY_DATETIME_RANGE: DateTime<Utc> = DateTime::from_timestamp_nanos(i64::MAX);
 
+pub async fn get_continuous_booking(
+    connection: &mut SqliteConnection,
+    now: &DateTime<Utc>,
+    unit_id: &UnitId,
+    customer_id: &IdentityId,
+    time_from: &DateTime<Utc>,
+    time_to: &DateTime<Utc>,
+) -> Result<Option<Booking>, Error> {
+    let result = sqlx::query!(
+        r#"
+            SELECT
+                b.id AS "b_id: BookingId",
+                b.unit_id AS "b_unit_id: UnitId",
+                hu.id AS "hu_id: UserId",
+                hu.provider AS "hu_provider: IdentityProvider",
+                hu.foreign_id AS "hu_foreign_id",
+                hu.name AS "hu_name",
+                hu.created_at AS "hu_created_at: DateTime<Utc>",
+                hu.deactivated_at AS "hu_deactivated_at: DateTime<Utc>",
+                hu.license_plate_number AS "hu_license_plate_number",
+                ci.discriminator AS "ci_discriminator: IdentityDiscriminator",
+                cu.id AS "cu_id: UserId",
+                cu.provider AS "cu_provider: IdentityProvider",
+                cu.foreign_id AS "cu_foreign_id: String",
+                cu.name AS "cu_name: String",
+                cu.created_at AS "cu_created_at: DateTime<Utc>",
+                cu.deactivated_at AS "cu_deactivated_at: DateTime<Utc>",
+                cu.license_plate_number AS "cu_license_plate_number",
+                cg.id AS "cg_id: GroupId",
+                cg.name AS "cg_name: String",
+                cg.owner_id AS "cg_owner_id: UserId",
+                cg.is_open AS "cg_is_open: bool",
+                cg.created_at AS "cg_created_at: DateTime<Utc>",
+                cg.deleted_at AS "cg_deleted_at: DateTime<Utc>",
+                b.time_from AS "b_time_from: DateTime<Utc>",
+                b.time_to AS "b_time_to: DateTime<Utc>",
+                b.created_at AS "b_created_at: DateTime<Utc>",
+                b.confirmed_at AS "b_confirmed_at: DateTime<Utc>",
+                b.canceled_at AS "b_canceled_at: DateTime<Utc>"
+            FROM booking "b"
+            JOIN user "hu" ON b.holder_id = hu.id
+            JOIN identity "ci" ON b.customer_id = ci.id
+            LEFT OUTER JOIN user "cu" ON
+                ci.discriminator = 'user' AND
+                ci.id = cu.id
+            LEFT OUTER JOIN "group" "cg" ON
+                ci.discriminator = 'group' AND
+                ci.id = cg.id
+            WHERE
+                (time_from = ?1 OR time_to = ?2) AND
+                (canceled_at IS NULL OR canceled_at > ?3) AND
+                unit_id = ?4 AND
+                customer_id = ?5
+            LIMIT 1
+        "#,
+        time_to,
+        time_from,
+        now,
+        unit_id,
+        customer_id
+    )
+    .fetch_optional(&mut *connection)
+    .await?;
+
+    if let Some(v) = result {
+        Ok(Some(Booking {
+            id: v.b_id,
+            unit_id: v.b_unit_id,
+            holder: User {
+                id: v.hu_id,
+                provider: v.hu_provider,
+                foreign_id: v.hu_foreign_id,
+                name: v.hu_name,
+                created_at: v.hu_created_at,
+                deactivated_at: v.hu_deactivated_at,
+                license_plate_number: v.hu_license_plate_number,
+            },
+            customer: match v.ci_discriminator {
+                IdentityDiscriminator::User => Identity::User(User {
+                    id: v.cu_id.ok_or(Error::MissingField("cu_id"))?,
+                    provider: v.cu_provider.ok_or(Error::MissingField("cu_provider"))?,
+                    foreign_id: v
+                        .cu_foreign_id
+                        .ok_or(Error::MissingField("cu_foreign_id"))?,
+                    name: v.cu_name.ok_or(Error::MissingField("cu_name"))?,
+                    created_at: v
+                        .cu_created_at
+                        .ok_or(Error::MissingField("cu_created_at"))?,
+                    deactivated_at: v.cu_deactivated_at,
+                    license_plate_number: v.cu_license_plate_number,
+                }),
+                IdentityDiscriminator::Group => Identity::Group(Group {
+                    id: v.cg_id.ok_or(Error::MissingField("cg_id"))?,
+                    name: v.cg_name.ok_or(Error::MissingField("cg_name"))?,
+                    owner_id: v.cg_owner_id.ok_or(Error::MissingField("cg_owner_id"))?,
+                    is_open: v.cg_is_open.ok_or(Error::MissingField("cg_is_open"))?,
+                    created_at: v
+                        .cg_created_at
+                        .ok_or(Error::MissingField("cg_created_at"))?,
+                    deleted_at: v.cg_deleted_at,
+                }),
+            },
+            time_from: v.b_time_from,
+            time_to: v.b_time_to,
+            created_at: v.b_created_at,
+            confirmed_at: v.b_confirmed_at,
+            canceled_at: v.b_canceled_at,
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
 pub async fn is_booking_available(
     connection: &mut SqliteConnection,
     now: &DateTime<Utc>,

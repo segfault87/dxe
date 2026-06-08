@@ -10,6 +10,7 @@ import RequiresAuth from "../../../lib/RequiresAuth";
 import type { BookingId, ProductType } from "../../../types/models/base";
 import { defaultErrorHandler } from "../../../lib/error";
 import { redirect } from "react-router";
+import { TemporaryReservationIdStorage } from "../../../lib/storage";
 
 export function meta(): Route.MetaDescriptors {
   return [{ title: "결제 확인 | 드림하우스 합주실" }];
@@ -93,7 +94,7 @@ function TossPaymentSuccess({ loaderData }: Route.ComponentProps) {
         orderId,
         amount: parseInt(amount),
       });
-
+      TemporaryReservationIdStorage.clear();
       setBookingId(result.data.bookingId);
       ReactGA.event("payment_success");
     } catch (error) {

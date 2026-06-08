@@ -177,13 +177,31 @@ export default function Index() {
           <li>
             마이크:
             <ul>
-              <li>유선: Shure SM58 ×3</li>
               <li>무선: Kanals KB-9700 ×2</li>
+              <li>유선: Shure SM58 ×3</li>
             </ul>
           </li>
           <li>PA 스피커: JBL EON 715 ×2</li>
-          <li>모니터링 스피커: Behringer Eurolive F1220D</li>
-          <li>믹서: Roland VM-3100Pro</li>
+          <li>
+            모니터링 스피커:
+            <ul>
+              <li>보컬 모니터: Behringer Eurolive F1220D</li>
+              <li>키보드 모니터: Yamaha HS50M</li>
+              <li>드럼 모니터: Yamaha HS50M + 유선 이어폰 연결 가능</li>
+            </ul>
+          </li>
+          <li>믹서: Allen &amp; Heath SQ (시설 내 태블릿으로 제어 가능)</li>
+          <li>
+            추가 장비 연결성:
+            <ul>
+              <li>XLR 유선 마이크 3채널</li>
+              <li>1/4" 언밸런스드 DI 입력 2채널</li>
+              <li>라인 입력 2채널 (1/4" / XLR 콤보)</li>
+              <li>RCA 스테레오 라인 입력 1채널</li>
+              <li>1/4" 스테레오 라인 입력 1채널</li>
+              <li>MTR 입력 2채널 (1/4" / XLR 콤보)</li>
+            </ul>
+          </li>
         </ul>
         <small>
           적정 정원은 7명이며, 그 이상 입장이 가능하지만 다소 좁을 수 있습니다.

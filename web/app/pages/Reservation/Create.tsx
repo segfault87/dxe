@@ -23,9 +23,10 @@ import type {
   IdentityId,
   UserId,
 } from "../../types/models/base";
-import type { OccupiedSlot } from "../../types/models/booking";
+import type { Booking, OccupiedSlot } from "../../types/models/booking";
 import type { GroupWithUsers } from "../../types/models/group";
 import ReservationCalendar from "../../components/ReservationCalendar";
+import { TemporaryReservationIdStorage } from "../../lib/storage";
 
 export function meta(): Route.MetaDescriptors {
   return [{ title: "예약 | 드림하우스 합주실" }];
@@ -382,7 +383,10 @@ function Reservation({ auth }: AuthProps) {
   const [now, setNow] = useState(new Date());
   const [errorMessage, setErrorMessage] = useState("");
   const [temporaryReservationId, setTemporaryReservationId] =
-    useState<AdhocReservationId | null>(null);
+    useState<AdhocReservationId | null>(TemporaryReservationIdStorage.get());
+  const [amendReservation, setAmendReservation] = useState<Booking | null>(
+    null,
+  );
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<Date | null>(null);
@@ -421,7 +425,11 @@ function Reservation({ auth }: AuthProps) {
 
   const fetchCalendar = async () => {
     try {
-      const result = await BookingService.calendar(DEFAULT_UNIT_ID);
+      const result = await BookingService.calendar(
+        DEFAULT_UNIT_ID,
+        undefined,
+        temporaryReservationId ?? undefined,
+      );
       setStart(new Date(result.data.start));
       setEnd(new Date(result.data.end));
       setMaxBookingHours(result.data.maxBookingHours);
@@ -460,6 +468,59 @@ function Reservation({ auth }: AuthProps) {
     }
   };
 
+  const proceedTossPaymentAmend = async (widgets: TossPaymentsWidgets) => {
+    if (
+      selectedTime === null ||
+      selectedHours === null ||
+      selectedIdentityId === null ||
+      amendReservation === null
+    ) {
+      return;
+    }
+
+    const prevStartTime = new Date(amendReservation.bookingStart);
+    const prevEndTime = new Date(amendReservation.bookingEnd);
+
+    const newStartTime = selectedTime;
+    const newEndTime = new Date(selectedTime.getTime());
+    newEndTime.setHours(newEndTime.getHours() + selectedHours);
+
+    console.log(prevStartTime, newEndTime, newStartTime, prevEndTime);
+
+    if (
+      prevStartTime.getTime() !== newEndTime.getTime() &&
+      newStartTime.getTime() !== prevEndTime.getTime()
+    ) {
+      alert("잘못된 예약 시간입니다.");
+      return;
+    }
+
+    setRequestInProgress(true);
+    try {
+      const amendResult = await BookingService.amend(amendReservation.id, {
+        newTimeFrom: toUtcIso8601(newStartTime),
+        additionalHours: selectedHours,
+      });
+
+      if (amendResult.data.foreignPaymentId) {
+        await widgets.requestPayment({
+          orderId: amendResult.data.foreignPaymentId,
+          orderName: `추가 공간이용료 (${selectedHours} 시간)`,
+          successUrl:
+            window.location.origin + "/reservation/payment/toss/success/",
+          failUrl: window.location.origin + "/reservation/payment/toss/fail/",
+        });
+      } else {
+        alert("예약이 변경되었습니다.");
+        navigate(`/reservation/${amendReservation.id}`);
+      }
+    } catch (error) {
+      defaultErrorHandler(error);
+    } finally {
+      setRequestInProgress(false);
+    }
+  };
+
   const proceedTossPayment = async (widgets: TossPaymentsWidgets) => {
     if (
       selectedTime === null ||
@@ -481,6 +542,7 @@ function Reservation({ auth }: AuthProps) {
       });
       const data = initiateResult.data;
       activeAdhocReservationId = data.temporaryReservationId;
+      TemporaryReservationIdStorage.set(data.temporaryReservationId);
       setTemporaryReservationId(data.temporaryReservationId);
 
       await widgets.requestPayment({
@@ -495,6 +557,7 @@ function Reservation({ auth }: AuthProps) {
         await BookingService.deleteTemporaryReservation(
           activeAdhocReservationId,
         );
+        TemporaryReservationIdStorage.clear();
         setTemporaryReservationId(null);
       }
       defaultErrorHandler(error);
@@ -507,7 +570,11 @@ function Reservation({ auth }: AuthProps) {
     ReactGA.event("payment_initiate");
 
     if (env.enableTossPayments && tossPaymentsWidgets !== null) {
-      await proceedTossPayment(tossPaymentsWidgets);
+      if (amendReservation) {
+        await proceedTossPaymentAmend(tossPaymentsWidgets);
+      } else {
+        await proceedTossPayment(tossPaymentsWidgets);
+      }
     } else if (!env.enableTossPayments) {
       await makeReservation();
     }
@@ -552,7 +619,10 @@ function Reservation({ auth }: AuthProps) {
           unitId: DEFAULT_UNIT_ID,
           desiredHours: selectedHours,
           timeFrom: toUtcIso8601(selectedTime),
+          customerId: selectedIdentityId ?? undefined,
+          excludeAdhocReservationId: temporaryReservationId ?? undefined,
         });
+        setAmendReservation(result.data.amendReservation ?? null);
         setPrice(result.data.totalPrice);
       } catch (error) {
         if (isAxiosError(error)) {
@@ -564,7 +634,7 @@ function Reservation({ auth }: AuthProps) {
     };
 
     checkAvailability();
-  }, [selectedTime, selectedHours]);
+  }, [selectedTime, selectedHours, selectedIdentityId, temporaryReservationId]);
 
   return (
     <>

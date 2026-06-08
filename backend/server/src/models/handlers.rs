@@ -197,6 +197,7 @@ pub mod booking {
     pub struct CheckRequest {
         pub unit_id: UnitId,
         pub time_from: DateTime<FixedOffset>,
+        pub customer_id: Option<IdentityId>,
         pub desired_hours: i64,
         pub additional_hours: Option<i64>,
         pub exclude_booking_id: Option<BookingId>,
@@ -206,6 +207,7 @@ pub mod booking {
     #[derive(Debug, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct CheckResponse {
+        pub amend_reservation: Option<Booking>,
         pub total_price: i64,
     }
 

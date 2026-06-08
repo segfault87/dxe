@@ -1,22 +1,24 @@
 use actix_web::web;
 use chrono::TimeDelta;
-use dxe_data::queries::booking::is_booking_available;
+use dxe_data::queries::booking::{get_continuous_booking, is_booking_available};
 use dxe_data::queries::unit::is_unit_enabled;
 use sqlx::SqlitePool;
 
-use crate::config::BookingConfig;
+use crate::config::{BookingConfig, TimeZoneConfig};
 use crate::middleware::datetime_injector::Now;
-use crate::models::Error;
+use crate::models::entities::Booking;
 use crate::models::handlers::booking::{CheckRequest, CheckResponse};
+use crate::models::{Error, IntoView};
 use crate::session::UserSession;
 use crate::utils::datetime::truncate_time;
 
 pub async fn post(
     now: Now,
-    _session: UserSession,
+    session: UserSession,
     body: web::Json<CheckRequest>,
     database: web::Data<SqlitePool>,
     booking_config: web::Data<BookingConfig>,
+    timezone_config: web::Data<TimeZoneConfig>,
 ) -> Result<web::Json<CheckResponse>, Error> {
     let mut connection = database.acquire().await?;
 
@@ -24,9 +26,10 @@ pub async fn post(
         return Err(Error::UnitNotFound);
     }
 
-    if body.desired_hours > booking_config.max_booking_hours {
-        return Err(Error::InvalidTimeRange);
-    }
+    // NOTE: do not place restrictions on extensions for now
+    // if body.desired_hours > booking_config.max_booking_hours {
+    //    return Err(Error::InvalidTimeRange);
+    // }
 
     let time_from = truncate_time(body.time_from).to_utc();
     let time_to = time_from + TimeDelta::hours(body.desired_hours);
@@ -52,7 +55,31 @@ pub async fn post(
                 .map_err(|_| Error::UnitNotFound)?
         };
 
-        Ok(web::Json(CheckResponse { total_price }))
+        let customer_id = body.customer_id.unwrap_or(session.user_id.into());
+
+        let amend_reservation = get_continuous_booking(
+            &mut connection,
+            &now,
+            &body.unit_id,
+            &customer_id,
+            &time_from,
+            &time_to,
+        )
+        .await?;
+
+        let amend_reservation = if let Some(amend_reservation) = amend_reservation {
+            Some(
+                Booking::convert(amend_reservation, &timezone_config, &now)?
+                    .finish(booking_config.as_ref(), &now),
+            )
+        } else {
+            None
+        };
+
+        Ok(web::Json(CheckResponse {
+            amend_reservation,
+            total_price,
+        }))
     } else {
         Err(Error::TimeRangeOccupied)
     }

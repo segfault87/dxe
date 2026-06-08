@@ -72,9 +72,11 @@ pub async fn put(
         }
 
         let total_hours = additional_hours + current_hours;
-        if total_hours > booking_config.max_booking_hours {
-            return Err(Error::InvalidTimeRange);
-        }
+
+        // NOTE: do not place restrictions on extensions for now
+        // if total_hours > booking_config.max_booking_hours {
+        //    return Err(Error::InvalidTimeRange);
+        // }
 
         let desired_time_from = booking.time_from;
         let desired_time_to = desired_time_from + TimeDelta::hours(total_hours);

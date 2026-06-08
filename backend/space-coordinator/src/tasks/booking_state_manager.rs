@@ -267,13 +267,17 @@ impl BookingStateManager {
                 .collect::<HashMap<_, _>>()
         };
 
-        for (key, value) in tasks_to_remove.iter() {
-            let task_name = key.to_string();
+        for (key, value) in tasks_to_remove.into_iter() {
             let task_id = value.task_id.lock().clone();
-            if let Some(task_id) = task_id
-                && let Ok(_) = Arc::clone(&self).scheduler.remove(task_id.as_str()).await
-            {
-                log::info!("Booking task {task_name} removed");
+            if let Some(task_id) = task_id {
+                if let Ok(_) = Arc::clone(&self).scheduler.remove(task_id.as_str()).await {
+                    log::info!("Booking task {key} removed");
+                } else {
+                    log::info!("Removing stale task {key}...");
+                }
+            } else {
+                // Push back if not scheduled yet
+                self.pending_tasks.lock().insert(key, value);
             }
         }
 

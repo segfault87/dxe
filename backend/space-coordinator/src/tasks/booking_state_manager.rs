@@ -41,7 +41,6 @@ impl Display for BookingTaskKey {
 }
 
 struct BookingTask {
-    task_id: Arc<Mutex<Option<String>>>,
     booking: BookingWithUsers,
     time: DateTime<Utc>,
     is_active: Option<bool>,
@@ -59,6 +58,7 @@ pub struct BookingStateManager {
 
     booking_entries: Arc<Mutex<HashMap<BookingId, BookingWithUsers>>>,
     pending_tasks: Mutex<HashMap<BookingTaskKey, BookingTask>>,
+    pending_task_ids: Arc<Mutex<HashMap<BookingTaskKey, String>>>,
     table: TablePublisher<UnitId, Endpoint, BookingsPath>,
 }
 
@@ -100,6 +100,7 @@ impl BookingStateManager {
             client,
             booking_entries: Arc::new(Mutex::new(HashMap::new())),
             pending_tasks: Mutex::new(HashMap::new()),
+            pending_task_ids: Arc::new(Mutex::new(HashMap::new())),
             table: TablePublisher::new(),
         }
     }
@@ -230,7 +231,6 @@ impl BookingStateManager {
                     tasks.insert(
                         BookingTaskKey(event_id.clone(), booking.booking.id),
                         BookingTask {
-                            task_id: Arc::new(Mutex::new(None)),
                             booking: booking.clone(),
                             time,
                             is_active,
@@ -268,8 +268,7 @@ impl BookingStateManager {
         };
 
         for (key, value) in tasks_to_remove.into_iter() {
-            let task_id = value.task_id.lock().clone();
-            if let Some(task_id) = task_id {
+            if let Some(task_id) = self.pending_task_ids.lock().remove(&key) {
                 if let Ok(_) = Arc::clone(&self).scheduler.remove(task_id.as_str()).await {
                     log::info!("Booking task {key} removed");
                 } else {
@@ -285,20 +284,18 @@ impl BookingStateManager {
             .iter()
             .filter(|(k, _)| !self.pending_tasks.lock().contains_key(k))
         {
-            let task_name = key.to_string();
             log::info!(
-                "Scheduling booking task {task_name} at {}...",
+                "Scheduling booking task {key} at {}...",
                 value.time.with_timezone(&Local).format("%H:%M:%S")
             );
 
-            let task_name_cloned = task_name.clone();
+            let key_cloned = key.clone();
             let booking_cloned = value.booking.clone();
             let arc_self = Arc::clone(&self);
-            let key_cloned = key.0.clone();
+            let booking_event_id = key.0.clone();
             let is_active = value.is_active;
             let is_active_offset_edge = value.is_active_offset_edge;
-            let task_id = value.task_id.clone();
-            let task = TaskBuilder::new(task_name.as_str(), move || {
+            let task = TaskBuilder::new(key.as_str(), move || {
                 if let Some(is_active) = is_active {
                     arc_self.clone().table.update_value(
                         booking_cloned.booking.unit_id.clone(),
@@ -315,23 +312,22 @@ impl BookingStateManager {
                 }
 
                 arc_self.clone().event_sender.publish(
-                    EventId::Booking(key_cloned.clone()),
+                    EventId::Booking(booking_event_id.clone()),
                     Event::Booking {
                         booking: booking_cloned.clone(),
                     },
                 );
 
                 let scheduler = arc_self.scheduler.clone();
-                let task_name = task_name_cloned.clone();
-                let task_id = task_id.clone();
+                let key = key_cloned.clone();
+                let pending_task_ids = arc_self.pending_task_ids.clone();
                 tokio::task::spawn(async move {
-                    let task_id = task_id.lock().clone();
-                    if let Some(task_id) = task_id
+                    if let Some(task_id) = pending_task_ids.lock().remove(&key)
                         && let Err(e) = scheduler.remove(task_id.as_str()).await
                     {
-                        log::warn!("Could not remove completed task {task_name}: {e}");
+                        log::warn!("Could not remove completed task {key}: {e}");
                     } else {
-                        log::info!("Booking task {task_name} complete.");
+                        log::info!("Booking task {key} complete.");
                     }
                 });
 
@@ -344,10 +340,10 @@ impl BookingStateManager {
 
             match self.scheduler.add_task(task).await {
                 Ok(id) => {
-                    *value.task_id.lock() = Some(id);
+                    self.pending_task_ids.lock().insert(key.clone(), id);
                 }
                 Err(e) => {
-                    log::error!("Could not schedule {task_name}: {e}");
+                    log::error!("Could not schedule {key}: {e}");
                 }
             }
         }

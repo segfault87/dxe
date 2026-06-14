@@ -268,7 +268,8 @@ impl BookingStateManager {
         };
 
         for (key, value) in tasks_to_remove.into_iter() {
-            if let Some(task_id) = self.pending_task_ids.lock().remove(&key) {
+            let task_id = self.pending_task_ids.lock().remove(&key);
+            if let Some(task_id) = task_id {
                 if let Ok(_) = Arc::clone(&self).scheduler.remove(task_id.as_str()).await {
                     log::info!("Booking task {key} removed");
                 } else {
@@ -322,7 +323,8 @@ impl BookingStateManager {
                 let key = key_cloned.clone();
                 let pending_task_ids = arc_self.pending_task_ids.clone();
                 tokio::task::spawn(async move {
-                    if let Some(task_id) = pending_task_ids.lock().remove(&key)
+                    let task_id = pending_task_ids.lock().remove(&key);
+                    if let Some(task_id) = task_id
                         && let Err(e) = scheduler.remove(task_id.as_str()).await
                     {
                         log::warn!("Could not remove completed task {key}: {e}");

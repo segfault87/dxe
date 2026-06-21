@@ -14,12 +14,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import kr.dream_house.osd.BuildConfig
-import kr.dream_house.osd.views.units.CONTACT_PER_UNIT
+import kr.dream_house.osd.R
 
 @Composable
 fun TroubleshootingContact(modifier: Modifier = Modifier, message: String) {
-    val contactResource = CONTACT_PER_UNIT[BuildConfig.UNIT_ID] ?: return
+    val contactResource = R.drawable.img_qr_telephone_default
 
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(

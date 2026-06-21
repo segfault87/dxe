@@ -16,9 +16,9 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 @Serializable
 data class ChannelData(
-    val level: Float = Float.NEGATIVE_INFINITY,
+    val level: Float = -128.0f,
     val pan: Float = 0.0f,
-    val reverb: Float = Float.NEGATIVE_INFINITY,
+    val reverb: Float = -128.0f,
     val mute: Boolean = false,
     val eqHighLevel: Float = 0.0f,
     val eqHighFreq: Float = 9490.0f,
@@ -340,8 +340,8 @@ private fun TransformedChannelData.buildControlPayloads(channel: MixerChannelCon
 
 @Serializable
 data class GlobalData(
-    val masterLevel: Float = Float.NEGATIVE_INFINITY,
-    val monitorLevel: Float = Float.NEGATIVE_INFINITY,
+    val masterLevel: Float = -128.0f,
+    val monitorLevel: Float = -128.0f,
 )
 
 private fun GlobalData.snapshot(): PartialGlobalDataUpdate {

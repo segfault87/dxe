@@ -22,6 +22,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "UNIT_ID", "\"default\"")
+        buildConfigField("String", "INFORMATION_URL_BASE", "\"https://dream-house.kr\"")
     }
 
     buildTypes {

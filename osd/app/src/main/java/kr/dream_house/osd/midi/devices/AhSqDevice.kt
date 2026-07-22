@@ -216,7 +216,7 @@ class AhSqDevice : MixerDevice {
                         MidiNrpnParameter.LENGTH_FINE
                     }
                     GlobalControlParameter.MONITOR_LEVEL -> {
-                        buildNprnPayload(0x4f.toByte(), 0x11.toByte(), value.value, output, offset)
+                        buildNprnPayload(0x4f.toByte(), 0x05.toByte(), value.value, output, offset)
                         MidiNrpnParameter.LENGTH_FINE
                     }
                 }

@@ -4,8 +4,10 @@ use dxe_data::queries::booking::{
 };
 use dxe_data::queries::payment::{
     confirm_cash_payment, get_cash_transaction, get_toss_payments_transaction_by_product_id,
-    refund_cash_payment,
+    get_toss_payments_transactions_by_booking_amentments, refund_cash_payment,
+    refund_toss_payments,
 };
+use dxe_extern::toss_payments::{Error as TossPaymentsError, TossPaymentsClient};
 use dxe_types::{BookingId, ProductId};
 use sqlx::SqlitePool;
 
@@ -16,7 +18,8 @@ use crate::models::entities::{
     TossPaymentsTransaction, Transaction,
 };
 use crate::models::handlers::admin::{
-    GetBookingResponse, ModifyAction, ModifyBookingRequest, ModifyBookingResponse,
+    CancelBookingQuery, CancelBookingResponse, GetBookingResponse, ModifyAction,
+    ModifyBookingRequest, ModifyBookingResponse,
 };
 use crate::models::{Error, IntoView};
 use crate::services::calendar::CalendarService;
@@ -151,4 +154,123 @@ pub async fn put(
             None
         },
     }))
+}
+
+pub async fn delete(
+    now: Now,
+    booking_id: web::Path<BookingId>,
+    query: web::Query<CancelBookingQuery>,
+    database: web::Data<SqlitePool>,
+    booking_config: web::Data<BookingConfig>,
+    timezone_config: web::Data<TimeZoneConfig>,
+    calendar_service: web::Data<Option<CalendarService>>,
+    toss_payments_service: web::Data<TossPaymentsClient>,
+) -> Result<web::Json<CancelBookingResponse>, Error> {
+    let mut tx = database.begin().await?;
+
+    let booking = get_booking(&mut tx, booking_id.as_ref())
+        .await?
+        .ok_or(Error::BookingNotFound)?;
+
+    cancel_booking(&mut tx, &now, booking_id.as_ref()).await?;
+
+    let product_id = ProductId::from(*booking_id);
+
+    let transaction = if let Some(mut toss_tx) =
+        get_toss_payments_transaction_by_product_id(&mut tx, &product_id).await?
+        && let Some(payment_key) = toss_tx.payment_key.as_ref()
+        && !query.omit_refund
+    {
+        let refund_price = toss_tx.price;
+
+        if refund_price > 0 {
+            match toss_payments_service
+                .cancel_payment(
+                    payment_key,
+                    query
+                        .cancel_reason
+                        .as_deref()
+                        .unwrap_or("Cancellation request by user"),
+                    Some(refund_price),
+                )
+                .await
+            {
+                Ok(_) => {
+                    log::info!(
+                        "Payment {payment_key} refunded successfully. Refunded amount: {refund_price}"
+                    );
+                }
+                Err(e) => match e {
+                    TossPaymentsError::Remote { code, message } => {
+                        Err(Error::TossPaymentsFailed { message, code })?
+                    }
+                    TossPaymentsError::RemoteStatus(status) => {
+                        Err(Error::PaymentFailed(status.to_string()))?
+                    }
+                    rest => Err(Error::Internal(Box::new(rest)))?,
+                },
+            }
+        }
+
+        if refund_toss_payments(&mut tx, &now, &toss_tx.id, refund_price).await? {
+            toss_tx.refund_price = Some(refund_price);
+            toss_tx.refunded_at = Some(*now);
+        }
+
+        for amendment in
+            get_toss_payments_transactions_by_booking_amentments(&mut tx, &now, &booking_id).await?
+        {
+            let Some(payment_key) = amendment.payment_key else {
+                continue;
+            };
+
+            let refund_price = booking_config
+                .calculate_refund_price(
+                    timezone_config.as_ref(),
+                    amendment.price,
+                    booking.time_from,
+                    *now,
+                )
+                .map_err(|_| Error::NotRefundable)?;
+
+            if refund_price > 0 {
+                match toss_payments_service
+                    .cancel_payment(
+                        &payment_key,
+                        query
+                            .cancel_reason
+                            .as_deref()
+                            .unwrap_or("Cancellation request by user"),
+                        Some(refund_price),
+                    )
+                    .await
+                {
+                    Ok(_) => {
+                        log::info!(
+                            "Amendment payment {payment_key} refunded successfully. Refunded amount: {refund_price}"
+                        );
+                    }
+                    Err(e) => log::error!("Couldn't refund amendment tx {payment_key}: {e}"),
+                }
+            }
+        }
+
+        Some(Transaction::TossPayments(TossPaymentsTransaction::convert(
+            toss_tx,
+            &timezone_config,
+            &now,
+        )?))
+    } else {
+        None
+    };
+
+    tx.commit().await?;
+
+    if let Some(calendar_service) = calendar_service.as_ref()
+        && let Err(e) = calendar_service.delete_booking(&booking.id).await
+    {
+        log::error!("Failed to delete event on calendar: {e}");
+    }
+
+    Ok(web::Json(CancelBookingResponse { transaction }))
 }

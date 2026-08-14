@@ -134,6 +134,21 @@ pub mod admin {
         pub desired_hours: i64,
         pub license_plate_number: String,
     }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    pub struct CancelBookingQuery {
+        #[serde(default)]
+        pub omit_refund: bool,
+        #[serde(default)]
+        pub cancel_reason: Option<String>,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct CancelBookingResponse {
+        pub transaction: Option<Transaction>,
+    }
 }
 
 pub mod auth {

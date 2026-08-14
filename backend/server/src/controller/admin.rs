@@ -13,7 +13,8 @@ pub fn scope() -> actix_web::Scope {
         .service(
             web::resource("/booking/{booking_id}")
                 .route(web::get().to(booking::get))
-                .route(web::put().to(booking::put)),
+                .route(web::put().to(booking::put))
+                .route(web::delete().to(booking::delete)),
         )
         .service(
             web::resource("/booking/{booking_id}/telemetry").route(web::get().to(telemetry::get)),

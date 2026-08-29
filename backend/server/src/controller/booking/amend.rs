@@ -67,7 +67,10 @@ pub async fn put(
     if let Some(additional_hours) = body.additional_hours
         && additional_hours > 0
     {
-        if *now >= booking.time_from {
+        if *now >= booking.time_from
+            && let Some(new_time_from) = body.new_time_from
+            && new_time_from != booking.time_from
+        {
             return Err(Error::OngoingBookingNotModifiable);
         }
 
@@ -78,7 +81,10 @@ pub async fn put(
         //    return Err(Error::InvalidTimeRange);
         // }
 
-        let desired_time_from = booking.time_from;
+        let desired_time_from = body
+            .new_time_from
+            .map(|v| v.to_utc())
+            .unwrap_or(booking.time_from);
         let desired_time_to = desired_time_from + TimeDelta::hours(total_hours);
 
         let price = booking_config

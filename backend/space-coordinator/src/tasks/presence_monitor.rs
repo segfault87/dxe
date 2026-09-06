@@ -10,6 +10,7 @@ use tokio_task_scheduler::{Task, TaskBuilder};
 use crate::config::presence::{Config, PresenceIdentityConfig};
 use crate::events::{Event, EventSender};
 use crate::tables::{QualifiedPath, TablePublisher};
+use crate::tasks::metrics_exporter::{EventDataPoint, MetricsExporterHandle};
 use crate::types::{Endpoint, EventId, PresenceEvent, PresenceRef, PublishKey, TenantId};
 
 static PUBLISH_KEY_IS_PRESENT: PublishKey = PublishKey::new_const("is_present");
@@ -26,18 +27,47 @@ impl QualifiedPath for PresencePath {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone)]
 pub struct PresenceState {
+    tenant_id: TenantId,
     has_initialized: bool,
     pub is_present: bool,
     last_state: bool,
     last_seen_at: Option<DateTime<Utc>>,
 }
 
+impl PresenceState {
+    pub fn new(tenant_id: TenantId) -> Self {
+        Self {
+            tenant_id,
+            has_initialized: false,
+            is_present: false,
+            last_state: false,
+            last_seen_at: None,
+        }
+    }
+}
+
+impl EventDataPoint<bool, TenantId> for PresenceState {
+    fn measurement() -> &'static str {
+        "presence"
+    }
+
+    fn tags(&self) -> impl Iterator<Item = (&'static str, TenantId)> {
+        vec![("tenant_id", self.tenant_id.clone())].into_iter()
+    }
+
+    fn values(&self) -> impl Iterator<Item = (&'static str, bool)> {
+        vec![("presence", self.is_present)].into_iter()
+    }
+}
+
 pub struct PresenceMonitor {
     state: Arc<Mutex<HashMap<TenantId, PresenceState>>>,
 
     event_sender: EventSender,
+    metrics_exporter_handle: Option<MetricsExporterHandle>,
+
     identities: HashMap<TenantId, PresenceIdentityConfig>,
     away_interval: TimeDelta,
     table: TablePublisher<PresenceRef, Endpoint, PresencePath>,
@@ -45,13 +75,18 @@ pub struct PresenceMonitor {
 }
 
 impl PresenceMonitor {
-    pub async fn new(config: &Config, event_sender: EventSender) -> Self {
+    pub async fn new(
+        config: &Config,
+        event_sender: EventSender,
+        metrics_exporter_handle: Option<MetricsExporterHandle>,
+    ) -> Self {
         let state = Arc::new(Mutex::new(Default::default()));
 
         let monitor = Self {
             state: state.clone(),
 
             event_sender,
+            metrics_exporter_handle,
             identities: config.identities.clone(),
             away_interval: config.away_interval,
             table: TablePublisher::new(),
@@ -64,7 +99,9 @@ impl PresenceMonitor {
     }
 
     async fn ping(&self) {
-        'outer: for (tenant_id, config) in self.identities.iter() {
+        for (tenant_id, config) in self.identities.iter() {
+            let mut found = false;
+
             for address in config.scan_ips.iter() {
                 let address = *address;
                 let result = tokio::task::spawn_blocking(move || {
@@ -75,53 +112,51 @@ impl PresenceMonitor {
 
                 // For some reason it fails to decode ICMP packet and we are ignoring it anyways.
                 if result.is_ok() || matches!(result, Err(ping::Error::DecodeV4Error)) {
-                    let mut has_entered = false;
-
-                    {
-                        let mut states = self.state.lock();
-                        let state = states.entry(tenant_id.clone()).or_default();
-                        if !state.last_state && state.is_present {
-                            log::info!(
-                                "Presence of tenant {tenant_id} detected. endpoint: {address}"
-                            );
-                        } else if !state.is_present {
-                            log::info!(
-                                "Presence of tenant {tenant_id} state changed to true. endpoint: {address}"
-                            );
-                            state.is_present = true;
-                            state.has_initialized = true;
-                            has_entered = true;
-                        }
-                        state.last_state = true;
-                        state.last_seen_at = Some(Utc::now());
-                    }
-
-                    if has_entered {
-                        self.event_sender.publish(
-                            EventId::Presence(tenant_id.clone(), PresenceEvent::Enter),
-                            Event::Presence {
-                                tenant_id: tenant_id.clone(),
-                                r#type: PresenceEvent::Enter,
-                            },
-                        );
-                        self.table.update_value(
-                            PresenceRef::Tenant(tenant_id.clone()),
-                            PUBLISH_KEY_IS_PRESENT.clone(),
-                            serde_json::Value::Bool(true),
-                        );
-                        self.tenant_count
-                            .update(Ordering::Release, Ordering::Acquire, |v| v + 1);
-                    }
-
-                    continue 'outer;
+                    found = true;
+                    break;
                 }
             }
 
-            let mut has_left = false;
-            {
-                let mut states = self.state.lock();
-                let state = states.entry(tenant_id.clone()).or_default();
+            let mut states = self.state.lock();
+            let state = states
+                .entry(tenant_id.clone())
+                .or_insert_with(|| PresenceState::new(tenant_id.clone()));
 
+            if found {
+                let mut has_entered = false;
+
+                if !state.last_state && state.is_present {
+                    log::info!("Presence of tenant {tenant_id} detected.");
+                } else if !state.is_present {
+                    log::info!("Presence of tenant {tenant_id} state changed to true.");
+                    state.is_present = true;
+                    state.has_initialized = true;
+                    has_entered = true;
+                }
+                state.last_state = true;
+                state.last_seen_at = Some(Utc::now());
+
+                if has_entered {
+                    self.event_sender.publish(
+                        EventId::Presence(tenant_id.clone(), PresenceEvent::Enter),
+                        Event::Presence {
+                            tenant_id: tenant_id.clone(),
+                            r#type: PresenceEvent::Enter,
+                        },
+                    );
+                    if let Some(metrics_exporter_handle) = self.metrics_exporter_handle.clone() {
+                        metrics_exporter_handle.export_event(state);
+                    }
+                    self.table.update_value(
+                        PresenceRef::Tenant(tenant_id.clone()),
+                        PUBLISH_KEY_IS_PRESENT.clone(),
+                        serde_json::Value::Bool(true),
+                    );
+                    self.tenant_count
+                        .update(Ordering::Release, Ordering::Acquire, |v| v + 1);
+                }
+            } else {
+                let mut has_left = false;
                 if !state.has_initialized {
                     state.has_initialized = true;
                     has_left = true;
@@ -142,25 +177,31 @@ impl PresenceMonitor {
                         has_left = true;
                     }
                 }
-            }
 
-            if has_left {
-                self.event_sender.publish(
-                    EventId::Presence(tenant_id.clone(), PresenceEvent::Leave),
-                    Event::Presence {
-                        tenant_id: tenant_id.clone(),
-                        r#type: PresenceEvent::Leave,
-                    },
-                );
-                self.table.update_value(
-                    PresenceRef::Tenant(tenant_id.clone()),
-                    PUBLISH_KEY_IS_PRESENT.clone(),
-                    serde_json::Value::Bool(false),
-                );
-                self.tenant_count
-                    .update(Ordering::Release, Ordering::Acquire, |v| {
-                        if v > 0 { v - 1 } else { 0 }
-                    });
+                if has_left {
+                    self.event_sender.publish(
+                        EventId::Presence(tenant_id.clone(), PresenceEvent::Leave),
+                        Event::Presence {
+                            tenant_id: tenant_id.clone(),
+                            r#type: PresenceEvent::Leave,
+                        },
+                    );
+                    if let Some(metrics_exporter_handle) = self.metrics_exporter_handle.clone() {
+                        metrics_exporter_handle.export_event(state);
+                    }
+                    self.table.update_value(
+                        PresenceRef::Tenant(tenant_id.clone()),
+                        PUBLISH_KEY_IS_PRESENT.clone(),
+                        serde_json::Value::Bool(false),
+                    );
+                    if let Some(metrics_exporter_handle) = self.metrics_exporter_handle.clone() {
+                        metrics_exporter_handle.export_event(state);
+                    }
+                    self.tenant_count
+                        .update(Ordering::Release, Ordering::Acquire, |v| {
+                            if v > 0 { v - 1 } else { 0 }
+                        });
+                }
             }
         }
 
@@ -173,6 +214,15 @@ impl PresenceMonitor {
     }
 
     pub fn task(self) -> Task {
+        // Initialize the table
+        for tenant_id in self.identities.keys() {
+            self.table.update_value(
+                PresenceRef::Tenant(tenant_id.clone()),
+                PUBLISH_KEY_IS_PRESENT.clone(),
+                serde_json::Value::Bool(false),
+            );
+        }
+
         let arc_self = Arc::new(self);
 
         TaskBuilder::new("presence_monitor", move || {

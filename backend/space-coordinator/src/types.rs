@@ -19,6 +19,12 @@ impl From<String> for AlertId {
     }
 }
 
+impl From<AlertId> for String {
+    fn from(value: AlertId) -> Self {
+        value.0
+    }
+}
+
 impl Display for AlertId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
@@ -113,6 +119,12 @@ pub struct DeviceId(String);
 impl From<String> for DeviceId {
     fn from(value: String) -> Self {
         Self(value)
+    }
+}
+
+impl From<DeviceId> for String {
+    fn from(value: DeviceId) -> Self {
+        value.0
     }
 }
 
@@ -321,6 +333,12 @@ pub struct TenantId(String);
 impl From<String> for TenantId {
     fn from(value: String) -> Self {
         Self(value)
+    }
+}
+
+impl From<TenantId> for String {
+    fn from(value: TenantId) -> Self {
+        value.0
     }
 }
 

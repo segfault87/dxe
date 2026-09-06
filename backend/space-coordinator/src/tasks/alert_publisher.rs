@@ -10,12 +10,31 @@ use tokio::task::JoinHandle;
 use crate::config::events::AlertConfig;
 use crate::events::{Event, EventSender};
 use crate::services::table_manager::{TableManager, TableSnapshot};
+use crate::tasks::metrics_exporter::{EventDataPoint, MetricsExporterHandle};
 use crate::types::{AlertId, EventId};
+
+struct AlertEvent(AlertId);
+
+impl EventDataPoint<String, String> for AlertEvent {
+    fn measurement() -> &'static str {
+        "alert"
+    }
+
+    fn tags(&self) -> impl Iterator<Item = (&'static str, String)> {
+        std::iter::empty()
+    }
+
+    fn values(&self) -> impl Iterator<Item = (&'static str, String)> {
+        vec![("alert_id", self.0.clone().into())].into_iter()
+    }
+}
 
 pub struct AlertPublisher {
     alerts: HashMap<AlertId, AlertConfig>,
 
     sender: EventSender,
+    metrics_exporter_handle: Option<MetricsExporterHandle>,
+
     tasks: Mutex<HashMap<AlertId, JoinHandle<()>>>,
 }
 
@@ -28,10 +47,17 @@ impl Drop for AlertPublisher {
 }
 
 impl AlertPublisher {
-    pub fn new(configs: &HashMap<AlertId, AlertConfig>, sender: EventSender) -> Self {
+    pub fn new(
+        configs: &HashMap<AlertId, AlertConfig>,
+        sender: EventSender,
+        metrics_exporter_handle: Option<MetricsExporterHandle>,
+    ) -> Self {
         Self {
             alerts: configs.clone(),
+
             sender,
+            metrics_exporter_handle,
+
             tasks: Mutex::new(HashMap::new()),
         }
     }
@@ -115,6 +141,11 @@ impl AlertPublisher {
                                 unit_ids: alert.unit_ids.clone(),
                             },
                         );
+
+                        if let Some(metrics_exporter_handle) = self.metrics_exporter_handle.clone()
+                        {
+                            metrics_exporter_handle.export_event(&AlertEvent(alert_id.clone()));
+                        }
                     }
                 } else if alert_fired {
                     alert_fired = false;

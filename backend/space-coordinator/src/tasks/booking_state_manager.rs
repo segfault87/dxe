@@ -13,6 +13,7 @@ use crate::client::DxeClient;
 use crate::config::events::{BookingEventConfig, BookingEventType};
 use crate::events::{Event, EventSender};
 use crate::tables::{QualifiedPath, TablePublisher};
+use crate::tasks::metrics_exporter::{EventDataPoint, MetricsExporterHandle};
 use crate::tasks::unit_fetcher::UnitsState;
 use crate::types::{BookingEventId, Endpoint, EventId, PublishKey};
 
@@ -47,12 +48,32 @@ struct BookingTask {
     is_active_offset_edge: Option<bool>,
 }
 
+struct BookingEvent {
+    booking_id: BookingId,
+    event_id: BookingEventId,
+}
+
+impl EventDataPoint<String, String> for BookingEvent {
+    fn measurement() -> &'static str {
+        "booking"
+    }
+
+    fn tags(&self) -> impl Iterator<Item = (&'static str, String)> {
+        vec![("booking_id", self.booking_id.to_string())].into_iter()
+    }
+
+    fn values(&self) -> impl Iterator<Item = (&'static str, String)> {
+        vec![("event_id", self.event_id.to_string())].into_iter()
+    }
+}
+
 pub struct BookingStateManager {
     config: HashMap<BookingEventId, BookingEventConfig>,
     offsets: HashMap<UnitId, (TimeDelta, TimeDelta)>,
     units: UnitsState,
 
     event_sender: EventSender,
+    metrics_exporter_handle: Option<MetricsExporterHandle>,
     scheduler: Scheduler,
     client: DxeClient,
 
@@ -69,6 +90,7 @@ impl BookingStateManager {
         client: DxeClient,
         scheduler: Scheduler,
         units: UnitsState,
+        metrics_exporter_handle: Option<MetricsExporterHandle>,
     ) -> Self {
         let mut offsets = HashMap::new();
 
@@ -96,6 +118,7 @@ impl BookingStateManager {
             offsets,
             units,
             event_sender,
+            metrics_exporter_handle,
             scheduler,
             client,
             booking_entries: Arc::new(Mutex::new(HashMap::new())),
@@ -270,7 +293,12 @@ impl BookingStateManager {
         for (key, value) in tasks_to_remove.into_iter() {
             let task_id = self.pending_task_ids.lock().remove(&key);
             if let Some(task_id) = task_id {
-                if let Ok(_) = Arc::clone(&self).scheduler.remove(task_id.as_str()).await {
+                if Arc::clone(&self)
+                    .scheduler
+                    .remove(task_id.as_str())
+                    .await
+                    .is_ok()
+                {
                     log::info!("Booking task {key} removed");
                 } else {
                     log::info!("Removing stale task {key}...");
@@ -296,7 +324,7 @@ impl BookingStateManager {
             let booking_event_id = key.0.clone();
             let is_active = value.is_active;
             let is_active_offset_edge = value.is_active_offset_edge;
-            let task = TaskBuilder::new(key.as_str(), move || {
+            let task = TaskBuilder::new(key.to_string().as_str(), move || {
                 if let Some(is_active) = is_active {
                     arc_self.clone().table.update_value(
                         booking_cloned.booking.unit_id.clone(),
@@ -318,6 +346,14 @@ impl BookingStateManager {
                         booking: booking_cloned.clone(),
                     },
                 );
+                if let Some(metrics_exporter_handle) =
+                    arc_self.clone().metrics_exporter_handle.clone()
+                {
+                    metrics_exporter_handle.export_event(&BookingEvent {
+                        booking_id: booking_cloned.booking.id,
+                        event_id: booking_event_id.clone(),
+                    });
+                }
 
                 let scheduler = arc_self.scheduler.clone();
                 let key = key_cloned.clone();

@@ -54,6 +54,8 @@ pub struct AlertConfig {
 #[derive(Debug, Deserialize)]
 pub struct Config {
     #[serde(default)]
+    pub export: bool,
+    #[serde(default)]
     pub bookings: HashMap<BookingEventId, BookingEventConfig>,
     #[serde(default)]
     pub alerts: HashMap<AlertId, AlertConfig>,

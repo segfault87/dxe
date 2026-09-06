@@ -20,4 +20,6 @@ pub struct Config {
         deserialize_with = "deserialize_time_delta_seconds"
     )]
     pub away_interval: TimeDelta,
+    #[serde(default)]
+    pub export: bool,
 }

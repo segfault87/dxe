@@ -15,6 +15,7 @@ use crate::client::DxeClient;
 use crate::config::Config;
 use crate::events::EventSender;
 use crate::services::carpark_exemption::CarparkExemptionService;
+use crate::services::influxdb::InfluxDbClient;
 use crate::services::mqtt::MqttService;
 use crate::services::notification::NotificationService;
 use crate::services::table_manager::TableManager;
@@ -25,6 +26,7 @@ use crate::tasks::audio_recorder::AudioRecorder;
 use crate::tasks::booking_reminder::BookingReminder;
 use crate::tasks::booking_state_manager::BookingStateManager;
 use crate::tasks::carpark_exempter::CarparkExempter;
+use crate::tasks::metrics_exporter::MetricsExporter;
 use crate::tasks::metrics_publisher::MetricsPublisher;
 use crate::tasks::notification_publisher::NotificationPublisher;
 use crate::tasks::osd_controller::OsdController;
@@ -57,6 +59,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     client.synchronize_clock().await?;
 
+    let influxdb_client = InfluxDbClient::new(&config.influxdb);
+    let metrics_exporter = MetricsExporter::new(influxdb_client);
+    let metrics_exporter_handle = metrics_exporter.handle();
+
     let unit_fetcher = UnitFetcher::new(client.clone()).await?;
     let (unit_fetcher, unit_fetcher_task) = unit_fetcher.task();
 
@@ -72,11 +78,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         client.clone(),
         task_context.scheduler.clone(),
         unit_fetcher.state(),
+        if config.events.export {
+            Some(metrics_exporter_handle.clone())
+        } else {
+            None
+        },
     );
 
-    let presence_monitor =
-        PresenceMonitor::new(&config.presence_monitor, event_sender.clone()).await;
-    let alert_publisher = AlertPublisher::new(&config.events.alerts, event_sender.clone());
+    let presence_monitor = PresenceMonitor::new(
+        &config.presence_monitor,
+        event_sender.clone(),
+        if config.presence_monitor.export {
+            Some(metrics_exporter_handle.clone())
+        } else {
+            None
+        },
+    )
+    .await;
+    let alert_publisher = AlertPublisher::new(
+        &config.events.alerts,
+        event_sender.clone(),
+        if config.events.export {
+            Some(metrics_exporter_handle.clone())
+        } else {
+            None
+        },
+    );
 
     let action_controller = ActionController::new(config.triggers.clone());
 
@@ -86,7 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     z2m_controller.start().await;
 
     let (sound_meter_controller, sound_meter_tasks) =
-        SoundMeterController::new(config.sound_meters.iter())?;
+        SoundMeterController::new(config.sound_meters.iter(), metrics_exporter_handle)?;
 
     let mut metrics_publisher = MetricsPublisher::new(config.metrics.iter());
 
@@ -165,6 +192,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         task_context.add_task(task).await?;
     }
 
+    let (_, metrics_exporter_task) = metrics_exporter.start();
+
     let presence_monitor_task = presence_monitor.task();
     let booking_state_manager_task = booking_state_manager.task();
 
@@ -177,8 +206,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     task_context.run().await;
 
+    metrics_exporter_task.abort();
     telemetry_manager.abort();
-
     for sound_meter_task in sound_meter_tasks {
         sound_meter_task.abort();
     }

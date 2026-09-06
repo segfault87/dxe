@@ -4,6 +4,7 @@ pub mod audio_recorder;
 pub mod booking_reminder;
 pub mod booking_state_manager;
 pub mod carpark_exempter;
+pub mod metrics_exporter;
 pub mod metrics_publisher;
 pub mod notification_publisher;
 pub mod osd_controller;

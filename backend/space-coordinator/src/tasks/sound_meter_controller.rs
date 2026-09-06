@@ -8,6 +8,7 @@ use tasi_sound_level_meter::TasiSoundLevelMeter;
 
 use crate::config::SoundMeterConfig;
 use crate::tables::{QualifiedPath, TablePublisher};
+use crate::tasks::metrics_exporter::{MetricsDataPoint, MetricsExporterHandle};
 use crate::types::{DeviceId, DeviceRef, DeviceType, PublishKey};
 
 #[pin_project::pin_project]
@@ -126,6 +127,25 @@ impl QualifiedPath for SoundMeterPath {
     }
 }
 
+struct SoundMeterMetricValue {
+    device_id: DeviceId,
+    value: f64,
+}
+
+impl MetricsDataPoint<f64, DeviceId> for SoundMeterMetricValue {
+    fn measurement() -> &'static str {
+        "sound_meter"
+    }
+
+    fn tags(&self) -> impl Iterator<Item = (&'static str, DeviceId)> {
+        vec![("device_id", self.device_id.clone())].into_iter()
+    }
+
+    fn values(&self) -> impl Iterator<Item = (&'static str, f64)> {
+        vec![("sound_level", self.value)].into_iter()
+    }
+}
+
 pub struct SoundMeterController {
     table: TablePublisher<DeviceId, DeviceRef, SoundMeterPath>,
 }
@@ -133,15 +153,19 @@ pub struct SoundMeterController {
 impl SoundMeterController {
     pub fn new<'a>(
         config: impl Iterator<Item = &'a SoundMeterConfig>,
+        metrics_exporter_handle: MetricsExporterHandle,
     ) -> Result<(Self, Vec<tokio::task::JoinHandle<()>>), Error> {
         let mut tasks = vec![];
 
         let table = TablePublisher::new();
 
         for config in config {
+            let metrics_exporter_handle_cloned = metrics_exporter_handle.clone();
+
             let (device, mut backend) = SoundMeterDevice::new(config)?;
             let publish_key = device.publish_key.clone();
             let device_id = config.id.clone();
+            let export = config.export;
 
             let table_inner = table.clone();
 
@@ -152,6 +176,12 @@ impl SoundMeterController {
                         publish_key.clone(),
                         serde_json::Number::from_f64(value).into(),
                     );
+                    if export {
+                        metrics_exporter_handle_cloned.export_metrics(SoundMeterMetricValue {
+                            device_id: device_id.clone(),
+                            value,
+                        });
+                    }
                 }
             });
 

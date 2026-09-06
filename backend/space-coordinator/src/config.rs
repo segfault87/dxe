@@ -183,6 +183,16 @@ pub struct SoundMeterConfig {
     #[serde(flatten)]
     pub device: SoundMeterDevice,
     pub publish_key: PublishKey,
+    #[serde(default)]
+    pub export: bool,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct InfluxDbConfig {
+    pub url: url::Url,
+    pub org: String,
+    pub bucket: String,
+    pub token: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -209,6 +219,7 @@ pub struct Config {
     pub telemetry: telemetry::Config,
     pub events: events::Config,
     pub triggers: Vec<triggers::Trigger>,
+    pub influxdb: InfluxDbConfig,
 }
 
 impl Config {

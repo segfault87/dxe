@@ -40,10 +40,10 @@ fun Modifier.centerHorizontally(): Modifier {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CenteredSlider(
+    modifier: Modifier = Modifier,
     value: Float,
     onValueChanged: (Float) -> Unit,
     enabled: Boolean = true,
-    modifier: Modifier = Modifier,
     valueRange: ClosedFloatingPointRange<Float> = -1f..1f,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     colors: SliderColors = SliderDefaults.colors(),
@@ -139,7 +139,7 @@ fun CenteredSlider(
 val CenteredThumb = @Composable {
     Box(
         Modifier
-            .size(24.dp)
+            .size(24.dp, 44.dp)
             .padding(4.dp)
             .background(MaterialTheme.colorScheme.primary, CircleShape)
     )

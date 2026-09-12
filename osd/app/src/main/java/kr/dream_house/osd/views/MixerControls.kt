@@ -89,11 +89,12 @@ private fun MixerRow(
             center = convertToLinear(0.0f),
             onValueChanged = {
                 onChangeLevel(convertToGain(it))
-             },
+            },
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.tertiary,
                 activeTrackColor = MaterialTheme.colorScheme.tertiary
             ),
+            thumb = CenteredThumb,
         )
         if (capabilities.contains(MixerCapability.CHANNEL_REVERB)) {
             if (!channel.capabilityReverb) {
@@ -178,7 +179,8 @@ private fun GlobalControlRow(
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.secondary,
                 activeTrackColor = MaterialTheme.colorScheme.secondary
-            )
+            ),
+            thumb = CenteredThumb,
         )
         Text(modifier = Modifier.padding(start = 24.dp, end = 8.dp), text = "개인 모니터 음량")
         CenteredSlider(
@@ -193,7 +195,8 @@ private fun GlobalControlRow(
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.secondary,
                 activeTrackColor = MaterialTheme.colorScheme.secondary
-            )
+            ),
+            thumb = CenteredThumb,
         )
     }
 }

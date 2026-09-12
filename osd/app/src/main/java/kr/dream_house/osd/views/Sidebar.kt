@@ -48,7 +48,7 @@ fun Sidebar(
                     style = MaterialTheme.typography.titleLarge
                 )
             }
-            ElevatedButton(
+            /*ElevatedButton(
                 modifier = Modifier.fillMaxWidth().padding(8.dp),
                 colors = ButtonDefaults.elevatedButtonColors(
                     contentColor = MaterialTheme.colorScheme.tertiary
@@ -61,7 +61,7 @@ fun Sidebar(
                     text = "도움말",
                     style = MaterialTheme.typography.titleLarge
                 )
-            }
+            }*/
         }
     }
 }

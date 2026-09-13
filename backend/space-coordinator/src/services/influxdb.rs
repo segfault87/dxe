@@ -66,27 +66,33 @@ impl InfluxDbClient {
         }
     }
 
-    pub async fn publish_loop<S: Stream<Item = Publishment> + Send + Sync + 'static>(
+    pub async fn publish_loop<S: Stream<Item = Publishment> + Send + Sync + Unpin + 'static>(
         &self,
-        stream: S,
+        mut stream: S,
     ) -> Result<(), Error> {
-        self.client
-            .write(
-                &self.bucket,
-                stream.filter_map(|v| async move {
-                    let mut datapoint = DataPoint::builder(v.measurement);
+        while let Some(item) = stream.next().await {
+            let mut datapoint = DataPoint::builder(item.measurement);
 
-                    for (name, value) in v.tags {
-                        datapoint = datapoint.tag(name, value);
-                    }
-                    for (name, value) in v.fields {
-                        datapoint = datapoint.field(name, value);
-                    }
+            for (name, value) in item.tags {
+                datapoint = datapoint.tag(name, value);
+            }
+            for (name, value) in item.fields {
+                datapoint = datapoint.field(name, value);
+            }
 
-                    datapoint.build().ok()
-                }),
-            )
-            .await?;
+            let datapoint = datapoint.build()?;
+
+            if let Err(e) = self
+                .client
+                .write(
+                    &self.bucket,
+                    futures::stream::once(async move { datapoint }),
+                )
+                .await
+            {
+                log::warn!("Could not write to InfluxDB: {e}");
+            }
+        }
 
         Ok(())
     }

@@ -15,7 +15,7 @@ use crate::events::{Event, EventSender};
 use crate::services::table_manager::{TableManager, TableSnapshot};
 use crate::tasks::booking_reminder::BookingReminder;
 use crate::tasks::z2m_controller::Z2mController;
-use crate::types::{DeviceRef, Z2mDeviceId};
+use crate::types::{CommandId, DeviceRef, Z2mDeviceId};
 
 pub struct DeviceController {
     booking_reminder: Arc<BookingReminder>,
@@ -128,6 +128,25 @@ impl DeviceController {
                 .await
             {
                 log::warn!("Could not set switch state for {z2m_device_id}: {e}");
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn send_commands<'a>(
+        self: Arc<Self>,
+        commands: impl Iterator<Item = (&'a DeviceRef, &'a Vec<CommandId>)>,
+    ) -> Result<(), Box<dyn StdError>> {
+        for (z2m_device_id, commands) in commands.filter_map(|(k, v)| {
+            Some((TryInto::<Z2mDeviceId>::try_into(k.clone()).ok()?, v.clone()))
+        }) {
+            if let Err(e) = self
+                .z2m_controller
+                .send_commands(z2m_device_id.clone(), commands.iter())
+                .await
+            {
+                log::warn!("Could not send command to {z2m_device_id}: {e}");
             }
         }
 
@@ -247,6 +266,12 @@ impl ActionController {
                                 cloned_device_controller
                                     .clone()
                                     .control_devices(switches.iter())
+                                    .await
+                            }
+                            TriggerAction::Commands(commands) => {
+                                cloned_device_controller
+                                    .clone()
+                                    .send_commands(commands.iter())
                                     .await
                             }
                             TriggerAction::Delay(delay) => {

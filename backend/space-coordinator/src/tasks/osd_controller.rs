@@ -3,26 +3,28 @@ pub mod types;
 
 use std::collections::{HashMap, HashSet};
 use std::error::Error as StdError;
+use std::iter::once;
 use std::sync::Arc;
 
 use dxe_s2s_shared::entities::BookingWithUsers;
 use dxe_s2s_shared::handlers::{GetMixerConfigResponse, UpdateMixerConfigRequest};
-use dxe_types::entities::MixerPresets;
-use dxe_types::{IdentityId, UnitId};
+use dxe_types::{IdentityId, MixerChannelId, UnitId};
 use futures::StreamExt;
 use parking_lot::Mutex;
 use rumqttc::Publish;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
 use tokio_task_scheduler::{Task, TaskBuilder};
 
 use crate::callback::LifecycleEventCallback;
 use crate::client::DxeClient;
-use crate::config::osd::Config as OsdConfig;
+use crate::config::osd::{Config as OsdConfig, MixerConfig};
 use crate::events::{Event, EventSender};
+use crate::services::influxdb::MetricValue;
 use crate::services::mqtt::{Error as MqttError, MqttService, MqttTopicPrefix};
+use crate::tasks::metrics_exporter::{IntoDataPoint, MetricsExporterHandle};
 use crate::tasks::osd_controller::topics::{Alert, DoorLockOpenResult};
-use crate::tasks::osd_controller::types::AlertData;
+use crate::tasks::osd_controller::types::{AlertData, MixerChannelData, MixerGlobalData};
 use crate::tasks::unit_fetcher::UnitsState;
 use crate::types::EventId;
 
@@ -30,15 +32,78 @@ pub trait OsdTopic: Serialize {
     fn topic_name(&self) -> String;
 }
 
+#[derive(Deserialize)]
+struct MixerStateUpdates {
+    overwrite: bool,
+    channels: HashMap<MixerChannelId, MixerChannelData>,
+    globals: Option<MixerGlobalData>,
+}
+
+struct MixerChannelDataPoint<'a> {
+    channel: &'a MixerChannelId,
+    data: &'a MixerChannelData,
+}
+
+impl<'a> IntoDataPoint for MixerChannelDataPoint<'a> {
+    fn measurement() -> &'static str {
+        "mixer_states"
+    }
+
+    fn tags(&self) -> impl Iterator<Item = (&'static str, String)> {
+        once(("channel", self.channel.to_string()))
+    }
+
+    fn fields(&self) -> impl Iterator<Item = (&'static str, MetricValue)> {
+        vec![
+            (
+                "level",
+                MetricValue::Float(self.data.level.unwrap_or(-127.0)),
+            ),
+            ("pan", MetricValue::Float(self.data.pan.unwrap_or(0.0))),
+            (
+                "reverb",
+                MetricValue::Float(self.data.level.unwrap_or(-127.0)),
+            ),
+            (
+                "mute",
+                MetricValue::Boolean(self.data.mute.unwrap_or(false)),
+            ),
+        ]
+        .into_iter()
+    }
+}
+
+struct MixerGlobalDataPoint<'a> {
+    data: &'a MixerGlobalData,
+}
+
+impl<'a> IntoDataPoint for MixerGlobalDataPoint<'a> {
+    fn measurement() -> &'static str {
+        "mixer_states"
+    }
+
+    fn tags(&self) -> impl Iterator<Item = (&'static str, String)> {
+        once(("channel", "global".to_owned()))
+    }
+
+    fn fields(&self) -> impl Iterator<Item = (&'static str, MetricValue)> {
+        once((
+            "level",
+            MetricValue::Float(self.data.master_level.unwrap_or(0.0)),
+        ))
+    }
+}
+
 #[derive(Debug)]
 pub struct OsdController {
     client: DxeClient,
     mqtt_service: MqttService,
+    metrics_exporter_handle: Option<MetricsExporterHandle>,
     units: UnitsState,
 
     topic_prefix: MqttTopicPrefix,
     alerts: HashMap<EventId, Vec<AlertData>>,
-    mixer_configs: HashMap<UnitId, MixerPresets>,
+    mixer_configs: HashMap<UnitId, MixerConfig>,
     doorbell_event_id: Option<EventId>,
 
     event_receiver: Mutex<Option<JoinHandle<()>>>,
@@ -50,6 +115,7 @@ impl OsdController {
         config: &OsdConfig,
         client: DxeClient,
         mqtt_service: MqttService,
+        metrics_exporter_handle: Option<MetricsExporterHandle>,
         units: UnitsState,
     ) -> Self {
         let mut alerts: HashMap<EventId, Vec<AlertData>> = HashMap::new();
@@ -66,6 +132,7 @@ impl OsdController {
         Self {
             client,
             mqtt_service,
+            metrics_exporter_handle,
             units,
 
             topic_prefix: config.topic_prefix.clone(),
@@ -132,6 +199,27 @@ impl OsdController {
     async fn handle_message(self: Arc<Self>, message: Publish) {
         if message.topic == self.topic_prefix.topic("doorlock/set") {
             self.clone().handle_doorlock().await;
+        } else if let topic = self.topic_prefix.topic("mixer_state/")
+            && message.topic.starts_with(&topic)
+            && message.topic.ends_with("/sync")
+        {
+            let Some(unit_id) = message
+                .topic
+                .strip_prefix(&topic)
+                .and_then(|v| v.strip_suffix("/sync"))
+            else {
+                log::warn!(
+                    "Invalid unit id for mixer_preferences/+/set: {}",
+                    message.topic
+                );
+                return;
+            };
+            let unit_id = UnitId::from(unit_id.to_owned());
+
+            match serde_json::from_slice::<MixerStateUpdates>(&message.payload) {
+                Ok(payload) => self.clone().publish_mixer_states(unit_id, payload).await,
+                Err(e) => log::warn!("Could not deserialize mixer states: {e}"),
+            }
         } else if let topic = self.topic_prefix.topic("mixer_preferences/")
             && message.topic.starts_with(&topic)
             && message.topic.ends_with("/set")
@@ -191,6 +279,40 @@ impl OsdController {
         }
     }
 
+    async fn publish_mixer_states(
+        self: Arc<Self>,
+        unit_id: UnitId,
+        mut updates: MixerStateUpdates,
+    ) {
+        let Some(metrics_exporter_handle) = self.metrics_exporter_handle.clone() else {
+            return;
+        };
+
+        let Some(mixer_config) = self.mixer_configs.get(&unit_id) else {
+            return;
+        };
+
+        if !mixer_config.export {
+            return;
+        }
+
+        if updates.overwrite {
+            for channel_id in mixer_config.channels.keys() {
+                updates.channels.entry(channel_id.clone()).or_default();
+            }
+            if updates.globals.is_none() {
+                updates.globals = Some(Default::default());
+            }
+        }
+
+        for (channel, data) in updates.channels.iter() {
+            metrics_exporter_handle.export(&MixerChannelDataPoint { channel, data })
+        }
+        if let Some(data) = &updates.globals {
+            metrics_exporter_handle.export(&MixerGlobalDataPoint { data })
+        }
+    }
+
     async fn send_mixer_states(self: Arc<Self>, unit_id: UnitId, identity_id: IdentityId) {
         let prefs = match self
             .client
@@ -244,6 +366,10 @@ impl OsdController {
         self.mqtt_service
             .subscribe(&self.topic_prefix.topic("mixer_preferences/+/set"))
             .await?;
+        self.mqtt_service
+            .subscribe(&self.topic_prefix.topic("mixer_states/+/sync"))
+            .await?;
+
         let mut subscriber = self.mqtt_service.receiver(self.topic_prefix.clone());
 
         let arc_self = Arc::new(self);
@@ -340,10 +466,6 @@ impl LifecycleEventCallback<BookingWithUsers> for OsdController {
             log::warn!("Could not send SetScreenState to OSD: {e}");
         }
 
-        self.clone()
-            .send_mixer_states(event.booking.unit_id.clone(), event.booking.customer_id)
-            .await;
-
         let booking = types::Booking {
             booking_id: event.booking.id,
             customer_id: event.booking.customer_id,
@@ -352,9 +474,26 @@ impl LifecycleEventCallback<BookingWithUsers> for OsdController {
             time_to: event.booking.date_end.to_utc(),
         };
 
-        self.clone()
-            .send_mixer_states(event.booking.unit_id.clone(), event.booking.customer_id)
-            .await;
+        if let Some(mixer_config) = self.clone().mixer_configs.get(&event.booking.unit_id) {
+            self.clone()
+                .send_mixer_states(event.booking.unit_id.clone(), event.booking.customer_id)
+                .await;
+
+            self.clone()
+                .publish_mixer_states(
+                    event.booking.unit_id.clone(),
+                    MixerStateUpdates {
+                        overwrite: true,
+                        channels: mixer_config
+                            .channels
+                            .iter()
+                            .map(|(k, v)| (k.clone(), v.clone().into()))
+                            .collect(),
+                        globals: Some(mixer_config.globals.clone().into()),
+                    },
+                )
+                .await;
+        }
 
         if let Err(e) = self
             .publish(&topics::CurrentSession {

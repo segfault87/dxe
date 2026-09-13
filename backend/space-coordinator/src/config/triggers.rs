@@ -4,7 +4,7 @@ use std::time::Duration;
 use serde::Deserialize;
 
 use crate::device::SwitchState;
-use crate::types::{DeviceRef, EndpointKey, EventId};
+use crate::types::{CommandId, DeviceRef, EndpointKey, EventId};
 use crate::utils::boolean::Expression;
 use crate::utils::deserializers::deserialize_duration_milliseconds;
 
@@ -21,6 +21,7 @@ pub enum TriggerAction {
     #[serde(rename = "delay_milliseconds")]
     Delay(#[serde(deserialize_with = "deserialize_duration_milliseconds")] Duration),
     Switches(HashMap<DeviceRef, SwitchState>),
+    Commands(HashMap<DeviceRef, Vec<CommandId>>),
     BookingControl(StateAction),
     OsdControl(StateAction),
     BookingReminder,

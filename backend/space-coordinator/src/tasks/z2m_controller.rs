@@ -13,7 +13,9 @@ use crate::config::z2m;
 use crate::device::SwitchState;
 use crate::services::mqtt::{Error as MqttError, MqttService, MqttTopicPrefix};
 use crate::tables::{QualifiedPath, SingleTable, TablePublisher};
-use crate::types::{DeviceId, DeviceRef, DeviceType, PublishKey, PublishedValues, Z2mDeviceId};
+use crate::types::{
+    CommandId, DeviceId, DeviceRef, DeviceType, PublishKey, PublishedValues, Z2mDeviceId,
+};
 use crate::utils::boolean::Error as BooleanError;
 
 const MQTT_TOPIC_PREFIX_Z2M: MqttTopicPrefix = MqttTopicPrefix::new_const("zigbee2mqtt");
@@ -385,9 +387,47 @@ impl Z2mController {
         }
     }
 
-    async fn update(self: Arc<Self>) {
-        // TODO
+    pub async fn send_commands<'a>(
+        &self,
+        device_id: Z2mDeviceId,
+        command_ids: impl Iterator<Item = &'a CommandId>,
+    ) -> Result<(), Error> {
+        let device = self
+            .devices
+            .get(&device_id)
+            .ok_or(Error::StateNotFound(device_id.clone()))?;
+
+        let Some(command_publisher) = &device.classes.command_publisher else {
+            return Err(Error::DeviceNotCompliant(
+                device_id.clone(),
+                "command_publisher",
+            ));
+        };
+
+        let mut values = vec![];
+
+        for command_id in command_ids {
+            let Some(commands) = command_publisher.commands.get(command_id) else {
+                log::warn!("Command {command_id} not found in z2m device {device_id}");
+                continue;
+            };
+
+            values.push(
+                commands
+                    .iter()
+                    .map(|(k, v)| (k.clone(), serde_json::Value::String(v.to_owned())))
+                    .collect::<PublishedValues>(),
+            );
+        }
+
+        if !values.is_empty() {
+            self.set_state(device_id.clone(), &values).await?;
+        }
+
+        Ok(())
     }
+
+    async fn update(self: Arc<Self>) {}
 
     pub fn task(self) -> (Arc<Self>, JoinHandle<()>, Task) {
         let task_name = "mqtt_controller".to_string();

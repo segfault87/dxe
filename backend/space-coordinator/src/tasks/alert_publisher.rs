@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::iter::once;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -9,13 +10,14 @@ use tokio::task::JoinHandle;
 
 use crate::config::events::AlertConfig;
 use crate::events::{Event, EventSender};
+use crate::services::influxdb::MetricValue;
 use crate::services::table_manager::{TableManager, TableSnapshot};
-use crate::tasks::metrics_exporter::{EventDataPoint, MetricsExporterHandle};
+use crate::tasks::metrics_exporter::{IntoDataPoint, MetricsExporterHandle};
 use crate::types::{AlertId, EventId};
 
 struct AlertEvent(AlertId);
 
-impl EventDataPoint<String, String> for AlertEvent {
+impl IntoDataPoint for AlertEvent {
     fn measurement() -> &'static str {
         "alert"
     }
@@ -24,8 +26,8 @@ impl EventDataPoint<String, String> for AlertEvent {
         std::iter::empty()
     }
 
-    fn values(&self) -> impl Iterator<Item = (&'static str, String)> {
-        vec![("alert_id", self.0.clone().into())].into_iter()
+    fn fields(&self) -> impl Iterator<Item = (&'static str, MetricValue)> {
+        once(("alert_id", MetricValue::String(self.0.clone().into())))
     }
 }
 
@@ -144,7 +146,7 @@ impl AlertPublisher {
 
                         if let Some(metrics_exporter_handle) = self.metrics_exporter_handle.clone()
                         {
-                            metrics_exporter_handle.export_event(&AlertEvent(alert_id.clone()));
+                            metrics_exporter_handle.export(&AlertEvent(alert_id.clone()));
                         }
                     }
                 } else if alert_fired {

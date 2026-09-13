@@ -32,7 +32,6 @@ use crate::tasks::notification_publisher::NotificationPublisher;
 use crate::tasks::osd_controller::OsdController;
 use crate::tasks::presence_monitor::PresenceMonitor;
 use crate::tasks::sound_meter_controller::SoundMeterController;
-use crate::tasks::telemetry_manager::TelemetryManager;
 use crate::tasks::unit_fetcher::UnitFetcher;
 use crate::tasks::z2m_controller::Z2mController;
 
@@ -113,7 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     z2m_controller.start().await;
 
     let (sound_meter_controller, sound_meter_tasks) =
-        SoundMeterController::new(config.sound_meters.iter(), metrics_exporter_handle)?;
+        SoundMeterController::new(config.sound_meters.iter(), metrics_exporter_handle.clone())?;
 
     let mut metrics_publisher = MetricsPublisher::new(config.metrics.iter());
 
@@ -131,11 +130,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &config.osd,
         client.clone(),
         mqtt_service.clone(),
+        if config.events.export {
+            Some(metrics_exporter_handle)
+        } else {
+            None
+        },
         unit_fetcher.state(),
     );
-
-    let telemetry_manager =
-        TelemetryManager::new(&config.telemetry, client.clone(), table_manager.clone())?;
 
     let (z2m_controller, z2m_consumer_task, z2m_controller_task) = z2m_controller.task();
     let mut device_controller =
@@ -164,7 +165,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .start(event_sender.clone());
 
     device_controller.add_booking_state_callback(audio_recorder);
-    device_controller.add_booking_state_callback(telemetry_manager.clone());
     device_controller.add_osd_state_callback(osd_controller.clone());
 
     let device_controller = device_controller.build();
@@ -207,7 +207,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     task_context.run().await;
 
     metrics_exporter_task.abort();
-    telemetry_manager.abort();
     for sound_meter_task in sound_meter_tasks {
         sound_meter_task.abort();
     }

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::iter::once;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
@@ -9,8 +10,9 @@ use tokio_task_scheduler::{Task, TaskBuilder};
 
 use crate::config::presence::{Config, PresenceIdentityConfig};
 use crate::events::{Event, EventSender};
+use crate::services::influxdb::MetricValue;
 use crate::tables::{QualifiedPath, TablePublisher};
-use crate::tasks::metrics_exporter::{EventDataPoint, MetricsExporterHandle};
+use crate::tasks::metrics_exporter::{IntoDataPoint, MetricsExporterHandle};
 use crate::types::{Endpoint, EventId, PresenceEvent, PresenceRef, PublishKey, TenantId};
 
 static PUBLISH_KEY_IS_PRESENT: PublishKey = PublishKey::new_const("is_present");
@@ -48,17 +50,17 @@ impl PresenceState {
     }
 }
 
-impl EventDataPoint<bool, TenantId> for PresenceState {
+impl IntoDataPoint for PresenceState {
     fn measurement() -> &'static str {
         "presence"
     }
 
-    fn tags(&self) -> impl Iterator<Item = (&'static str, TenantId)> {
-        vec![("tenant_id", self.tenant_id.clone())].into_iter()
+    fn tags(&self) -> impl Iterator<Item = (&'static str, String)> {
+        once(("tenant_id", self.tenant_id.to_string()))
     }
 
-    fn values(&self) -> impl Iterator<Item = (&'static str, bool)> {
-        vec![("presence", self.is_present)].into_iter()
+    fn fields(&self) -> impl Iterator<Item = (&'static str, MetricValue)> {
+        once(("presence", self.is_present.into()))
     }
 }
 
@@ -145,7 +147,7 @@ impl PresenceMonitor {
                         },
                     );
                     if let Some(metrics_exporter_handle) = self.metrics_exporter_handle.clone() {
-                        metrics_exporter_handle.export_event(state);
+                        metrics_exporter_handle.export(state);
                     }
                     self.table.update_value(
                         PresenceRef::Tenant(tenant_id.clone()),
@@ -187,7 +189,7 @@ impl PresenceMonitor {
                         },
                     );
                     if let Some(metrics_exporter_handle) = self.metrics_exporter_handle.clone() {
-                        metrics_exporter_handle.export_event(state);
+                        metrics_exporter_handle.export(state);
                     }
                     self.table.update_value(
                         PresenceRef::Tenant(tenant_id.clone()),
@@ -195,7 +197,7 @@ impl PresenceMonitor {
                         serde_json::Value::Bool(false),
                     );
                     if let Some(metrics_exporter_handle) = self.metrics_exporter_handle.clone() {
-                        metrics_exporter_handle.export_event(state);
+                        metrics_exporter_handle.export(state);
                     }
                     self.tenant_count
                         .update(Ordering::Release, Ordering::Acquire, |v| {

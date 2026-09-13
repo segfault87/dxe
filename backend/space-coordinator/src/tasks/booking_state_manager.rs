@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::iter::once;
 use std::sync::Arc;
 
 use chrono::{DateTime, Local, TimeDelta, Utc};
@@ -12,8 +13,9 @@ use tokio_task_scheduler::{Scheduler, Task, TaskBuilder};
 use crate::client::DxeClient;
 use crate::config::events::{BookingEventConfig, BookingEventType};
 use crate::events::{Event, EventSender};
+use crate::services::influxdb::MetricValue;
 use crate::tables::{QualifiedPath, TablePublisher};
-use crate::tasks::metrics_exporter::{EventDataPoint, MetricsExporterHandle};
+use crate::tasks::metrics_exporter::{IntoDataPoint, MetricsExporterHandle};
 use crate::tasks::unit_fetcher::UnitsState;
 use crate::types::{BookingEventId, Endpoint, EventId, PublishKey};
 
@@ -53,17 +55,17 @@ struct BookingEvent {
     event_id: BookingEventId,
 }
 
-impl EventDataPoint<String, String> for BookingEvent {
+impl IntoDataPoint for BookingEvent {
     fn measurement() -> &'static str {
         "booking"
     }
 
     fn tags(&self) -> impl Iterator<Item = (&'static str, String)> {
-        vec![("booking_id", self.booking_id.to_string())].into_iter()
+        once(("booking_id", self.booking_id.to_string()))
     }
 
-    fn values(&self) -> impl Iterator<Item = (&'static str, String)> {
-        vec![("event_id", self.event_id.to_string())].into_iter()
+    fn fields(&self) -> impl Iterator<Item = (&'static str, MetricValue)> {
+        once(("event_id", self.event_id.to_string().into()))
     }
 }
 
@@ -349,7 +351,7 @@ impl BookingStateManager {
                 if let Some(metrics_exporter_handle) =
                     arc_self.clone().metrics_exporter_handle.clone()
                 {
-                    metrics_exporter_handle.export_event(&BookingEvent {
+                    metrics_exporter_handle.export(&BookingEvent {
                         booking_id: booking_cloned.booking.id,
                         event_id: booking_event_id.clone(),
                     });

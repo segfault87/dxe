@@ -1,3 +1,4 @@
+use std::iter::once;
 use std::pin::Pin;
 use std::task::Poll;
 use std::time::Duration;
@@ -7,8 +8,9 @@ use futures::{Stream, StreamExt};
 use tasi_sound_level_meter::TasiSoundLevelMeter;
 
 use crate::config::SoundMeterConfig;
+use crate::services::influxdb::MetricValue;
 use crate::tables::{QualifiedPath, TablePublisher};
-use crate::tasks::metrics_exporter::{MetricsDataPoint, MetricsExporterHandle};
+use crate::tasks::metrics_exporter::{IntoDataPoint, MetricsExporterHandle};
 use crate::types::{DeviceId, DeviceRef, DeviceType, PublishKey};
 
 #[pin_project::pin_project]
@@ -132,17 +134,17 @@ struct SoundMeterMetricValue {
     value: f64,
 }
 
-impl MetricsDataPoint<f64, DeviceId> for SoundMeterMetricValue {
+impl IntoDataPoint for SoundMeterMetricValue {
     fn measurement() -> &'static str {
         "sound_meter"
     }
 
-    fn tags(&self) -> impl Iterator<Item = (&'static str, DeviceId)> {
-        vec![("device_id", self.device_id.clone())].into_iter()
+    fn tags(&self) -> impl Iterator<Item = (&'static str, String)> {
+        once(("device_id", self.device_id.to_string()))
     }
 
-    fn values(&self) -> impl Iterator<Item = (&'static str, f64)> {
-        vec![("sound_level", self.value)].into_iter()
+    fn fields(&self) -> impl Iterator<Item = (&'static str, MetricValue)> {
+        once(("sound_level", self.value.into()))
     }
 }
 
@@ -177,7 +179,7 @@ impl SoundMeterController {
                         serde_json::Number::from_f64(value).into(),
                     );
                     if export {
-                        metrics_exporter_handle_cloned.export_metrics(SoundMeterMetricValue {
+                        metrics_exporter_handle_cloned.export(&SoundMeterMetricValue {
                             device_id: device_id.clone(),
                             value,
                         });

@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use chrono::TimeDelta;
 use serde::Deserialize;
 
-use crate::types::{PublishKey, PublishedValues, Z2mDeviceId};
+use crate::types::{CommandId, PublishKey, PublishedValues, Z2mDeviceId};
 use crate::utils::boolean::{ComparisonOperator, Condition, Expression};
 use crate::utils::deserializers::deserialize_time_delta_seconds;
 
@@ -60,10 +60,16 @@ pub struct DeviceClassSwitch {
     pub state_keys: Vec<PublishKey>,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+pub struct DeviceClassCommandPublisher {
+    pub commands: HashMap<CommandId, HashMap<PublishKey, String>>,
+}
+
 #[derive(Clone, Debug, Deserialize, Default)]
 pub struct DeviceClasses {
     pub power_meter: Option<DeviceClassPowerMeter>,
     pub switch: Option<DeviceClassSwitch>,
+    pub command_publisher: Option<DeviceClassCommandPublisher>,
 }
 
 #[derive(Clone, Debug, Deserialize)]

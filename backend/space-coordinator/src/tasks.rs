@@ -10,7 +10,6 @@ pub mod notification_publisher;
 pub mod osd_controller;
 pub mod presence_monitor;
 pub mod sound_meter_controller;
-pub mod telemetry_manager;
 pub mod unit_fetcher;
 pub mod z2m_controller;
 

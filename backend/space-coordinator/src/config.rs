@@ -2,7 +2,6 @@ pub mod events;
 pub mod metrics;
 pub mod osd;
 pub mod presence;
-pub mod telemetry;
 pub mod triggers;
 pub mod z2m;
 
@@ -216,7 +215,6 @@ pub struct Config {
     pub sound_meters: Vec<SoundMeterConfig>,
     pub metrics: Vec<metrics::Metric>,
     pub osd: osd::Config,
-    pub telemetry: telemetry::Config,
     pub events: events::Config,
     pub triggers: Vec<triggers::Trigger>,
     pub influxdb: InfluxDbConfig,

@@ -222,6 +222,7 @@ impl DxeClient {
         Ok(serde_json::from_value(response)?)
     }
 
+    #[allow(dead_code)]
     pub async fn post_multipart<R: DeserializeOwned>(
         &self,
         path: &str,

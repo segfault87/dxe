@@ -199,7 +199,7 @@ impl OsdController {
     async fn handle_message(self: Arc<Self>, message: Publish) {
         if message.topic == self.topic_prefix.topic("doorlock/set") {
             self.clone().handle_doorlock().await;
-        } else if let topic = self.topic_prefix.topic("mixer_state/")
+        } else if let topic = self.topic_prefix.topic("mixer_states/")
             && message.topic.starts_with(&topic)
             && message.topic.ends_with("/sync")
         {

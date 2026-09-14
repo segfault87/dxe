@@ -62,7 +62,7 @@ impl<'a> IntoDataPoint for MixerChannelDataPoint<'a> {
             ("pan", MetricValue::Float(self.data.pan.unwrap_or(0.0))),
             (
                 "reverb",
-                MetricValue::Float(self.data.level.unwrap_or(-127.0)),
+                MetricValue::Float(self.data.reverb.unwrap_or(-127.0)),
             ),
             (
                 "mute",

@@ -34,8 +34,11 @@ pub trait OsdTopic: Serialize {
 
 #[derive(Deserialize)]
 struct MixerStateUpdates {
+    #[serde(default)]
     overwrite: bool,
+    #[serde(default)]
     channels: HashMap<MixerChannelId, MixerChannelData>,
+    #[serde(default)]
     globals: Option<MixerGlobalData>,
 }
 

@@ -9,7 +9,6 @@ base64 = { workspace = true }
 bytes = "1.10"
 chrono = { workspace = true }
 clap = { workspace = true }
-csv-async = { workspace = true }
 ed25519-compact = "2"
 env_logger = "0.11"
 futures = "0.3"

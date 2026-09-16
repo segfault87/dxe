@@ -1436,7 +1436,6 @@ dependencies = [
  "bytes",
  "chrono",
  "clap",
- "csv-async",
  "dxe-extern",
  "dxe-s2s-shared",
  "dxe-types",

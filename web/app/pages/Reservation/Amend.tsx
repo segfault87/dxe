@@ -1,5 +1,5 @@
 import { isAxiosError } from "axios";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { redirect, useNavigate } from "react-router";
 import { loadTossPayments } from "@tosspayments/tosspayments-sdk";
 import type { TossPaymentsWidgets } from "@tosspayments/tosspayments-sdk";
@@ -13,10 +13,15 @@ import { useEnv } from "../../context/EnvContext";
 import { checkSlots, toUtcIso8601 } from "../../lib/datetime";
 import { defaultErrorHandler } from "../../lib/error";
 import RequiresAuth from "../../lib/RequiresAuth";
+import AttachmentSelection from "../../components/AttachmentSelection";
 import Calendar from "../../components/Calendar";
 import Section from "../../components/Section";
-import type { UserId } from "../../types/models/base";
-import type { Booking, OccupiedSlot } from "../../types/models/booking";
+import type { BookingAttachmentId, UserId } from "../../types/models/base";
+import type {
+  Booking,
+  BookingAttachment,
+  OccupiedSlot,
+} from "../../types/models/booking";
 
 export function meta(): Route.MetaDescriptors {
   return [{ title: "예약 변경 | 드림하우스 합주실" }];
@@ -215,37 +220,64 @@ function AmendReservation({ loaderData }: Route.ComponentProps) {
   );
   const [price, setPrice] = useState<number | null>(null);
 
+  const [attachments, setAttachments] = useState<BookingAttachment[]>([]);
+  const [unavailableAttachmentIds, setUnavailableAttachmentIds] = useState<
+    BookingAttachmentId[]
+  >([]);
+  const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<
+    BookingAttachmentId[]
+  >([]);
+  const includedAttachmentIds = useMemo(
+    () => booking.attachments.map((v) => v.id),
+    [booking],
+  );
+
   const [tossPaymentsWidgets, setTossPaymentsWidgets] =
     useState<TossPaymentsWidgets | null>(null);
   const [hasAgreedRequiredTerms, setAgreedRequiredTerms] = useState(true);
 
   const [isRequestInProgress, setRequestInProgress] = useState(false);
 
+  // Time is left unchanged unless a new time range is fully selected, so that
+  // attachments alone can be added to the booking
+  const isTimeSelected = selectedTime !== null && selectedHours !== null;
+  const isTimeSelectionIncomplete = selectedDate !== null && !isTimeSelected;
+
   const isAvailable =
-    selectedDate !== null &&
-    selectedTime !== null &&
-    selectedHours !== null &&
+    !isTimeSelectionIncomplete &&
+    (isTimeSelected || selectedAttachmentIds.length > 0) &&
     !isRequestInProgress &&
     hasAgreedRequiredTerms;
 
   const proceed = async () => {
-    if (selectedTime === null || selectedHours === null) {
+    if (isTimeSelectionIncomplete) {
       return;
     }
 
-    const additionalHours = selectedHours - booking.bookingHours;
+    const additionalHours =
+      selectedHours !== null ? selectedHours - booking.bookingHours : 0;
 
     setRequestInProgress(true);
     try {
       const amendResult = await BookingService.amend(booking.id, {
-        newTimeFrom: toUtcIso8601(selectedTime),
+        newTimeFrom:
+          selectedTime !== null ? toUtcIso8601(selectedTime) : undefined,
         additionalHours,
+        attachmentIds: selectedAttachmentIds,
       });
 
       if (amendResult.data.foreignPaymentId) {
+        const orderNames = [];
+        if (additionalHours > 0) {
+          orderNames.push(`추가 공간이용료 (${additionalHours} 시간)`);
+        }
+        if (selectedAttachmentIds.length > 0) {
+          orderNames.push(`대여물품 (${selectedAttachmentIds.length}개)`);
+        }
+
         await tossPaymentsWidgets?.requestPayment({
           orderId: amendResult.data.foreignPaymentId,
-          orderName: `추가 공간이용료 (${additionalHours} 시간)`,
+          orderName: orderNames.join(", "),
           successUrl:
             window.location.origin + "/reservation/payment/toss/success/",
           failUrl: window.location.origin + "/reservation/payment/toss/fail/",
@@ -299,21 +331,65 @@ function AmendReservation({ loaderData }: Route.ComponentProps) {
   });
 
   useEffect(() => {
+    let isStale = false;
+
+    const fetchAttachments = async () => {
+      try {
+        const result =
+          selectedTime !== null && selectedHours !== null
+            ? await BookingService.getAttachments(
+                selectedTime,
+                selectedHours,
+                booking.id,
+              )
+            : await BookingService.getAttachments(
+                new Date(booking.bookingStart),
+                booking.bookingHours,
+                booking.id,
+              );
+        if (isStale) {
+          return;
+        }
+
+        const unavailableIds = result.data.unavailableAttachmentIds;
+        setAttachments(result.data.attachments);
+        setUnavailableAttachmentIds(unavailableIds);
+        setSelectedAttachmentIds((ids) =>
+          ids.filter((id) => !unavailableIds.includes(id)),
+        );
+      } catch (error) {
+        defaultErrorHandler(error);
+      }
+    };
+
+    fetchAttachments();
+
+    return () => {
+      isStale = true;
+    };
+  }, [booking, selectedTime, selectedHours]);
+
+  useEffect(() => {
     const checkAvailability = async () => {
-      if (selectedTime === null || selectedHours === null) {
+      const isTimeSelected = selectedTime !== null && selectedHours !== null;
+      if (!isTimeSelected && selectedAttachmentIds.length === 0) {
         setPrice(null);
         return;
       }
 
       setErrorMessage("");
 
+      const timeFrom = selectedTime ?? new Date(booking.bookingStart);
+      const desiredHours = selectedHours ?? booking.bookingHours;
+
       try {
         const result = await BookingService.check({
           unitId: DEFAULT_UNIT_ID,
-          desiredHours: selectedHours,
-          timeFrom: toUtcIso8601(selectedTime),
-          additionalHours: selectedHours - booking.bookingHours,
+          desiredHours,
+          timeFrom: toUtcIso8601(timeFrom),
+          additionalHours: desiredHours - booking.bookingHours,
           excludeBookingId: booking.id,
+          attachmentIds: [...includedAttachmentIds, ...selectedAttachmentIds],
         });
         if (result.data.totalPrice > 0) {
           setPrice(result.data.totalPrice);
@@ -328,7 +404,13 @@ function AmendReservation({ loaderData }: Route.ComponentProps) {
     };
 
     checkAvailability();
-  }, [booking, selectedTime, selectedHours]);
+  }, [
+    booking,
+    selectedTime,
+    selectedHours,
+    includedAttachmentIds,
+    selectedAttachmentIds,
+  ]);
 
   return (
     <>
@@ -362,6 +444,17 @@ function AmendReservation({ loaderData }: Route.ComponentProps) {
         ) : null}
         {errorMessage ? <p className="error-message">{errorMessage}</p> : null}
       </Section>
+      {attachments.length > 0 ? (
+        <Section id="attachments" title="대여물품 추가">
+          <AttachmentSelection
+            attachments={attachments}
+            unavailableAttachmentIds={unavailableAttachmentIds}
+            includedAttachmentIds={includedAttachmentIds}
+            selectedAttachmentIds={selectedAttachmentIds}
+            onSelectAttachmentIds={setSelectedAttachmentIds}
+          />
+        </Section>
+      ) : null}
       {auth && price !== null && price > 0 ? (
         <Section id="payment" title="결제 정보">
           <TossPayment

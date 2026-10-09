@@ -56,7 +56,7 @@ export default function Guide() {
               <li>Orange Dual Terror 30W Guitar Amp Head</li>
               <li>Marshall 1936 2×12 Guitar Amp Cabinet</li>
               <li>Fender Frontman 212R Guitar Amp</li>
-              <li>Aguilar Tone Hammer 350 Bass Amp Head</li>
+              <li>Darkglass Electronics Microtubes 500v2 Bass Amp Head</li>
               <li>Markbass Traveller 102P Bass Amp Cabinet</li>
             </ul>
           </li>
@@ -151,15 +151,18 @@ export default function Guide() {
       <Section id="additional-service" title="부가 서비스">
         <ul>
           <li>
-            녹음 서비스를 무료로 제공해드리고 있습니다. 이용이 끝나면 자동으로
-            카카오톡 알림톡을 통해 발송됩니다. 음원 파일은 1주일 후 삭제되므로
-            1주일 내로 내려받아 주십시오.
+            자동 녹음 서비스를 무료로 제공해드리고 있습니다. 이용이 끝나면
+            자동으로 카카오톡 알림톡을 통해 발송됩니다. 음원 파일은 1주일 후
+            삭제되므로 1주일 내로 내려받아 주십시오.
           </li>
           <li>
-            음원 파일은 사전 설정된 프리셋으로 믹싱되어 있습니다. 녹음 과정은
-            자동화되어 있으므로 모든 밸런스를 직접 잡아드리진 못합니다. 멀티트랙
-            녹음 서비스는 유료로 제공해드리고 있으며, 필요하다면{" "}
-            <Link to="/inquiries/">연락 바랍니다</Link>.
+            음원 파일은 사전 설정된 프리셋으로 믹싱됩니다. 녹음 과정이
+            자동화되어 있으므로 사운드 밸런스를 직접 잡아드리진 못합니다.
+          </li>
+          <li>
+            전문적인 녹음 서비스는 유료로 제공해드리고 있습니다.{" "}
+            <Link to="/recording-services/">녹음 서비스</Link> 페이지를 참고해
+            주십시오.
           </li>
         </ul>
       </Section>

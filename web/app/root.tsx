@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { CookiesProvider } from "react-cookie";
 import ReactGA from "react-ga4";
 import Modal from "react-modal";
 import {
@@ -11,7 +12,6 @@ import {
 } from "react-router";
 
 import type { Route } from "./+types/root";
-import GitHubRibbon from "./assets/GitHubRibbon.svg";
 import SinglePage from "./components/SinglePage";
 import { AuthProvider } from "./context/AuthContext";
 import { EnvProvider, useEnv } from "./context/EnvContext";
@@ -99,14 +99,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body id="root">
         {children}
-        <div className="bottom-left-ribbon">
-          <a
-            onClick={() => ReactGA.event("open_github")}
-            href="https://github.com/segfault87/dxe"
-          >
-            <img src={GitHubRibbon} alt="Fork me at GitHub" />
-          </a>
-        </div>
         <ScrollRestoration />
         <Scripts />
       </body>
@@ -117,9 +109,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <EnvProvider>
-      <AuthProvider>
-        <Outlet />
-      </AuthProvider>
+      <CookiesProvider>
+        <AuthProvider>
+          <Outlet />
+        </AuthProvider>
+      </CookiesProvider>
     </EnvProvider>
   );
 }

@@ -1,5 +1,6 @@
 import type {
   AdhocReservationId,
+  BookingAttachmentId,
   BookingId,
   DateTime,
   ForeignPaymentId,
@@ -7,7 +8,12 @@ import type {
   IdentityId,
   UnitId,
 } from "../models/base";
-import type { AudioRecording, Booking, OccupiedSlot } from "../models/booking";
+import type {
+  AudioRecording,
+  Booking,
+  BookingAttachment,
+  OccupiedSlot,
+} from "../models/booking";
 import type { CashTransaction, Transaction } from "../models/payment";
 
 export interface CalendarResponse {
@@ -15,6 +21,11 @@ export interface CalendarResponse {
   end: DateTime;
   maxBookingHours: number;
   slots: OccupiedSlot[];
+}
+
+export interface GetBookingAttachmentsResponse {
+  attachments: BookingAttachment[];
+  unavailableAttachmentIds: BookingAttachmentId[];
 }
 
 export interface CheckRequest {
@@ -25,6 +36,7 @@ export interface CheckRequest {
   customerId?: IdentityId;
   excludeBookingId?: BookingId;
   excludeAdhocReservationId?: AdhocReservationId;
+  attachmentIds?: BookingAttachmentId[];
 }
 
 export interface CheckResponse {
@@ -38,6 +50,7 @@ export interface SubmitBookingRequest {
   desiredHours: number;
   identityId: IdentityId;
   depositorName: string;
+  attachmentIds?: BookingAttachmentId[];
 }
 
 export interface SubmitBookingResponse {
@@ -60,6 +73,7 @@ export interface AmendBookingRequest {
   newIdentityId?: IdentityId;
   newTimeFrom?: DateTime;
   additionalHours?: number;
+  attachmentIds?: BookingAttachmentId[];
 }
 
 export interface AmendBookingResponse {
@@ -77,6 +91,7 @@ export interface TossPaymentInitiateRequest {
   timeFrom: DateTime;
   desiredHours: number;
   identityId: IdentityId;
+  attachmentIds?: BookingAttachmentId[];
 }
 
 export interface TossPaymentInitiateResponse {

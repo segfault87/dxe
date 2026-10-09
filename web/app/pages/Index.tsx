@@ -24,7 +24,10 @@ export function meta(): Route.MetaDescriptors {
     { property: "og:type", content: "website" },
     { property: "og:image", content: "/og.png" },
     { property: "og:url", content: "https://dream-house.kr" },
-    { property: "og:description", content: "직장인 음악인들을 위한 합주 공간" },
+    {
+      property: "og:description",
+      content: "취미, 전문 음악인들을 위한 합주 공간 및 레코딩 스튜디오",
+    },
     { property: "og:locale", content: "ko_KR" },
   ];
 }
@@ -38,11 +41,11 @@ interface CarouselImage {
 }
 
 const CAROUSEL_IMAGES: CarouselImage[] = [
-  { src: Image1, alt: "합주실 내부" },
-  { src: Image2, alt: "대기실" },
-  { src: Image3, alt: "합주실 측면" },
-  { src: Image4, alt: "합주실 측면" },
-  { src: Image5, alt: "대기실" },
+  { src: Image1, alt: "합주실 전경" },
+  { src: Image2, alt: "시설 (키보드)" },
+  { src: Image3, alt: "시설 (드럼)" },
+  { src: Image4, alt: "시설 (믹서)" },
+  { src: Image5, alt: "대기실 전경" },
 ];
 
 function Carousel() {
@@ -75,7 +78,7 @@ function Introduction() {
       <div className="spacer" />
       <div className="contents">
         <p>
-          드림하우스 합주실은 직장인 음악인 중심으로 운영되는 합주실 및 레코딩
+          드림하우스 합주실은 취미, 전문 음악인들을 위한 합주실 및 레코딩
           스튜디오입니다. 서울시 강남구 테헤란로에 위치하여 뛰어난 접근성을
           가지고 있습니다.
         </p>
@@ -181,25 +184,15 @@ export default function Index() {
               <li>유선: Shure SM58 ×3</li>
             </ul>
           </li>
+          <li>믹서: Allen &amp; Heath SQ Rack (시설 내 태블릿으로 제어 가능)</li>
+          <li>개인 모니터: Allen &amp; Heath ME 시스템 (ME-500 ×4, ME-1 ×1)</li>
           <li>PA 스피커: JBL EON 715 ×2</li>
           <li>
             모니터링 스피커:
             <ul>
               <li>보컬 모니터: Behringer Eurolive F1220D</li>
               <li>키보드 모니터: Yamaha HS50M</li>
-              <li>드럼 모니터: Yamaha HS50M + 유선 이어폰 연결 가능</li>
-            </ul>
-          </li>
-          <li>믹서: Allen &amp; Heath SQ (시설 내 태블릿으로 제어 가능)</li>
-          <li>
-            추가 장비 연결성:
-            <ul>
-              <li>XLR 유선 마이크 3채널</li>
-              <li>1/4" 언밸런스드 DI 입력 2채널</li>
-              <li>라인 입력 2채널 (1/4" / XLR 콤보)</li>
-              <li>RCA 스테레오 라인 입력 1채널</li>
-              <li>1/4" 스테레오 라인 입력 1채널</li>
-              <li>MTR 입력 2채널 (1/4" / XLR 콤보)</li>
+              <li>드럼 모니터: Yamaha HS50M</li>
             </ul>
           </li>
         </ul>

@@ -11,6 +11,7 @@ export default [
     index("./pages/Index.tsx"),
     route("guide/", "./pages/Guide.tsx"),
     route("inquiries/", "./pages/Inquiries.tsx"),
+    route("recording-services/", "./pages/RecordingServices.tsx"),
     route("reservation/", "./pages/Reservation/Create.tsx"),
     route("reservation/login/", "./pages/Reservation/Login.tsx"),
     route(
@@ -43,6 +44,11 @@ export default [
       route("users/", "./pages/Admin/Users.tsx"),
       route("adhoc-reservations/", "./pages/Admin/AdhocReservations.tsx"),
       route("adhoc-parkings/", "./pages/Admin/AdhocParkings.tsx"),
+    ]),
+  ]),
+  layout("./components/OsdScaffold.tsx", [
+    ...prefix("/units/default", [
+      index("./pages/UnitInformation/Default/Index.tsx"),
     ]),
   ]),
 ] satisfies RouteConfig;

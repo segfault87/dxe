@@ -3,7 +3,14 @@ import type { Config } from "@react-router/dev/config";
 export default {
   ssr: false,
   async prerender() {
-    return ["/", "/guide", "/inquiries", "/terms-of-service"];
+    return [
+      "/",
+      "/guide",
+      "/inquiries",
+      "/terms-of-service",
+      "/recording-services",
+      "/units/default/",
+    ];
   },
   routeDiscovery: { mode: "initial" },
 } satisfies Config;

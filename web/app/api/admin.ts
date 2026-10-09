@@ -1,6 +1,7 @@
 import API from "../api";
 import { toUtcIso8601 } from "../lib/datetime";
 import type {
+  CancelBookingResponse,
   CreateAdhocParkingRequest,
   CreateAdhocReservationRequest,
   CreateAdhocReservationResponse,
@@ -92,7 +93,12 @@ const deleteAdhocParking = (id: AdhocParkingId) => {
   return API.delete(`/admin/adhoc-parking/${id}`);
 };
 
+const cancelBooking = (id: BookingId) => {
+  return API.delete<CancelBookingResponse>(`/admin/booking/${id}`);
+}
+
 const AdminService = {
+  cancelBooking,
   getBooking,
   getBookings,
   getUsers,

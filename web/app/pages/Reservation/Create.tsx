@@ -15,15 +15,21 @@ import { useEnv } from "../../context/EnvContext";
 import { checkSlots, toUtcIso8601 } from "../../lib/datetime";
 import { defaultErrorHandler } from "../../lib/error";
 import RequiresAuth, { type AuthProps } from "../../lib/RequiresAuth";
+import AttachmentSelection from "../../components/AttachmentSelection";
 import Calendar from "../../components/Calendar";
 import GroupInvitationModal from "../../components/GroupInvitation";
 import Section from "../../components/Section";
 import type {
   AdhocReservationId,
+  BookingAttachmentId,
   IdentityId,
   UserId,
 } from "../../types/models/base";
-import type { Booking, OccupiedSlot } from "../../types/models/booking";
+import type {
+  Booking,
+  BookingAttachment,
+  OccupiedSlot,
+} from "../../types/models/booking";
 import type { GroupWithUsers } from "../../types/models/group";
 import ReservationCalendar from "../../components/ReservationCalendar";
 import { TemporaryReservationIdStorage } from "../../lib/storage";
@@ -423,17 +429,25 @@ function Reservation({ auth }: AuthProps) {
   const [selectedIdentityId, setSelectedIdentityId] =
     useState<IdentityId | null>(null);
 
-  const fetchCalendar = async () => {
+  const [attachments, setAttachments] = useState<BookingAttachment[]>([]);
+  const [unavailableAttachmentIds, setUnavailableAttachmentIds] = useState<
+    BookingAttachmentId[]
+  >([]);
+  const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<
+    BookingAttachmentId[]
+  >([]);
+
+  const fetchStates = async () => {
     try {
-      const result = await BookingService.calendar(
+      const calendarResult = await BookingService.calendar(
         DEFAULT_UNIT_ID,
         undefined,
         temporaryReservationId ?? undefined,
       );
-      setStart(new Date(result.data.start));
-      setEnd(new Date(result.data.end));
-      setMaxBookingHours(result.data.maxBookingHours);
-      setSlots(result.data.slots);
+      setStart(new Date(calendarResult.data.start));
+      setEnd(new Date(calendarResult.data.end));
+      setMaxBookingHours(calendarResult.data.maxBookingHours);
+      setSlots(calendarResult.data.slots);
     } catch (error) {
       defaultErrorHandler(error);
     }
@@ -458,6 +472,7 @@ function Reservation({ auth }: AuthProps) {
         desiredHours: selectedHours,
         identityId: selectedIdentityId,
         depositorName: depositor,
+        attachmentIds: selectedAttachmentIds,
       });
 
       navigate(`/reservation/${result.data.booking.id}`);
@@ -539,6 +554,7 @@ function Reservation({ auth }: AuthProps) {
         desiredHours: selectedHours,
         identityId: selectedIdentityId,
         temporaryReservationId: temporaryReservationId,
+        attachmentIds: selectedAttachmentIds,
       });
       const data = initiateResult.data;
       activeAdhocReservationId = data.temporaryReservationId;
@@ -590,12 +606,12 @@ function Reservation({ auth }: AuthProps) {
   }, [selectedTime]);
 
   useEffect(() => {
-    fetchCalendar();
+    fetchStates();
 
-    window.addEventListener("focus", fetchCalendar);
+    window.addEventListener("focus", fetchStates);
 
     return () => {
-      window.removeEventListener("focus", fetchCalendar);
+      window.removeEventListener("focus", fetchStates);
     };
   }, []);
 
@@ -621,6 +637,7 @@ function Reservation({ auth }: AuthProps) {
           timeFrom: toUtcIso8601(selectedTime),
           customerId: selectedIdentityId ?? undefined,
           excludeAdhocReservationId: temporaryReservationId ?? undefined,
+          attachmentIds: selectedAttachmentIds,
         });
         setAmendReservation(result.data.amendReservation ?? null);
         setPrice(result.data.totalPrice);
@@ -634,7 +651,46 @@ function Reservation({ auth }: AuthProps) {
     };
 
     checkAvailability();
-  }, [selectedTime, selectedHours, selectedIdentityId, temporaryReservationId]);
+  }, [
+    selectedTime,
+    selectedHours,
+    selectedIdentityId,
+    temporaryReservationId,
+    selectedAttachmentIds,
+  ]);
+
+  useEffect(() => {
+    let isStale = false;
+
+    const fetchAttachments = async () => {
+      try {
+        const result = await BookingService.getAttachments(
+          selectedTime ?? undefined,
+          selectedHours ?? undefined,
+          undefined,
+          temporaryReservationId ?? undefined,
+        );
+        if (isStale) {
+          return;
+        }
+
+        const unavailableIds = result.data.unavailableAttachmentIds;
+        setAttachments(result.data.attachments);
+        setUnavailableAttachmentIds(unavailableIds);
+        setSelectedAttachmentIds((ids) =>
+          ids.filter((id) => !unavailableIds.includes(id)),
+        );
+      } catch (error) {
+        defaultErrorHandler(error);
+      }
+    };
+
+    fetchAttachments();
+
+    return () => {
+      isStale = true;
+    };
+  }, [selectedTime, selectedHours, temporaryReservationId]);
 
   return (
     <>
@@ -665,6 +721,16 @@ function Reservation({ auth }: AuthProps) {
         ) : null}
         {errorMessage ? <p className="error-message">{errorMessage}</p> : null}
       </Section>
+      {attachments.length > 0 ? (
+        <Section id="attachments" title="대여물품 선택">
+          <AttachmentSelection
+            attachments={attachments}
+            unavailableAttachmentIds={unavailableAttachmentIds}
+            selectedAttachmentIds={selectedAttachmentIds}
+            onSelectAttachmentIds={setSelectedAttachmentIds}
+          />
+        </Section>
+      ) : null}
       <Section id="customer" title="예약자 선택">
         <CustomerSelection
           auth={auth}

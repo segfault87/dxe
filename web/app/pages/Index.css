@@ -1,102 +1,129 @@
 .top {
-    display: flex;
-    width: 100%;
-    gap: 20px;
+  display: flex;
+  width: 100%;
+  gap: 20px;
 
-    > div {
-        flex: 1;
-    }
+  > div {
+    flex: 1;
+  }
 
-    > .availability-info {
-        border-top: 2px solid #000;
-        padding-top: 30px;
-        padding-bottom: 30px;
-        font-size: 20px;
-        line-height: 200%;
-    }
+  > .availability-info {
+    border-top: 2px solid #000;
+    padding-top: 30px;
+    padding-bottom: 30px;
+    font-size: 20px;
+    line-height: 200%;
+  }
 }
 
 .carousel {
+  width: 100%;
+  overflow: hidden;
+  margin-bottom: 50px;
+
+  .container {
     width: 100%;
-    margin-bottom: 50px;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
 
-    .container {
-        width: 100%;
-        aspect-ratio: 16 / 9;
-        overflow: hidden;
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+    }
+  }
 
-        img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            object-position: center;
-        }
-    }
+  .slick-prev {
+    left: -30px;
+  }
+  .slick-next {
+    right: -30px;
+  }
 
-    .slick-prev {
-        left: -30px;
-    }
-    .slick-next {
-        right: -30px;
-    }
-
-    .slick-prev::before,
-    .slick-next::before {
-        color: #000;
-    }
+  .slick-prev::before,
+  .slick-next::before {
+    color: #000;
+  }
 }
 
 .introduction {
-    display: flex;
-    width: 100%;
-    gap: 20px;
-    padding-top: 30px;
-    padding-bottom: 30px;
-    border-top: 1px #ba9787 solid;
+  display: flex;
+  width: 100%;
+  gap: 20px;
+  padding-top: 30px;
+  padding-bottom: 30px;
+  border-top: 1px #ba9787 solid;
 
-    > .contents,
-    > .spacer {
-        flex: 1;
-    }
+  > .contents,
+  > .spacer {
+    flex: 1;
+  }
 
-    > .contents {
-        p {
-            font-size: 25px;
-            line-height: 200%;
-        }
+  > .contents {
+    p {
+      font-size: 25px;
+      line-height: 200%;
     }
+  }
 }
 
 #location {
-    > .body ul {
-        margin-top: 16px;
-    }
+  > .body ul {
+    margin-top: 16px;
+  }
 }
 
 @media only screen and (max-width: 767px) {
-    .top {
-        flex-direction: column;
+  .top {
+    flex-direction: column;
 
-        > .actions {
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        > .availability-info {
-            padding-top: 20px;
-            font-size: 18px;
-        }
+    > .actions {
+      margin-left: auto;
+      margin-right: auto;
     }
 
-    .introduction {
-        > .spacer {
-            display: none;
-        }
-
-        > .contents {
-            p {
-                font-size: 20px;
-            }
-        }
+    > .availability-info {
+      padding-top: 20px;
+      font-size: 18px;
     }
+  }
+
+  .introduction {
+    > .spacer {
+      display: none;
+    }
+
+    > .contents {
+      p {
+        font-size: 20px;
+      }
+    }
+  }
+
+  .carousel {
+    width: calc(100vw - 60px);
+  }
+}
+
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal {
+    background-color: white;
+    padding: 16px;
+    border-radius: 8xp;
+    max-width: 400px;
+    width: 90%;
+    box-sizing: border-box;
 }

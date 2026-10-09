@@ -1,4 +1,10 @@
-import type { DateTime, IdentityId, SpaceId, UnitId } from "../models/base";
+import type {
+  BookingAttachmentId,
+  DateTime,
+  IdentityId,
+  SpaceId,
+  UnitId,
+} from "../models/base";
 import type {
   AdhocParking,
   AdhocReservation,
@@ -8,7 +14,7 @@ import type {
   TelemetryEntry,
 } from "../models/booking";
 import type { GroupWithUsers } from "../models/group";
-import type { CashTransaction } from "../models/payment";
+import type { CashTransaction, Transaction } from "../models/payment";
 import type { SelfUser } from "../models/user";
 
 export interface GetBookingResponse {
@@ -43,6 +49,7 @@ export interface CreateAdhocReservationRequest {
   desiredHours: number;
   expiresAt: DateTime | null;
   remark: string | null;
+  attachmentIds?: BookingAttachmentId[];
 }
 
 export interface CreateAdhocReservationResponse {
@@ -66,4 +73,8 @@ export interface CreateAdhocParkingRequest {
   timeFrom: DateTime;
   desiredHours: number;
   licensePlateNumber: string;
+}
+
+export interface CancelBookingResponse {
+  transaction: Transaction | null;
 }

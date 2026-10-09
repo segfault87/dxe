@@ -1,0 +1,74 @@
+.attachment-selection {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+
+  li {
+    position: relative;
+    border: #ebc1ae 1px solid;
+    border-radius: 12px;
+    overflow: hidden;
+
+    &:has(input[type="checkbox"]:checked) {
+      border-color: #000;
+      box-shadow: 0 0 0 2px #000;
+    }
+
+    input[type="checkbox"] {
+      position: absolute;
+      bottom: 14px;
+      right: 12px;
+      width: 20px;
+      height: 20px;
+      margin: 0;
+    }
+
+    label {
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
+
+      img {
+        width: calc(100% - 16px);
+        height: auto;
+        margin: 8px;
+        display: block;
+      }
+
+      .name {
+        padding: 2px 44px 0 12px;
+        font-size: 17px;
+      }
+
+      .category {
+        padding: 2px 44px 10px 12px;
+        font-size: 14px;
+        color: #888;
+      }
+    }
+
+    &.included label {
+      cursor: default;
+    }
+
+    &.unavailable {
+      opacity: 0.35;
+
+      label {
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  &.readonly li label {
+    cursor: default;
+
+    .name,
+    .category {
+      padding-right: 12px;
+    }
+  }
+}

@@ -1,6 +1,7 @@
 import type {
   AdhocParkingId,
   AdhocReservationId,
+  BookingAttachmentId,
   BookingId,
   DateTime,
   TelemetryType,
@@ -33,6 +34,7 @@ export interface Booking {
   canceledAt: DateTime | null;
   isCanceled: boolean;
   status: BookingStatus;
+  attachments: BookingAttachment[];
 }
 
 export interface BookingWithPayments {
@@ -55,6 +57,7 @@ export interface AdhocReservation {
   reservedHours: number;
   deletedAt: DateTime;
   remark: string | null;
+  attachmentIds: BookingAttachmentId[];
 }
 
 export interface AudioRecording {
@@ -75,4 +78,11 @@ export interface AdhocParking {
 
 export interface TelemetryEntry {
   type: TelemetryType;
+}
+
+export interface BookingAttachment {
+  id: BookingAttachmentId;
+  name: string;
+  category: string;
+  price: number;
 }

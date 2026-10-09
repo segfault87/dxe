@@ -13,3 +13,9 @@
         text-align: center;
     }
 }
+
+p.note {
+    font-size: 14px;
+    margin-top: 16px;
+    margin-left: 16px;
+}

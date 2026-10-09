@@ -1,6 +1,10 @@
+import { useNavigate } from "react-router";
+import type { NavigateFunction } from "react-router";
+
 import type { Route } from "./+types/ConfirmedBookings";
 import AdminService from "../../api/admin";
 import { loaderErrorHandler } from "../../lib/error";
+import type { BookingId } from "../../types/models/base";
 import type { BookingWithPayments } from "../../types/models/booking";
 
 interface LoaderData {
@@ -21,8 +25,22 @@ export async function clientLoader({
   }
 }
 
+async function cancelBooking(id: BookingId, navigate: NavigateFunction) {
+  const result = await AdminService.cancelBooking(id);
+
+  if (result.status === 200) {
+    if (result.data.transaction) {
+      alert(`성공했습니다. 환불액: ${result.data.transaction.tossPayments?.refundPrice}`);
+      navigate(0);
+    }
+  } else {
+    alert(`오류가 발생했습니다: ${result.statusText}`)
+  }
+}
+
 export default function PendingBookings({ loaderData }: Route.ComponentProps) {
   const { bookings } = loaderData;
+  const navigate = useNavigate();
 
   return (
     <>
@@ -36,6 +54,8 @@ export default function PendingBookings({ loaderData }: Route.ComponentProps) {
           <th>종료시간</th>
           <th>생성시각</th>
           <th>확정 시각</th>
+          <th>대여물품</th>
+          <th>동작</th>
         </tr>
         {bookings.map((e) => (
           <tr key={e.booking.id}>
@@ -46,6 +66,14 @@ export default function PendingBookings({ loaderData }: Route.ComponentProps) {
             <td>{new Date(e.booking.bookingEnd).toLocaleString()}</td>
             <td>{new Date(e.booking.createdAt).toLocaleString()}</td>
             <td>{new Date(e.booking.confirmedAt!).toLocaleString()}</td>
+            <td>
+              {e.booking.attachments ? (
+                <ul>
+                  {e.booking.attachments.map((e) => <li>{e.name}</li>)}
+                </ul>
+              ) : null}
+            </td>
+            <td><button onClick={() => cancelBooking(e.booking.id, navigate)}>환불</button></td>
           </tr>
         ))}
       </table>

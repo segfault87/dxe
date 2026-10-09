@@ -1,4 +1,5 @@
 import API from "../api";
+import { toUtcIso8601 } from "../lib/datetime";
 import type {
   AmendBookingResponse,
   AmendBookingRequest,
@@ -6,6 +7,7 @@ import type {
   CancelBookingResponse,
   CheckRequest,
   CheckResponse,
+  GetBookingAttachmentsResponse,
   GetAudioRecordingResponse,
   GetBookingResponse,
   GetTossPaymentStateResponse,
@@ -37,6 +39,32 @@ const calendar = (
   }
 
   return API.get<CalendarResponse>(url);
+};
+
+const getAttachments = (
+  timeFrom?: Date,
+  desiredHours?: number,
+  excludeBookingId?: BookingId,
+  excludeAdhocReservationId?: AdhocReservationId,
+) => {
+  const params = [];
+  if (timeFrom && desiredHours) {
+    params.push(`time_from=${encodeURIComponent(toUtcIso8601(timeFrom))}`);
+    params.push(`desired_hours=${desiredHours}`);
+  }
+  if (excludeBookingId) {
+    params.push(`exclude_booking_id=${excludeBookingId}`);
+  }
+  if (excludeAdhocReservationId) {
+    params.push(`exclude_adhoc_reservation_id=${excludeAdhocReservationId}`);
+  }
+
+  let url = "/bookings/attachments";
+  if (params.length > 0) {
+    url += `?${params.join("&")}`;
+  }
+
+  return API.get<GetBookingAttachmentsResponse>(url);
 };
 
 const check = (data: CheckRequest) => {
@@ -103,6 +131,7 @@ const deleteTemporaryReservation = (id: AdhocReservationId) => {
 
 const BookingService = {
   calendar,
+  getAttachments,
   check,
   submitBooking,
   get,

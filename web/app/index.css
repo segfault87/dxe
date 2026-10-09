@@ -1,138 +1,127 @@
 :root {
-    font-family:
-        Gowun Batang,
-        system-ui,
-        Avenir,
-        Helvetica,
-        Arial,
-        sans-serif;
-    line-height: 1.5;
-    font-weight: 400;
+  font-family:
+    Gowun Batang,
+    system-ui,
+    Avenir,
+    Helvetica,
+    Arial,
+    sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
 
-    color-scheme: only light;
-    color: #030303;
-    background-color: #fff6e6;
+  color-scheme: only light;
+  color: #030303;
+  background-color: #fff6e6;
 
-    font-synthesis: none;
-    text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html,
 body {
-    margin: 0;
-    height: 100%;
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 a {
-    all: unset;
-    cursor: pointer;
-    text-decoration: underline;
+  all: unset;
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 em {
-    font-weight: bold;
+  font-weight: bold;
 }
 
 main {
-    max-width: 1280px;
-    margin-left: auto;
-    margin-right: auto;
-    padding-left: 30px;
-    padding-right: 30px;
+  flex: 1;
+  max-width: 1280px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 30px;
+  padding-right: 30px;
 }
 
 .cta {
-    border: none;
-    font-family: Gowun Batang;
-    display: inline-block;
-    background-color: #000;
-    color: #ebc1ae;
-    font-size: 20px;
-    margin-right: 10px;
-    margin-bottom: 10px;
-    padding: 20px 30px 20px 30px;
-    text-decoration: none;
-    cursor: pointer;
+  border: none;
+  font-family: Gowun Batang;
+  display: inline-block;
+  background-color: #000;
+  color: #ebc1ae;
+  font-size: 20px;
+  margin-right: 10px;
+  margin-bottom: 10px;
+  padding: 20px 30px 20px 30px;
+  text-decoration: none;
+  cursor: pointer;
 
-    &:disabled {
-        background-color: #ddd;
-        color: #aaa;
-        cursor: default;
-    }
+  &:disabled {
+    background-color: #ddd;
+    color: #aaa;
+    cursor: default;
+  }
 }
 
 .error-message {
-    color: red;
+  color: red;
 }
 
 input[type="text"],
 input[type="tel"],
 input[type="password"] {
-    font-family: Gowun Batang;
-    padding: 8px;
-    font-size: 18px;
-    border: #ebc1ae 1px solid;
-    border-radius: 8px;
-    background: none;
+  font-family: Gowun Batang;
+  padding: 8px;
+  font-size: 18px;
+  border: #ebc1ae 1px solid;
+  border-radius: 8px;
+  background: none;
 }
 
 button {
-    border: none;
+  border: none;
 }
 
 button.primary,
 a.primary {
-    font-family: Gowun Batang;
-    padding: 8px;
-    border: #ebc1ae 1px solid;
-    font-size: 18px;
-    border-radius: 8px;
-    background: none;
-    cursor: pointer;
-    padding-left: 16px;
-    padding-right: 16px;
-    text-decoration: none;
+  font-family: Gowun Batang;
+  padding: 8px;
+  border: #ebc1ae 1px solid;
+  font-size: 18px;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  padding-left: 16px;
+  padding-right: 16px;
+  text-decoration: none;
 
-    &:disabled {
-        color: #ccc;
-        border: none;
-    }
+  &:disabled {
+    color: #ccc;
+    border: none;
+  }
 }
 
 hr {
-    margin-top: 16px;
-    margin-bottom: 16px;
-    border: #ebc1ae 1px solid;
+  margin-top: 16px;
+  margin-bottom: 16px;
+  border: #ebc1ae 1px solid;
 }
 
 @media only screen and (max-width: 767px) {
-    .cta {
-        padding: 10px 20px 10px 20px;
-    }
+  .cta {
+    padding: 10px 20px 10px 20px;
+  }
 }
 
 @media only screen and (max-width: 400px) {
-    .cta {
-        font-size: 16px;
-    }
+  .cta {
+    font-size: 16px;
+  }
 }
 
 p > a {
-    text-decoration: underline;
-}
-
-.bottom-left-ribbon {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 56px;
-    height: 56px;
-
-    img {
-        width: 56px;
-        height: 56px;
-        opacity: 0.5;
-    }
+  text-decoration: underline;
 }

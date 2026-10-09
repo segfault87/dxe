@@ -9,6 +9,7 @@ import UserService from "../../api/user";
 import RequiresAuth, { type AuthProps } from "../../lib/RequiresAuth";
 import type { Booking } from "../../types/models/booking";
 import type { Transaction } from "../../types/models/payment";
+import { AttachmentList } from "../../components/AttachmentSelection";
 import ExtendReservation from "../../components/ExtendReservation";
 import GroupInvitationModal from "../../components/GroupInvitation";
 import GroupSelectionModal from "../../components/GroupSelection";
@@ -244,6 +245,12 @@ function ShowReservation({
           <li>예약 상태: {status}</li>
         </ul>
       </Section>
+      {booking.attachments.length > 0 ? (
+        <Section id="attachments" title="대여물품">
+          <AttachmentList attachments={booking.attachments} />
+          <p className="note">이용에 문제가 있거나 다른 장비 이용을 원하실 경우 <Link to="/inquiries/">연락</Link> 바랍니다.</p>
+        </Section>
+      ) : null}
       {transaction?.cash ? (
         <Section id="payment-info" title="현금결제 정보">
           <ul>

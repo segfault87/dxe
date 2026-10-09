@@ -1,7 +1,9 @@
+use std::collections::HashSet;
+
 use chrono::{DateTime, Utc};
 use dxe_types::{
-    AdhocParkingId, AdhocReservationId, BookingAmendmentId, BookingId, SpaceId, TelemetryType,
-    UnitId,
+    AdhocParkingId, AdhocReservationId, BookingAmendmentId, BookingAttachmentId, BookingId,
+    SpaceId, TelemetryType, UnitId,
 };
 use sqlx::FromRow;
 
@@ -26,6 +28,7 @@ pub struct Booking {
     pub created_at: DateTime<Utc>,
     pub confirmed_at: Option<DateTime<Utc>>,
     pub canceled_at: Option<DateTime<Utc>>,
+    pub attachments: HashSet<BookingAttachment>,
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -64,6 +67,7 @@ pub struct AdhocReservation {
     pub time_to: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
     pub remark: Option<String>,
+    pub attachment_ids: HashSet<BookingAttachmentId>,
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -90,4 +94,13 @@ pub struct AdhocParking {
     pub time_to: DateTime<Utc>,
     pub license_plate_number: String,
     pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, FromRow)]
+pub struct BookingAttachment {
+    pub id: BookingAttachmentId,
+    pub name: String,
+    pub category: String,
+    pub price: i64,
+    pub disabled_at: Option<DateTime<Utc>>,
 }

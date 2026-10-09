@@ -21,6 +21,8 @@ pub enum Error {
     OngoingBookingNotModifiable,
     #[error("입력하신 날짜는 이미 예약이 완료되었습니다.")]
     TimeRangeOccupied,
+    #[error("선택하신 옵션은 해당 시간에 이용할 수 없습니다.")]
+    BookingAttachmentUnavailable,
     #[error("잘못된 요청입니다.")]
     MissingField(&'static str),
     #[error("잘못된 요청입니다.")]
@@ -95,6 +97,7 @@ impl From<DataError> for Error {
         match value {
             DataError::InvalidTimeRange => Self::InvalidTimeRange,
             DataError::TimeRangeOccupied => Self::TimeRangeOccupied,
+            DataError::BookingAttachmentUnavailable => Self::BookingAttachmentUnavailable,
             DataError::UnitNotFound => Self::UnitNotFound,
             DataError::UserNotFound => Self::UserNotFound,
             DataError::BookingNotFound => Self::BookingNotFound,
@@ -123,6 +126,7 @@ impl ResponseError for Error {
             Self::InvalidTimeRange => StatusCode::BAD_REQUEST,
             Self::OngoingBookingNotModifiable => StatusCode::BAD_REQUEST,
             Self::TimeRangeOccupied => StatusCode::BAD_REQUEST,
+            Self::BookingAttachmentUnavailable => StatusCode::BAD_REQUEST,
             Self::MissingField(_) => StatusCode::BAD_REQUEST,
             Self::UnitNotFound => StatusCode::BAD_REQUEST,
             Self::GroupNotFound => StatusCode::NOT_FOUND,
@@ -163,6 +167,7 @@ impl ResponseError for Error {
             Self::InvalidKakaoAccessToken => "InvalidKakaoAccessToken",
             Self::InvalidTimeRange => "InvalidTimeRange",
             Self::TimeRangeOccupied => "TimeRangeOccupied",
+            Self::BookingAttachmentUnavailable => "BookingAttachmentUnavailable",
             Self::OngoingBookingNotModifiable => "OngoingBookingNotModifiable",
             Self::MissingField(_) => "MissingField",
             Self::UnitNotFound => "UnitNotFound",

@@ -14,6 +14,8 @@ pub enum Error {
     InvalidTimeRange,
     #[error("Specified time range is already occupied")]
     TimeRangeOccupied,
+    #[error("Booking attachment is not available for the specified time range")]
+    BookingAttachmentUnavailable,
     #[error("Error querying database: {0}")]
     Sqlx(#[from] sqlx::Error),
 }

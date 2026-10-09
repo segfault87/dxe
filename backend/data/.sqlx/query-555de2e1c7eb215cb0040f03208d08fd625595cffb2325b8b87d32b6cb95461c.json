@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO booking_attachment_mapping(booking_id, attachment_id)\n            VALUES (?1, ?2)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "555de2e1c7eb215cb0040f03208d08fd625595cffb2325b8b87d32b6cb95461c"
+}

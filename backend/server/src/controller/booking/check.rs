@@ -1,6 +1,9 @@
 use actix_web::web;
 use chrono::TimeDelta;
-use dxe_data::queries::booking::{get_continuous_booking, is_booking_available};
+use dxe_data::queries::booking::{
+    calculate_booking_attachments_price, ensure_booking_attachments_available,
+    get_continuous_booking, is_booking_available,
+};
 use dxe_data::queries::unit::is_unit_enabled;
 use sqlx::SqlitePool;
 
@@ -45,6 +48,17 @@ pub async fn post(
     )
     .await?
     {
+        ensure_booking_attachments_available(
+            &mut connection,
+            &now,
+            &body.attachment_ids,
+            &time_from,
+            &time_to,
+            body.exclude_booking_id.as_ref(),
+            body.exclude_adhoc_reservation_id.as_ref(),
+        )
+        .await?;
+
         let total_price = if let Some(additional_hours) = body.additional_hours {
             booking_config
                 .calculate_additive_price(&body.unit_id, additional_hours)
@@ -53,6 +67,8 @@ pub async fn post(
             booking_config
                 .calculate_price(&body.unit_id, time_from, time_to)
                 .map_err(|_| Error::UnitNotFound)?
+                + calculate_booking_attachments_price(&mut connection, &now, &body.attachment_ids)
+                    .await?
         };
 
         let customer_id = body.customer_id.unwrap_or(session.user_id.into());

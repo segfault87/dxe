@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        DELETE FROM adhoc_reservation_attachment_mapping WHERE adhoc_reservation_id=?1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "ea3936535f33cc6dfbb8affad79c73e119e046a18419249a64a539d5edfd5d3d"
+}

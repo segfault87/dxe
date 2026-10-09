@@ -2,9 +2,9 @@ use chrono::{DateTime, Utc};
 use dxe_data::entities;
 
 use super::{
-    AdhocParking, AdhocReservation, AudioRecording, Booking, BookingStatus, CashTransaction, Group,
-    GroupWithUsers, Identity, OccupiedSlot, SelfUser, TelemetryEntry, TelemetryType,
-    TossPaymentsTransaction, User,
+    AdhocParking, AdhocReservation, AudioRecording, Booking, BookingAttachment, BookingStatus,
+    CashTransaction, Group, GroupWithUsers, Identity, OccupiedSlot, SelfUser, TelemetryEntry,
+    TelemetryType, TossPaymentsTransaction, User,
 };
 use crate::config::{BookingConfig, TimeZoneConfig};
 use crate::models::Error;
@@ -285,6 +285,24 @@ impl IntoView for AudioRecording {
 
             created_at: timezone.convert(entity.created_at),
             expires_in: entity.expires_in.map(|v| timezone.convert(v)),
+        })
+    }
+}
+
+impl IntoView for BookingAttachment {
+    type Entity = entities::BookingAttachment;
+    type Error = Error;
+
+    fn convert(
+        entity: Self::Entity,
+        _timezone: &TimeZoneConfig,
+        _now: &DateTime<Utc>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            id: entity.id,
+            name: entity.name,
+            category: entity.category,
+            price: entity.price,
         })
     }
 }

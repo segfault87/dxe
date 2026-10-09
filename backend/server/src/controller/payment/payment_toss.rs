@@ -4,9 +4,9 @@ use dxe_data::entities::{
     AdhocReservation, BookingAmendment, Identity, Product, TossPaymentsTransaction,
 };
 use dxe_data::queries::booking::{
-    cancel_booking_amendment, confirm_booking_amendment, create_adhoc_reservation, create_booking,
-    expire_adhoc_reservation, get_adhoc_reservation, get_booking, get_booking_with_user_id,
-    get_product, update_booking_time,
+    calculate_booking_attachments_price, cancel_booking_amendment, confirm_booking_amendment,
+    create_adhoc_reservation, create_booking, expire_adhoc_reservation, get_adhoc_reservation,
+    get_booking, get_booking_with_user_id, get_product, update_booking_time,
 };
 use dxe_data::queries::identity::{get_group_members, get_identity, is_member_of};
 use dxe_data::queries::payment::{
@@ -57,7 +57,8 @@ pub async fn post(
 
     let price = booking_config
         .calculate_price(&body.unit_id, time_from, time_to)
-        .map_err(|_| Error::UnitNotFound)?;
+        .map_err(|_| Error::UnitNotFound)?
+        + calculate_booking_attachments_price(&mut tx, &now, &body.attachment_ids).await?;
 
     let identity = get_identity(&mut tx, &now, &body.identity_id)
         .await?
@@ -74,9 +75,11 @@ pub async fn post(
             return Err(Error::TimeRangeOccupied);
         }
 
-        if temporary_reservation.time_from != time_from || temporary_reservation.time_to != time_to
+        if temporary_reservation.time_from != time_from
+            || temporary_reservation.time_to != time_to
+            || temporary_reservation.attachment_ids != body.attachment_ids
         {
-            // Update temporary reservation (when date/time changes)
+            // Update temporary reservation (when date/time or attachments change)
 
             expire_adhoc_reservation(&mut tx, &now, &temporary_reservation.id).await?;
 
@@ -90,6 +93,7 @@ pub async fn post(
                 &time_to,
                 &Some(String::from("Temporary preemption during Toss payment")),
                 &Some(expires_in),
+                &body.attachment_ids,
             )
             .await?;
 
@@ -146,6 +150,7 @@ pub async fn post(
             &time_to,
             &Some(String::from("Temporary preemption during Toss payment")),
             &Some(expires_in),
+            &body.attachment_ids,
         )
         .await?;
 
@@ -242,6 +247,7 @@ async fn confirm_booking_payment<'tx>(
         &temporary_reservation.time_from,
         &temporary_reservation.time_to,
         true,
+        &temporary_reservation.attachment_ids,
     )
     .await?;
 

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use actix_web::web;
 use chrono::TimeDelta;
 use dxe_data::entities::Identity;
@@ -63,6 +65,12 @@ pub async fn put(
 
     let mut foreign_payment_id = None;
 
+    let attachment_ids = booking
+        .attachments
+        .iter()
+        .map(|v| v.id)
+        .collect::<HashSet<_>>();
+
     let current_hours = (booking.time_to - booking.time_from).num_hours();
     if let Some(additional_hours) = body.additional_hours
         && additional_hours > 0
@@ -97,6 +105,7 @@ pub async fn put(
             &booking_id,
             &desired_time_from,
             &desired_time_to,
+            &attachment_ids,
             false,
         )
         .await?;
@@ -135,6 +144,7 @@ pub async fn put(
             &booking_id,
             &desired_time_from,
             &desired_time_to,
+            &attachment_ids,
             true,
         )
         .await?;

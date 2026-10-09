@@ -1,15 +1,16 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, FixedOffset};
 use dxe_types::{
-    AdhocReservationId, BookingId, ForeignPaymentId, IdentityId, SpaceId, TelemetryType, UnitId,
-    UserId,
+    AdhocReservationId, BookingAttachmentId, BookingId, ForeignPaymentId, IdentityId, SpaceId,
+    TelemetryType, UnitId, UserId,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::models::entities::{
-    AdhocParking, AdhocReservation, AudioRecording, Booking, BookingWithPayments, CashTransaction,
-    Group, GroupWithUsers, OccupiedSlot, ProductType, SelfUser, TelemetryEntry, Transaction,
+    AdhocParking, AdhocReservation, AudioRecording, Booking, BookingAttachment,
+    BookingWithPayments, CashTransaction, Group, GroupWithUsers, OccupiedSlot, ProductType,
+    SelfUser, TelemetryEntry, Transaction,
 };
 
 pub mod admin {
@@ -95,6 +96,8 @@ pub mod admin {
         pub desired_hours: i64,
         pub expires_at: Option<DateTime<FixedOffset>>,
         pub remark: Option<String>,
+        #[serde(default)]
+        pub attachment_ids: HashSet<BookingAttachmentId>,
     }
 
     #[derive(Debug, Serialize)]
@@ -207,6 +210,12 @@ pub mod booking {
         pub slots: Vec<OccupiedSlot>,
     }
 
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct GetBookingAttachmentsResponse {
+        pub attachments: Vec<BookingAttachment>,
+    }
+
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct CheckRequest {
@@ -217,6 +226,8 @@ pub mod booking {
         pub additional_hours: Option<i64>,
         pub exclude_booking_id: Option<BookingId>,
         pub exclude_adhoc_reservation_id: Option<AdhocReservationId>,
+        #[serde(default)]
+        pub attachment_ids: HashSet<BookingAttachmentId>,
     }
 
     #[derive(Debug, Serialize)]
@@ -234,6 +245,8 @@ pub mod booking {
         pub desired_hours: i64,
         pub identity_id: IdentityId,
         pub depositor_name: String,
+        #[serde(default)]
+        pub attachment_ids: HashSet<BookingAttachmentId>,
     }
 
     #[derive(Debug, Serialize)]
@@ -293,6 +306,8 @@ pub mod booking {
         pub time_from: DateTime<FixedOffset>,
         pub desired_hours: i64,
         pub identity_id: IdentityId,
+        #[serde(default)]
+        pub attachment_ids: HashSet<BookingAttachmentId>,
     }
 
     #[derive(Debug, Serialize)]

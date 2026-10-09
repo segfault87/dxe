@@ -1,15 +1,17 @@
+use std::collections::{HashMap, HashSet};
+
 use chrono::{DateTime, Utc};
 use dxe_types::{
-    AdhocParkingId, AdhocReservationId, BookingAmendmentId, BookingId, GroupId, IdentityId,
-    IdentityProvider, ProductId, SpaceId, TelemetryType, UnitId, UserId,
+    AdhocParkingId, AdhocReservationId, BookingAmendmentId, BookingAttachmentId, BookingId,
+    GroupId, IdentityId, IdentityProvider, ProductId, SpaceId, TelemetryType, UnitId, UserId,
 };
-use sqlx::SqliteConnection;
+use sqlx::{FromRow, QueryBuilder, SqliteConnection};
 
 use crate::Error;
 use crate::entities::{
-    AdhocParking, AdhocReservation, AudioRecording, Booking, BookingAmendment, CashTransaction,
-    Group, Identity, IdentityDiscriminator, OccupiedSlot, Product, ProductDiscriminator,
-    TelemetryFile, User,
+    AdhocParking, AdhocReservation, AudioRecording, Booking, BookingAmendment, BookingAttachment,
+    CashTransaction, Group, Identity, IdentityDiscriminator, OccupiedSlot, Product,
+    ProductDiscriminator, TelemetryFile, User,
 };
 use crate::queries::unit::is_unit_enabled;
 use crate::utils::is_in_effect;
@@ -81,7 +83,7 @@ pub async fn get_continuous_booking(
     .await?;
 
     if let Some(v) = result {
-        Ok(Some(Booking {
+        let mut booking = Booking {
             id: v.b_id,
             unit_id: v.b_unit_id,
             holder: User {
@@ -123,7 +125,12 @@ pub async fn get_continuous_booking(
             created_at: v.b_created_at,
             confirmed_at: v.b_confirmed_at,
             canceled_at: v.b_canceled_at,
-        }))
+            attachments: HashSet::new(),
+        };
+
+        populate_booking_attachments(&mut *connection, [&mut booking]).await?;
+
+        Ok(Some(booking))
     } else {
         Ok(None)
     }
@@ -175,6 +182,232 @@ pub async fn is_booking_available(
     .await?
     .count
         == 0)
+}
+
+pub async fn is_booking_attachment_available(
+    connection: &mut SqliteConnection,
+    now: &DateTime<Utc>,
+    attachment_id: &BookingAttachmentId,
+    range_from: &DateTime<Utc>,
+    range_to: &DateTime<Utc>,
+    exclude_booking_id: Option<&BookingId>,
+    exclude_adhoc_reservation_id: Option<&AdhocReservationId>,
+) -> Result<bool, Error> {
+    let exclude_booking_id = exclude_booking_id.cloned().unwrap_or(BookingId::nil());
+    let exclude_adhoc_reservation_id = exclude_adhoc_reservation_id
+        .cloned()
+        .unwrap_or(AdhocReservationId::nil());
+
+    let result = sqlx::query!(
+        r#"
+            SELECT
+                EXISTS (SELECT 1
+                FROM booking_attachment
+                WHERE
+                    id = ?1 AND
+                    (disabled_at IS NULL OR disabled_at > ?4))
+                AS "enabled: bool",
+                (SELECT COUNT(*)
+                FROM booking_attachment_mapping "m"
+                JOIN booking "b" ON m.booking_id = b.id
+                WHERE
+                    m.attachment_id = ?1 AND
+                    b.time_to >= ?2 AND
+                    MAX(b.time_from, ?2) < MIN(b.time_to, ?3) AND
+                    (b.canceled_at IS NULL OR b.canceled_at > ?4) AND
+                    b.id != ?5) +
+                (SELECT COUNT(*)
+                FROM adhoc_reservation_attachment_mapping "m"
+                JOIN adhoc_reservation "r" ON m.adhoc_reservation_id = r.id
+                WHERE
+                    m.attachment_id = ?1 AND
+                    r.time_to >= ?2 AND
+                    MAX(r.time_from, ?2) < MIN(r.time_to, ?3) AND
+                    (r.deleted_at IS NULL OR r.deleted_at > ?4) AND
+                    r.id != ?6)
+                AS "count: i64"
+        "#,
+        attachment_id,
+        range_from,
+        range_to,
+        now,
+        exclude_booking_id,
+        exclude_adhoc_reservation_id,
+    )
+    .fetch_one(&mut *connection)
+    .await?;
+
+    Ok(result.enabled && result.count == 0)
+}
+
+pub async fn ensure_booking_attachments_available(
+    connection: &mut SqliteConnection,
+    now: &DateTime<Utc>,
+    attachment_ids: &HashSet<BookingAttachmentId>,
+    range_from: &DateTime<Utc>,
+    range_to: &DateTime<Utc>,
+    exclude_booking_id: Option<&BookingId>,
+    exclude_adhoc_reservation_id: Option<&AdhocReservationId>,
+) -> Result<(), Error> {
+    for attachment_id in attachment_ids {
+        if !is_booking_attachment_available(
+            &mut *connection,
+            now,
+            attachment_id,
+            range_from,
+            range_to,
+            exclude_booking_id,
+            exclude_adhoc_reservation_id,
+        )
+        .await?
+        {
+            return Err(Error::BookingAttachmentUnavailable);
+        }
+    }
+
+    Ok(())
+}
+
+async fn populate_booking_attachments<'a>(
+    connection: &mut SqliteConnection,
+    bookings: impl IntoIterator<Item = &'a mut Booking>,
+) -> Result<(), Error> {
+    let mut bookings = bookings.into_iter().collect::<Vec<_>>();
+    if bookings.is_empty() {
+        return Ok(());
+    }
+
+    let mut query = QueryBuilder::new(
+        r#"
+        SELECT
+            m.booking_id,
+            ba.id,
+            ba.name,
+            ba.category,
+            ba.price,
+            ba.disabled_at
+        FROM booking_attachment_mapping "m"
+        JOIN booking_attachment "ba" ON m.attachment_id = ba.id
+        WHERE m.booking_id IN (
+        "#,
+    );
+    let mut separated = query.separated(", ");
+    for booking in &bookings {
+        separated.push_bind(booking.id);
+    }
+    separated.push_unseparated(")");
+
+    let mut attachments = HashMap::<BookingId, HashSet<BookingAttachment>>::new();
+    for row in query
+        .build_query_as::<BookingAttachmentMappingRow>()
+        .fetch_all(&mut *connection)
+        .await?
+    {
+        attachments
+            .entry(row.booking_id)
+            .or_default()
+            .insert(row.attachment);
+    }
+
+    for booking in bookings.iter_mut() {
+        booking.attachments = attachments.remove(&booking.id).unwrap_or_default();
+    }
+
+    Ok(())
+}
+
+async fn populate_adhoc_reservation_attachment_ids<'a>(
+    connection: &mut SqliteConnection,
+    reservations: impl IntoIterator<Item = &'a mut AdhocReservation>,
+) -> Result<(), Error> {
+    let mut reservations = reservations.into_iter().collect::<Vec<_>>();
+    if reservations.is_empty() {
+        return Ok(());
+    }
+
+    let mut query = QueryBuilder::new(
+        r#"
+        SELECT adhoc_reservation_id, attachment_id
+        FROM adhoc_reservation_attachment_mapping
+        WHERE adhoc_reservation_id IN (
+        "#,
+    );
+    let mut separated = query.separated(", ");
+    for reservation in &reservations {
+        separated.push_bind(reservation.id);
+    }
+    separated.push_unseparated(")");
+
+    let mut attachment_ids = HashMap::<AdhocReservationId, HashSet<BookingAttachmentId>>::new();
+    for (reservation_id, attachment_id) in query
+        .build_query_as::<(AdhocReservationId, BookingAttachmentId)>()
+        .fetch_all(&mut *connection)
+        .await?
+    {
+        attachment_ids
+            .entry(reservation_id)
+            .or_default()
+            .insert(attachment_id);
+    }
+
+    for reservation in reservations.iter_mut() {
+        reservation.attachment_ids = attachment_ids.remove(&reservation.id).unwrap_or_default();
+    }
+
+    Ok(())
+}
+
+#[derive(FromRow)]
+struct BookingAttachmentMappingRow {
+    booking_id: BookingId,
+    #[sqlx(flatten)]
+    attachment: BookingAttachment,
+}
+
+pub async fn get_booking_attachments(
+    connection: &mut SqliteConnection,
+    now: &DateTime<Utc>,
+) -> Result<Vec<BookingAttachment>, Error> {
+    Ok(sqlx::query_as!(
+        BookingAttachment,
+        r#"
+        SELECT
+            id AS "id: _",
+            name,
+            category,
+            price,
+            disabled_at AS "disabled_at: _"
+        FROM booking_attachment
+        WHERE disabled_at IS NULL OR disabled_at > ?1
+        ORDER BY category ASC, name ASC
+        "#,
+        now
+    )
+    .fetch_all(&mut *connection)
+    .await?)
+}
+
+pub async fn calculate_booking_attachments_price(
+    connection: &mut SqliteConnection,
+    now: &DateTime<Utc>,
+    attachment_ids: &HashSet<BookingAttachmentId>,
+) -> Result<i64, Error> {
+    if attachment_ids.is_empty() {
+        return Ok(0);
+    }
+
+    let attachments = get_booking_attachments(connection, now).await?;
+
+    attachment_ids
+        .iter()
+        .map(|id| {
+            attachments
+                .iter()
+                .find(|v| &v.id == id)
+                .map(|v| v.price)
+                .ok_or(Error::BookingAttachmentUnavailable)
+        })
+        .sum()
 }
 
 pub async fn get_occupied_slots(
@@ -330,7 +563,7 @@ pub async fn get_product(
     .fetch_optional(&mut *connection)
     .await?;
 
-    Ok(if let Some(result) = result {
+    let mut product = if let Some(result) = result {
         Some(match result.p_discriminator {
             ProductDiscriminator::Booking => Product::Booking(Box::new(Booking {
                 id: result.b_id.ok_or(Error::MissingField("b_id"))?,
@@ -389,6 +622,7 @@ pub async fn get_product(
                     .ok_or(Error::MissingField("b_created_at"))?,
                 confirmed_at: result.b_confirmed_at,
                 canceled_at: result.b_canceled_at,
+                attachments: HashSet::new(),
             })),
             ProductDiscriminator::BookingAmendment => Product::Amendment(BookingAmendment {
                 id: result.ba_id.ok_or(Error::MissingField("ba_id"))?,
@@ -416,7 +650,13 @@ pub async fn get_product(
         })
     } else {
         None
-    })
+    };
+
+    if let Some(Product::Booking(booking)) = product.as_mut() {
+        populate_booking_attachments(&mut *connection, [booking.as_mut()]).await?;
+    }
+
+    Ok(product)
 }
 
 pub async fn get_booking(
@@ -472,7 +712,7 @@ pub async fn get_booking(
     .await?;
 
     if let Some(v) = result {
-        Ok(Some(Booking {
+        let mut booking = Booking {
             id: v.b_id,
             unit_id: v.b_unit_id,
             holder: User {
@@ -514,7 +754,12 @@ pub async fn get_booking(
             created_at: v.b_created_at,
             confirmed_at: v.b_confirmed_at,
             canceled_at: v.b_canceled_at,
-        }))
+            attachments: HashSet::new(),
+        };
+
+        populate_booking_attachments(&mut *connection, [&mut booking]).await?;
+
+        Ok(Some(booking))
     } else {
         Ok(None)
     }
@@ -576,7 +821,7 @@ pub async fn get_booking_with_user_id(
     .await?;
 
     if let Some(v) = result {
-        Ok(Some(Booking {
+        let mut booking = Booking {
             id: v.b_id,
             unit_id: v.b_unit_id,
             holder: User {
@@ -618,7 +863,12 @@ pub async fn get_booking_with_user_id(
             created_at: v.b_created_at,
             confirmed_at: v.b_confirmed_at,
             canceled_at: v.b_canceled_at,
-        }))
+            attachments: HashSet::new(),
+        };
+
+        populate_booking_attachments(&mut *connection, [&mut booking]).await?;
+
+        Ok(Some(booking))
     } else {
         Ok(None)
     }
@@ -633,7 +883,7 @@ pub async fn get_bookings_by_unit_id(
     confirmed_only: bool,
     exclude_canceled: bool,
 ) -> Result<Vec<Booking>, Error> {
-    sqlx::query!(
+    let mut bookings = sqlx::query!(
         r#"
         SELECT
             b.id AS "b_id: BookingId",
@@ -734,9 +984,14 @@ pub async fn get_bookings_by_unit_id(
             created_at: v.b_created_at,
             confirmed_at: v.b_confirmed_at,
             canceled_at: v.b_canceled_at,
+            attachments: HashSet::new(),
         })
     })
-    .collect::<Result<Vec<_>, Error>>()
+    .collect::<Result<Vec<_>, Error>>()?;
+
+    populate_booking_attachments(&mut *connection, bookings.iter_mut()).await?;
+
+    Ok(bookings)
 }
 
 pub async fn get_bookings_by_user_id(
@@ -746,7 +1001,7 @@ pub async fn get_bookings_by_user_id(
     range_from: &DateTime<Utc>,
     include_canceled: bool,
 ) -> Result<Vec<Booking>, Error> {
-    sqlx::query!(
+    let mut bookings = sqlx::query!(
         r#"
         SELECT
             b.id AS "b_id: BookingId",
@@ -850,9 +1105,14 @@ pub async fn get_bookings_by_user_id(
             created_at: v.b_created_at,
             confirmed_at: v.b_confirmed_at,
             canceled_at: v.b_canceled_at,
+            attachments: HashSet::new(),
         })
     })
-    .collect::<Result<Vec<_>, Error>>()
+    .collect::<Result<Vec<_>, Error>>()?;
+
+    populate_booking_attachments(&mut *connection, bookings.iter_mut()).await?;
+
+    Ok(bookings)
 }
 
 pub async fn get_complete_bookings(
@@ -863,7 +1123,7 @@ pub async fn get_complete_bookings(
     offset: i64,
     limit: i64,
 ) -> Result<Vec<Booking>, Error> {
-    sqlx::query!(
+    let mut bookings = sqlx::query!(
         r#"
         SELECT
             b.id AS "b_id: BookingId",
@@ -961,9 +1221,14 @@ pub async fn get_complete_bookings(
             created_at: v.b_created_at,
             confirmed_at: v.b_confirmed_at,
             canceled_at: v.b_canceled_at,
+            attachments: HashSet::new(),
         })
     })
-    .collect::<Result<Vec<_>, Error>>()
+    .collect::<Result<Vec<_>, Error>>()?;
+
+    populate_booking_attachments(&mut *connection, bookings.iter_mut()).await?;
+
+    Ok(bookings)
 }
 
 pub async fn get_bookings_with_pending_cash_payment(
@@ -975,7 +1240,7 @@ pub async fn get_bookings_with_pending_cash_payment(
     offset: i64,
     limit: i64,
 ) -> Result<Vec<(Booking, CashTransaction)>, Error> {
-    sqlx::query!(
+    let mut bookings = sqlx::query!(
         r#"
         SELECT
             b.id AS "b_id: BookingId",
@@ -1088,6 +1353,7 @@ pub async fn get_bookings_with_pending_cash_payment(
                 created_at: v.b_created_at,
                 confirmed_at: v.b_confirmed_at,
                 canceled_at: v.b_canceled_at,
+                attachments: HashSet::new(),
             },
             CashTransaction {
                 product_id: v.b_id.into(),
@@ -1101,7 +1367,15 @@ pub async fn get_bookings_with_pending_cash_payment(
             },
         ))
     })
-    .collect::<Result<Vec<_>, Error>>()
+    .collect::<Result<Vec<_>, Error>>()?;
+
+    populate_booking_attachments(
+        &mut *connection,
+        bookings.iter_mut().map(|(booking, _)| booking),
+    )
+    .await?;
+
+    Ok(bookings)
 }
 
 pub async fn get_bookings_with_pending_cash_refunds(
@@ -1111,7 +1385,7 @@ pub async fn get_bookings_with_pending_cash_refunds(
     offset: i64,
     limit: i64,
 ) -> Result<Vec<(Booking, CashTransaction)>, Error> {
-    sqlx::query!(
+    let mut bookings = sqlx::query!(
         r#"
         SELECT
             b.id AS "b_id: BookingId",
@@ -1216,6 +1490,7 @@ pub async fn get_bookings_with_pending_cash_refunds(
                 created_at: v.b_created_at,
                 confirmed_at: v.b_confirmed_at,
                 canceled_at: v.b_canceled_at,
+                attachments: HashSet::new(),
             },
             CashTransaction {
                 product_id: v.b_id.into(),
@@ -1229,7 +1504,15 @@ pub async fn get_bookings_with_pending_cash_refunds(
             },
         ))
     })
-    .collect::<Result<Vec<_>, Error>>()
+    .collect::<Result<Vec<_>, Error>>()?;
+
+    populate_booking_attachments(
+        &mut *connection,
+        bookings.iter_mut().map(|(booking, _)| booking),
+    )
+    .await?;
+
+    Ok(bookings)
 }
 
 pub async fn get_confirmed_bookings(
@@ -1240,7 +1523,7 @@ pub async fn get_confirmed_bookings(
     offset: i64,
     limit: i64,
 ) -> Result<Vec<Booking>, Error> {
-    sqlx::query!(
+    let mut bookings = sqlx::query!(
         r#"
         SELECT
             b.id AS "b_id: BookingId",
@@ -1335,9 +1618,14 @@ pub async fn get_confirmed_bookings(
             created_at: v.b_created_at,
             confirmed_at: v.b_confirmed_at,
             canceled_at: v.b_canceled_at,
+            attachments: HashSet::new(),
         })
     })
-    .collect::<Result<Vec<_>, Error>>()
+    .collect::<Result<Vec<_>, Error>>()?;
+
+    populate_booking_attachments(&mut *connection, bookings.iter_mut()).await?;
+
+    Ok(bookings)
 }
 
 pub async fn create_booking(
@@ -1349,6 +1637,7 @@ pub async fn create_booking(
     time_from: &DateTime<Utc>,
     time_to: &DateTime<Utc>,
     is_confirmed: bool,
+    attachment_ids: &HashSet<BookingAttachmentId>,
 ) -> Result<BookingId, Error> {
     if is_unit_enabled(connection, unit_id).await? != Some(true) {
         return Err(Error::UnitNotFound);
@@ -1357,6 +1646,17 @@ pub async fn create_booking(
     if !is_booking_available(connection, now, unit_id, time_from, time_to, None, None).await? {
         return Err(Error::TimeRangeOccupied);
     }
+
+    ensure_booking_attachments_available(
+        connection,
+        now,
+        attachment_ids,
+        time_from,
+        time_to,
+        None,
+        None,
+    )
+    .await?;
 
     let booking_id = BookingId::generate();
     let product_id = ProductId::from(booking_id);
@@ -1389,6 +1689,19 @@ pub async fn create_booking(
     )
     .execute(&mut *connection)
     .await?;
+
+    for attachment_id in attachment_ids {
+        sqlx::query!(
+            r#"
+            INSERT INTO booking_attachment_mapping(booking_id, attachment_id)
+            VALUES (?1, ?2)
+            "#,
+            booking_id,
+            attachment_id,
+        )
+        .execute(&mut *connection)
+        .await?;
+    }
 
     Ok(booking_id)
 }
@@ -1437,6 +1750,18 @@ pub async fn update_booking_time(
     {
         return Err(Error::TimeRangeOccupied);
     }
+
+    let attachment_ids = booking.attachments.iter().map(|v| v.id).collect();
+    ensure_booking_attachments_available(
+        &mut *connection,
+        now,
+        &attachment_ids,
+        time_from,
+        time_to,
+        Some(booking_id),
+        None,
+    )
+    .await?;
 
     if &booking.time_from != time_from || &booking.time_to != time_to {
         let result = sqlx::query!(
@@ -1535,6 +1860,7 @@ pub async fn create_booking_amendment(
     booking_id: &BookingId,
     desired_time_from: &DateTime<Utc>,
     desired_time_to: &DateTime<Utc>,
+    desired_attachment_ids: &HashSet<BookingAttachmentId>,
     is_confirmed: bool,
 ) -> Result<BookingAmendmentId, Error> {
     let booking = get_booking(&mut *connection, booking_id)
@@ -1558,6 +1884,17 @@ pub async fn create_booking_amendment(
     {
         return Err(Error::TimeRangeOccupied);
     }
+
+    ensure_booking_attachments_available(
+        connection,
+        now,
+        desired_attachment_ids,
+        desired_time_from,
+        desired_time_to,
+        Some(booking_id),
+        None,
+    )
+    .await?;
 
     let booking_amendment_id = BookingAmendmentId::generate();
     let product_id = ProductId::from(booking_amendment_id);
@@ -1688,6 +2025,7 @@ pub async fn create_adhoc_reservation(
     time_to: &DateTime<Utc>,
     remark: &Option<String>,
     deletes_at: &Option<DateTime<Utc>>,
+    attachment_ids: &HashSet<BookingAttachmentId>,
 ) -> Result<AdhocReservationId, Error> {
     if is_unit_enabled(connection, unit_id).await? != Some(true) {
         return Err(Error::UnitNotFound);
@@ -1696,6 +2034,17 @@ pub async fn create_adhoc_reservation(
     if !is_booking_available(connection, now, unit_id, time_from, time_to, None, None).await? {
         return Err(Error::TimeRangeOccupied);
     }
+
+    ensure_booking_attachments_available(
+        connection,
+        now,
+        attachment_ids,
+        time_from,
+        time_to,
+        None,
+        None,
+    )
+    .await?;
 
     let result = sqlx::query!(
         r#"
@@ -1714,7 +2063,22 @@ pub async fn create_adhoc_reservation(
     .fetch_one(&mut *connection)
     .await?;
 
-    Ok(result.id.into())
+    let adhoc_reservation_id = AdhocReservationId::from(result.id);
+
+    for attachment_id in attachment_ids {
+        sqlx::query!(
+            r#"
+            INSERT INTO adhoc_reservation_attachment_mapping(adhoc_reservation_id, attachment_id)
+            VALUES (?1, ?2)
+            "#,
+            adhoc_reservation_id,
+            attachment_id,
+        )
+        .execute(&mut *connection)
+        .await?;
+    }
+
+    Ok(adhoc_reservation_id)
 }
 
 pub async fn get_adhoc_reservation(
@@ -1769,7 +2133,7 @@ pub async fn get_adhoc_reservation(
         return Ok(None);
     };
 
-    Ok(Some(AdhocReservation {
+    let mut reservation = AdhocReservation {
         id: v.id,
         unit_id: v.unit_id,
         time_from: v.time_from,
@@ -1810,13 +2174,27 @@ pub async fn get_adhoc_reservation(
                 deleted_at: v.cg_deleted_at,
             }),
         },
-    }))
+        attachment_ids: HashSet::new(),
+    };
+
+    populate_adhoc_reservation_attachment_ids(&mut *connection, [&mut reservation]).await?;
+
+    Ok(Some(reservation))
 }
 
 pub async fn delete_adhoc_reservation(
     connection: &mut SqliteConnection,
     reservation_id: AdhocReservationId,
 ) -> Result<bool, Error> {
+    sqlx::query!(
+        r#"
+        DELETE FROM adhoc_reservation_attachment_mapping WHERE adhoc_reservation_id=?1
+        "#,
+        reservation_id
+    )
+    .execute(&mut *connection)
+    .await?;
+
     let result = sqlx::query!(
         r#"
         DELETE FROM adhoc_reservation WHERE id=?1
@@ -1886,7 +2264,7 @@ pub async fn get_adhoc_reservations_by_unit_id(
     .fetch_all(&mut *connection)
     .await?;
 
-    result
+    let mut reservations = result
         .into_iter()
         .map(|v| {
             Ok(AdhocReservation {
@@ -1930,9 +2308,14 @@ pub async fn get_adhoc_reservations_by_unit_id(
                         deleted_at: v.cg_deleted_at,
                     }),
                 },
+                attachment_ids: HashSet::new(),
             })
         })
-        .collect::<Result<Vec<_>, Error>>()
+        .collect::<Result<Vec<_>, Error>>()?;
+
+    populate_adhoc_reservation_attachment_ids(&mut *connection, reservations.iter_mut()).await?;
+
+    Ok(reservations)
 }
 
 pub async fn expire_adhoc_reservation(

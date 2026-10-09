@@ -1,7 +1,9 @@
 use actix_web::web;
 use chrono::TimeDelta;
 use dxe_data::entities::Identity;
-use dxe_data::queries::booking::{create_booking, get_booking_with_user_id};
+use dxe_data::queries::booking::{
+    calculate_booking_attachments_price, create_booking, get_booking_with_user_id,
+};
 use dxe_data::queries::identity::{get_group_members, get_identity, is_member_of};
 use dxe_data::queries::payment::{create_cash_transaction, get_cash_transaction};
 use dxe_data::queries::unit::is_unit_enabled;
@@ -70,12 +72,14 @@ pub async fn post(
         &time_from,
         &time_to,
         false,
+        &body.attachment_ids,
     )
     .await?;
 
     let price = booking_config
         .calculate_price(&body.unit_id, time_from, time_to)
-        .map_err(|_| Error::UnitNotFound)?;
+        .map_err(|_| Error::UnitNotFound)?
+        + calculate_booking_attachments_price(&mut tx, &now, &body.attachment_ids).await?;
 
     update_user_cash_payment_depositor_name(
         &mut tx,

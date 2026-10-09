@@ -5,8 +5,8 @@ mod prefs;
 mod unit;
 
 pub use booking::{
-    AdhocParking, AdhocReservation, AudioRecording, Booking, BookingAmendment, OccupiedSlot,
-    Product, ProductDiscriminator, TelemetryFile,
+    AdhocParking, AdhocReservation, AudioRecording, Booking, BookingAmendment, BookingAttachment,
+    OccupiedSlot, Product, ProductDiscriminator, TelemetryFile,
 };
 pub use identity::{
     Group, GroupAssociation, Identity, IdentityDiscriminator, User, UserCashPaymentInformation,

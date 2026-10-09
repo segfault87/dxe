@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            id AS \"id: _\",\n            name,\n            category,\n            price,\n            disabled_at AS \"disabled_at: _\"\n        FROM booking_attachment\n        WHERE disabled_at IS NULL OR disabled_at > ?1\n        ORDER BY category ASC, name ASC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: _",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "category",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "price",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "disabled_at: _",
+        "ordinal": 4,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "19e9e6ca71b05f39af2e68706e273663d1b70802009c6d0122777f32cbac1b90"
+}

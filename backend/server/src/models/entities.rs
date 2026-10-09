@@ -2,7 +2,8 @@ mod converters;
 
 use chrono::{DateTime, FixedOffset};
 use dxe_types::{
-    AdhocParkingId, AdhocReservationId, BookingId, GroupId, SpaceId, TelemetryType, UnitId, UserId,
+    AdhocParkingId, AdhocReservationId, BookingAttachmentId, BookingId, GroupId, SpaceId,
+    TelemetryType, UnitId, UserId,
 };
 use serde::Serialize;
 
@@ -94,6 +95,15 @@ pub struct Booking {
     pub canceled_at: Option<DateTime<FixedOffset>>,
     pub is_canceled: bool,
     pub status: BookingStatus,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookingAttachment {
+    pub id: BookingAttachmentId,
+    pub name: String,
+    pub category: String,
+    pub price: i64,
 }
 
 #[derive(Debug, Serialize)]

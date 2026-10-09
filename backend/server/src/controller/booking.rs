@@ -1,5 +1,6 @@
 mod adhoc_reservation;
 mod amend;
+mod attachments;
 mod calendar;
 mod cancel;
 mod check;
@@ -12,6 +13,7 @@ use actix_web::web;
 
 pub fn bookings_scope() -> actix_web::Scope {
     web::scope("/bookings")
+        .service(web::resource("/attachments").route(web::get().to(attachments::get)))
         .service(web::resource("/calendar").route(web::get().to(calendar::get)))
         .service(web::resource("/check").route(web::post().to(check::post)))
         .service(web::resource("").route(web::post().to(submit::post)))

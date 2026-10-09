@@ -64,6 +64,7 @@ pub async fn post(
         &time_to,
         &body.remark,
         &expires_at,
+        &body.attachment_ids,
     )
     .await?;
 

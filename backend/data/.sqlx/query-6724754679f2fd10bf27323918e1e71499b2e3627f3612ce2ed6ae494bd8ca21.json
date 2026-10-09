@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO adhoc_reservation_attachment_mapping(adhoc_reservation_id, attachment_id)\n            VALUES (?1, ?2)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "6724754679f2fd10bf27323918e1e71499b2e3627f3612ce2ed6ae494bd8ca21"
+}

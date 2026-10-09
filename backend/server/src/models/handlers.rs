@@ -210,10 +210,19 @@ pub mod booking {
         pub slots: Vec<OccupiedSlot>,
     }
 
+    #[derive(Debug, Deserialize)]
+    pub struct GetBookingAttachmentsQuery {
+        pub time_from: Option<DateTime<FixedOffset>>,
+        pub desired_hours: Option<i64>,
+        pub exclude_booking_id: Option<BookingId>,
+        pub exclude_adhoc_reservation_id: Option<AdhocReservationId>,
+    }
+
     #[derive(Debug, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct GetBookingAttachmentsResponse {
         pub attachments: Vec<BookingAttachment>,
+        pub unavailable_attachment_ids: Vec<BookingAttachmentId>,
     }
 
     #[derive(Debug, Deserialize)]
@@ -283,6 +292,8 @@ pub mod booking {
         pub new_identity_id: Option<IdentityId>,
         pub new_time_from: Option<DateTime<FixedOffset>>,
         pub additional_hours: Option<i64>,
+        #[serde(default)]
+        pub attachment_ids: HashSet<BookingAttachmentId>,
     }
 
     #[derive(Debug, Serialize)]

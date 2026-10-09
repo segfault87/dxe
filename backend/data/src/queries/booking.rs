@@ -1860,7 +1860,7 @@ pub async fn create_booking_amendment(
     booking_id: &BookingId,
     desired_time_from: &DateTime<Utc>,
     desired_time_to: &DateTime<Utc>,
-    desired_attachment_ids: &HashSet<BookingAttachmentId>,
+    additional_attachment_ids: &HashSet<BookingAttachmentId>,
     is_confirmed: bool,
 ) -> Result<BookingAmendmentId, Error> {
     let booking = get_booking(&mut *connection, booking_id)
@@ -1885,10 +1885,25 @@ pub async fn create_booking_amendment(
         return Err(Error::TimeRangeOccupied);
     }
 
+    // Attachments are append-only: the booking keeps all of its current attachments, and only
+    // the ones it doesn't have yet are added by this amendment.
+    let current_attachment_ids = booking
+        .attachments
+        .iter()
+        .map(|v| v.id)
+        .collect::<HashSet<_>>();
+    let additional_attachment_ids = additional_attachment_ids
+        .difference(&current_attachment_ids)
+        .copied()
+        .collect::<HashSet<_>>();
+
     ensure_booking_attachments_available(
         connection,
         now,
-        desired_attachment_ids,
+        &current_attachment_ids
+            .union(&additional_attachment_ids)
+            .copied()
+            .collect(),
         desired_time_from,
         desired_time_to,
         Some(booking_id),
@@ -1936,7 +1951,63 @@ pub async fn create_booking_amendment(
     .execute(&mut *connection)
     .await?;
 
+    for attachment_id in &additional_attachment_ids {
+        sqlx::query!(
+            r#"
+            INSERT INTO booking_amendment_attachment_mapping(booking_amendment_id, attachment_id)
+            VALUES (?1, ?2)
+            "#,
+            booking_amendment_id,
+            attachment_id,
+        )
+        .execute(&mut *connection)
+        .await?;
+    }
+
+    if is_confirmed {
+        apply_booking_amendment_attachments(&mut *connection, &booking_amendment_id).await?;
+    }
+
     Ok(booking_amendment_id)
+}
+
+pub async fn get_booking_amendment_attachment_ids(
+    connection: &mut SqliteConnection,
+    booking_amendment_id: &BookingAmendmentId,
+) -> Result<HashSet<BookingAttachmentId>, Error> {
+    Ok(sqlx::query!(
+        r#"
+        SELECT attachment_id AS "attachment_id: BookingAttachmentId"
+        FROM booking_amendment_attachment_mapping
+        WHERE booking_amendment_id = ?1
+        "#,
+        booking_amendment_id
+    )
+    .fetch_all(&mut *connection)
+    .await?
+    .into_iter()
+    .map(|v| v.attachment_id)
+    .collect())
+}
+
+async fn apply_booking_amendment_attachments(
+    connection: &mut SqliteConnection,
+    booking_amendment_id: &BookingAmendmentId,
+) -> Result<(), Error> {
+    sqlx::query!(
+        r#"
+        INSERT OR IGNORE INTO booking_attachment_mapping(booking_id, attachment_id)
+        SELECT ba.booking_id, m.attachment_id
+        FROM booking_amendment_attachment_mapping "m"
+        JOIN booking_amendment "ba" ON m.booking_amendment_id = ba.id
+        WHERE m.booking_amendment_id = ?1
+        "#,
+        booking_amendment_id
+    )
+    .execute(&mut *connection)
+    .await?;
+
+    Ok(())
 }
 
 pub async fn confirm_booking_amendment(
@@ -1976,6 +2047,22 @@ pub async fn confirm_booking_amendment(
         .execute(&mut *connection)
         .await?;
     }
+
+    // Pending amendments don't hold their attachments, so check again before applying them
+    let additional_attachment_ids =
+        get_booking_amendment_attachment_ids(&mut *connection, booking_amendment_id).await?;
+    ensure_booking_attachments_available(
+        &mut *connection,
+        now,
+        &additional_attachment_ids,
+        &booking_amendment.desired_time_from,
+        &booking_amendment.desired_time_to,
+        Some(&booking_amendment.booking_id),
+        None,
+    )
+    .await?;
+
+    apply_booking_amendment_attachments(&mut *connection, booking_amendment_id).await?;
 
     let _ = sqlx::query!(
         r#"

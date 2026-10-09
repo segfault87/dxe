@@ -95,6 +95,7 @@ pub struct Booking {
     pub canceled_at: Option<DateTime<FixedOffset>>,
     pub is_canceled: bool,
     pub status: BookingStatus,
+    pub attachments: Vec<BookingAttachment>,
 }
 
 #[derive(Debug, Serialize)]
@@ -147,6 +148,7 @@ pub struct AdhocReservation {
     pub reserved_hours: i64,
     pub deleted_at: Option<DateTime<FixedOffset>>,
     pub remark: Option<String>,
+    pub attachment_ids: Vec<BookingAttachmentId>,
 }
 
 #[derive(Debug, Serialize)]

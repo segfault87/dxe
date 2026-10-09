@@ -31,7 +31,7 @@ pub async fn get(
 
     let product_id = ProductId::from(booking.id);
 
-    let (paid_price, transaction) = if let Some(mut toss_tx) =
+    let transaction = if let Some(mut toss_tx) =
         get_toss_payments_transaction_by_product_id(&mut tx, &product_id).await?
     {
         let amendment_txs =
@@ -42,30 +42,24 @@ pub async fn get(
             toss_tx.price += tx.price;
         }
 
-        (
-            toss_tx.price,
-            Some(Transaction::TossPayments(TossPaymentsTransaction::convert(
-                toss_tx,
-                &timezone_config,
-                &now,
-            )?)),
-        )
+        Some(Transaction::TossPayments(TossPaymentsTransaction::convert(
+            toss_tx,
+            &timezone_config,
+            &now,
+        )?))
     } else if let Some(cash_tx) = get_cash_transaction(&mut tx, &product_id).await? {
-        (
-            cash_tx.price,
-            Some(Transaction::Cash(CashTransaction::convert(
-                cash_tx,
-                &timezone_config,
-                &now,
-            )?)),
-        )
+        Some(Transaction::Cash(CashTransaction::convert(
+            cash_tx,
+            &timezone_config,
+            &now,
+        )?))
     } else {
-        (0, None)
+        None
     };
 
     let amendable = booking_config
         .calculate_refund_price(&timezone_config, 100, booking.time_from, *now)
-        .map(|v| v == paid_price)
+        .map(|refund_rate| refund_rate == 100)
         .unwrap_or(false);
 
     let hours = (booking.time_to - booking.time_from).num_hours();

@@ -4,8 +4,8 @@ use actix_web::web;
 use chrono::TimeDelta;
 use dxe_data::entities::Identity;
 use dxe_data::queries::booking::{
-    create_booking_amendment, get_booking_with_user_id, update_booking_customer,
-    update_booking_time,
+    calculate_booking_attachments_price, create_booking_amendment, get_booking_with_user_id,
+    update_booking_customer, update_booking_time,
 };
 use dxe_data::queries::identity::is_member_of;
 use dxe_data::queries::payment::create_toss_payments_transaction;
@@ -65,16 +65,21 @@ pub async fn put(
 
     let mut foreign_payment_id = None;
 
-    let attachment_ids = booking
+    // Attachments are append-only; the ones the booking already has are ignored
+    let current_attachment_ids = booking
         .attachments
         .iter()
         .map(|v| v.id)
         .collect::<HashSet<_>>();
+    let additional_attachment_ids = body
+        .attachment_ids
+        .difference(&current_attachment_ids)
+        .copied()
+        .collect::<HashSet<_>>();
 
     let current_hours = (booking.time_to - booking.time_from).num_hours();
-    if let Some(additional_hours) = body.additional_hours
-        && additional_hours > 0
-    {
+    let additional_hours = body.additional_hours.unwrap_or(0).max(0);
+    if additional_hours > 0 || !additional_attachment_ids.is_empty() {
         if *now >= booking.time_from
             && let Some(new_time_from) = body.new_time_from
             && new_time_from != booking.time_from
@@ -97,7 +102,9 @@ pub async fn put(
 
         let price = booking_config
             .calculate_additive_price(&booking.unit_id, additional_hours)
-            .map_err(|_| Error::UnitNotFound)?;
+            .map_err(|_| Error::UnitNotFound)?
+            + calculate_booking_attachments_price(&mut tx, &now, &additional_attachment_ids)
+                .await?;
 
         let booking_amendment_id = create_booking_amendment(
             &mut tx,
@@ -105,7 +112,7 @@ pub async fn put(
             &booking_id,
             &desired_time_from,
             &desired_time_to,
-            &attachment_ids,
+            &additional_attachment_ids,
             false,
         )
         .await?;
@@ -144,7 +151,7 @@ pub async fn put(
             &booking_id,
             &desired_time_from,
             &desired_time_to,
-            &attachment_ids,
+            &HashSet::new(),
             true,
         )
         .await?;

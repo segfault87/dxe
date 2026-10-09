@@ -136,6 +136,13 @@ impl IntoView for Booking {
     ) -> Result<Self, Self::Error> {
         let booking_time = booking.time_to - booking.time_from;
 
+        let mut attachments = booking
+            .attachments
+            .into_iter()
+            .map(|v| BookingAttachment::convert(v, timezone, now))
+            .collect::<Result<Vec<_>, _>>()?;
+        attachments.sort_by(|a, b| (&a.category, &a.name).cmp(&(&b.category, &b.name)));
+
         Ok(Self {
             id: booking.id,
             unit_id: booking.unit_id,
@@ -150,6 +157,7 @@ impl IntoView for Booking {
             canceled_at: booking.canceled_at.map(|v| timezone.convert(v)),
             is_canceled: booking.canceled_at.map(|v| &v < now).unwrap_or(false),
             status: BookingStatus::Pending, // to set later
+            attachments,
         })
     }
 }
@@ -263,6 +271,7 @@ impl IntoView for AdhocReservation {
             reserved_hours: (entity.time_to - entity.time_from).num_hours(),
             deleted_at: entity.deleted_at.map(|v| timezone.convert(v)),
             remark: entity.remark,
+            attachment_ids: entity.attachment_ids.into_iter().collect(),
         })
     }
 }

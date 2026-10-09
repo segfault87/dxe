@@ -235,3 +235,14 @@ impl Display for MixerChannelId {
         write!(f, "{}", self.0)
     }
 }
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Deserialize, Serialize)]
+#[serde(transparent)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::Type), sqlx(transparent))]
+pub struct BookingAttachmentId(Uuid);
+
+impl Display for BookingAttachmentId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}

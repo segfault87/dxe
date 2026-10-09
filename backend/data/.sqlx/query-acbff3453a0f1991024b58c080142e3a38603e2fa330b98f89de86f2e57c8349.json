@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT attachment_id AS \"attachment_id: BookingAttachmentId\"\n        FROM booking_amendment_attachment_mapping\n        WHERE booking_amendment_id = ?1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "attachment_id: BookingAttachmentId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "acbff3453a0f1991024b58c080142e3a38603e2fa330b98f89de86f2e57c8349"
+}

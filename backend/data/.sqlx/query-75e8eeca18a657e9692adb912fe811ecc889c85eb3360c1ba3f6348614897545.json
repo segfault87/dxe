@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT OR IGNORE INTO booking_attachment_mapping(booking_id, attachment_id)\n        SELECT ba.booking_id, m.attachment_id\n        FROM booking_amendment_attachment_mapping \"m\"\n        JOIN booking_amendment \"ba\" ON m.booking_amendment_id = ba.id\n        WHERE m.booking_amendment_id = ?1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "75e8eeca18a657e9692adb912fe811ecc889c85eb3360c1ba3f6348614897545"
+}

@@ -24,3 +24,13 @@ CREATE TABLE adhoc_reservation_attachment_mapping(
     FOREIGN KEY(attachment_id) REFERENCES booking_attachment(id)
 );
 CREATE INDEX idx_adhoc_reservation_attachment_mapping_attachment_id ON adhoc_reservation_attachment_mapping(attachment_id);
+
+INSERT INTO booking_attachment VALUES(
+    x'7910f910b44d49d4aa0f761a0b101165', 'Squier Affinity Stratocaster', '일렉트릭 기타', 5000, NULL
+);
+INSERT INTO booking_attachment VALUES(
+    x'2db6af426cb148acb152a7c941950e13', 'Epiphone Les Paul Standard', '일렉트릭 기타', 5000, NULL
+);
+INSERT INTO booking_attachment VALUES(
+    x'68b1d57cf9ae4a0097539f593cd56e6c', 'Squier Jazz Bass', '일렉트릭 베이스', 5000, NULL
+);

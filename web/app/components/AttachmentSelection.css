@@ -72,3 +72,9 @@
     }
   }
 }
+
+/* Overrides the default list style of `.section ul` */
+.section .attachment-selection {
+  padding-left: 0;
+  list-style-type: none;
+}

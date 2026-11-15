@@ -4,6 +4,7 @@ import type {
   IdentityId,
   SpaceId,
   UnitId,
+  UserId,
 } from "../models/base";
 import type {
   AdhocParking,
@@ -54,6 +55,23 @@ export interface CreateAdhocReservationRequest {
 
 export interface CreateAdhocReservationResponse {
   reservation: AdhocReservation;
+}
+
+export interface CreateBookingRequest {
+  unitId: UnitId;
+  holderId: UserId;
+  customerId: IdentityId;
+  timeFrom: DateTime;
+  desiredHours: number;
+  attachmentIds?: BookingAttachmentId[];
+  skipPayment: boolean;
+  depositorName?: string | null;
+  price?: number | null;
+}
+
+export interface CreateBookingResponse {
+  booking: Booking;
+  cashTransaction: CashTransaction | null;
 }
 
 export interface GetGroupsResponse {

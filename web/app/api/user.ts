@@ -45,7 +45,7 @@ const joinGroup = (groupId: GroupId) => {
 };
 
 const leaveGroup = (groupId: GroupId) => {
-  return API.delete(`/user/group/${groupId}/membersip`);
+  return API.delete(`/user/group/${groupId}/membership`);
 };
 
 const UserService = {

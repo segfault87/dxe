@@ -106,6 +106,29 @@ pub mod admin {
         pub reservation: AdhocReservation,
     }
 
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct CreateBookingRequest {
+        pub unit_id: UnitId,
+        pub holder_id: UserId,
+        pub customer_id: IdentityId,
+        pub time_from: DateTime<FixedOffset>,
+        pub desired_hours: i64,
+        #[serde(default)]
+        pub attachment_ids: HashSet<BookingAttachmentId>,
+        #[serde(default)]
+        pub skip_payment: bool,
+        pub depositor_name: Option<String>,
+        pub price: Option<i64>,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct CreateBookingResponse {
+        pub booking: Booking,
+        pub cash_transaction: Option<CashTransaction>,
+    }
+
     #[derive(Debug, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct GetGroupsResponse {

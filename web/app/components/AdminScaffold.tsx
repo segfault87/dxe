@@ -36,6 +36,11 @@ export default function AdminScaffold() {
               </NavLink>
             </li>
             <li>
+              <NavLink to="/admin/create-booking/" end>
+                예약 생성
+              </NavLink>
+            </li>
+            <li>
               <NavLink to="/admin/adhoc-reservations/" end>
                 임의 예약
               </NavLink>

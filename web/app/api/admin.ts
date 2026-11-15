@@ -2,6 +2,8 @@ import API from "../api";
 import { toUtcIso8601 } from "../lib/datetime";
 import type {
   CancelBookingResponse,
+  CreateBookingRequest,
+  CreateBookingResponse,
   CreateAdhocParkingRequest,
   CreateAdhocReservationRequest,
   CreateAdhocReservationResponse,
@@ -48,6 +50,10 @@ const getBookings = (
   }
 
   return API.get<GetBookingsResponse>(`/admin/bookings?${query}`);
+};
+
+const createBooking = (data: CreateBookingRequest) => {
+  return API.post<CreateBookingResponse>("/admin/bookings", data);
 };
 
 const getUsers = () => {
@@ -99,6 +105,7 @@ const cancelBooking = (id: BookingId) => {
 
 const AdminService = {
   cancelBooking,
+  createBooking,
   getBooking,
   getBookings,
   getUsers,

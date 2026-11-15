@@ -2,6 +2,7 @@ mod adhoc_parking;
 mod adhoc_reservations;
 mod booking;
 mod bookings;
+mod create_booking;
 mod groups;
 mod telemetry;
 mod users;
@@ -19,7 +20,11 @@ pub fn scope() -> actix_web::Scope {
         .service(
             web::resource("/booking/{booking_id}/telemetry").route(web::get().to(telemetry::get)),
         )
-        .service(web::resource("/bookings").route(web::get().to(bookings::get)))
+        .service(
+            web::resource("/bookings")
+                .route(web::get().to(bookings::get))
+                .route(web::post().to(create_booking::post)),
+        )
         .service(
             web::resource("/adhoc-reservations")
                 .route(web::get().to(adhoc_reservations::get))

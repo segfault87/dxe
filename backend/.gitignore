@@ -1,4 +1,5 @@
 target/
 config*.toml
+*-gcloud-*.json
 .env*
 *.db

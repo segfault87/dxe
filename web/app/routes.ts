@@ -22,6 +22,7 @@ export default [
       "reservation/payment/toss/fail/",
       "./pages/Reservation/Payment/TossPaymentFail.tsx",
     ),
+    route("payment/:adHocPaymentId", "./pages/Payment/AdHocPayment.tsx"),
     route("reservation/:bookingId", "./pages/Reservation/Show.tsx"),
     route("reservation/:bookingId/amend", "./pages/Reservation/Amend.tsx"),
     route("login/", "./pages/Login.tsx"),
@@ -45,6 +46,7 @@ export default [
       route("users/", "./pages/Admin/Users.tsx"),
       route("adhoc-reservations/", "./pages/Admin/AdhocReservations.tsx"),
       route("adhoc-parkings/", "./pages/Admin/AdhocParkings.tsx"),
+      route("adhoc-payments/", "./pages/Admin/AdHocPayments.tsx"),
     ]),
   ]),
   layout("./components/OsdScaffold.tsx", [

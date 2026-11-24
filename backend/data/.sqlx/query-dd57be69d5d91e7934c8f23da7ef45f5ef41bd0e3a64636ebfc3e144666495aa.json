@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            id AS \"id: _\",\n            issuer_id AS \"issuer_id: _\",\n            recipient_id AS \"recipient_id: _\",\n            price,\n            note,\n            created_at AS \"created_at: _\",\n            paid_at AS \"paid_at: _\",\n            canceled_at AS \"canceled_at: _\"\n        FROM adhoc_payment\n        ORDER BY created_at DESC\n        LIMIT ?1 OFFSET ?2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: _",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "issuer_id: _",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "recipient_id: _",
+        "ordinal": 2,
+        "type_info": "Blob"
+      },
+      {
+        "name": "price",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "note",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at: _",
+        "ordinal": 5,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "paid_at: _",
+        "ordinal": 6,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "canceled_at: _",
+        "ordinal": 7,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "dd57be69d5d91e7934c8f23da7ef45f5ef41bd0e3a64636ebfc3e144666495aa"
+}

@@ -1,6 +1,7 @@
 import API from "../api";
 import { toUtcIso8601 } from "../lib/datetime";
 import type {
+  AdHocTossPaymentInitiateResponse,
   AmendBookingResponse,
   AmendBookingRequest,
   CalendarResponse,
@@ -9,6 +10,7 @@ import type {
   CheckResponse,
   GetBookingAttachmentsResponse,
   GetAudioRecordingResponse,
+  GetAdHocPaymentResponse,
   GetBookingResponse,
   GetTossPaymentStateResponse,
   SubmitBookingRequest,
@@ -19,6 +21,7 @@ import type {
   TossPaymentInitiateResponse,
 } from "../types/handlers/booking";
 import type {
+  AdHocPaymentId,
   AdhocReservationId,
   BookingId,
   ForeignPaymentId,
@@ -125,6 +128,16 @@ const getTossPaymentState = (id: ForeignPaymentId) => {
   return API.get<GetTossPaymentStateResponse>(`/payments/toss/order/${id}`);
 };
 
+const getAdHocPayment = (id: AdHocPaymentId) => {
+  return API.get<GetAdHocPaymentResponse>(`/payments/adhoc/${id}`);
+};
+
+const initiateAdHocTossPayment = (id: AdHocPaymentId) => {
+  return API.post<AdHocTossPaymentInitiateResponse>(
+    `/payments/adhoc/${id}/toss`,
+  );
+};
+
 const deleteTemporaryReservation = (id: AdhocReservationId) => {
   return API.delete(`/adhoc-reservation/${id}`);
 };
@@ -143,6 +156,8 @@ const BookingService = {
   confirmTossPayment,
   cancelTossPayment,
   getTossPaymentState,
+  getAdHocPayment,
+  initiateAdHocTossPayment,
   deleteTemporaryReservation,
 };
 

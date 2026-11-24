@@ -1,4 +1,5 @@
-import type { DateTime } from "./base";
+import type { AdHocPaymentId, DateTime } from "./base";
+import type { Identity } from "./identity";
 
 export interface CashTransaction {
   depositorName: string;
@@ -22,4 +23,21 @@ export interface TossPaymentsTransaction {
 export interface Transaction {
   cash?: CashTransaction;
   tossPayments?: TossPaymentsTransaction;
+}
+
+export type AdHocPaymentStatus = "PENDING" | "PAID" | "CANCELED";
+
+export interface AdHocPayment {
+  id: AdHocPaymentId;
+  recipient: Identity;
+  price: number;
+  note: string;
+  status: AdHocPaymentStatus;
+  createdAt: DateTime;
+  paidAt: DateTime | null;
+  canceledAt: DateTime | null;
+}
+
+export interface AdHocPaymentWithUrl extends AdHocPayment {
+  url: string;
 }

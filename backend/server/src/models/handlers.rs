@@ -2,15 +2,15 @@ use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, FixedOffset};
 use dxe_types::{
-    AdhocReservationId, BookingAttachmentId, BookingId, ForeignPaymentId, IdentityId, SpaceId,
-    TelemetryType, UnitId, UserId,
+    AdHocPaymentId, AdhocReservationId, BookingAttachmentId, BookingId, ForeignPaymentId,
+    IdentityId, SpaceId, TelemetryType, UnitId, UserId,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::models::entities::{
-    AdhocParking, AdhocReservation, AudioRecording, Booking, BookingAttachment,
-    BookingWithPayments, CashTransaction, Group, GroupWithUsers, OccupiedSlot, ProductType,
-    SelfUser, TelemetryEntry, Transaction,
+    AdHocPayment, AdHocPaymentWithUrl, AdhocParking, AdhocReservation, AudioRecording, Booking,
+    BookingAttachment, BookingWithPayments, CashTransaction, Group, GroupWithUsers, OccupiedSlot,
+    ProductType, SelfUser, TelemetryEntry, Transaction,
 };
 
 pub mod admin {
@@ -174,6 +174,32 @@ pub mod admin {
     #[serde(rename_all = "camelCase")]
     pub struct CancelBookingResponse {
         pub transaction: Option<Transaction>,
+    }
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct CreateAdHocPaymentRequest {
+        pub amount: i64,
+        pub recipient_id: IdentityId,
+        pub note: String,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct CreateAdHocPaymentResponse {
+        pub payment: AdHocPaymentWithUrl,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    pub struct GetAdHocPaymentsQuery {
+        pub limit: Option<i64>,
+        pub offset: Option<i64>,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct GetAdHocPaymentsResponse {
+        pub payments: Vec<AdHocPaymentWithUrl>,
     }
 }
 
@@ -364,15 +390,30 @@ pub mod booking {
     #[derive(Debug, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct ConfirmTossPaymentResponse {
-        pub booking_id: BookingId,
+        pub booking_id: Option<BookingId>,
+        pub adhoc_payment_id: Option<AdHocPaymentId>,
     }
 
     #[derive(Debug, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct GetTossPaymentStateResponse {
         pub r#type: ProductType,
-        pub time_from: DateTime<FixedOffset>,
-        pub time_to: DateTime<FixedOffset>,
+        pub time_from: Option<DateTime<FixedOffset>>,
+        pub time_to: Option<DateTime<FixedOffset>>,
+        pub note: Option<String>,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct GetAdHocPaymentResponse {
+        pub payment: AdHocPayment,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct InitiateAdHocTossPaymentResponse {
+        pub order_id: ForeignPaymentId,
+        pub price: i64,
     }
 }
 

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO product(id, discriminator)\n        VALUES(?1, 'adhoc_payment')\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "b198f2f5b3ccbe23e0f289888c3e00438a8ba81901d9e81c638d6e56a68ca4a3"
+}

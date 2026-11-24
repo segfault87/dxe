@@ -9,6 +9,14 @@ pub fn scope() -> actix_web::Scope {
             web::resource("/toss/confirm").route(web::post().to(payment_toss::confirm_payment)),
         )
         .service(
+            web::resource("/adhoc/{adhoc_payment_id}")
+                .route(web::get().to(payment_toss::get_adhoc)),
+        )
+        .service(
+            web::resource("/adhoc/{adhoc_payment_id}/toss")
+                .route(web::post().to(payment_toss::post_adhoc)),
+        )
+        .service(
             web::resource("/toss/order/{foreign_payment_id}")
                 .route(web::get().to(payment_toss::get))
                 .route(web::delete().to(payment_toss::delete)),

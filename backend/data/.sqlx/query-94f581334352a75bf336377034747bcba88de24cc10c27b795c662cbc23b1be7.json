@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE toss_payments_transaction\n        SET user_id=?1\n        WHERE id=?2 AND confirmed_at IS NULL\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "94f581334352a75bf336377034747bcba88de24cc10c27b795c662cbc23b1be7"
+}

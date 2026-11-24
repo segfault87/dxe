@@ -8,9 +8,10 @@ export type SpaceId = string;
 export type AdhocReservationId = number;
 export type AdhocParkingId = number;
 export type ForeignPaymentId = string;
+export type AdHocPaymentId = string;
 export type BookingAttachmentId = string;
 export type TelemetryType = string;
 
 export type IdentityId = UserId | GroupId;
 
-export type ProductType = "BOOKING" | "BOOKING_AMENDMENT";
+export type ProductType = "BOOKING" | "BOOKING_AMENDMENT" | "ADHOC_PAYMENT";

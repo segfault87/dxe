@@ -2,6 +2,9 @@ import API from "../api";
 import { toUtcIso8601 } from "../lib/datetime";
 import type {
   CancelBookingResponse,
+  CreateAdHocPaymentRequest,
+  CreateAdHocPaymentResponse,
+  GetAdHocPaymentsResponse,
   CreateBookingRequest,
   CreateBookingResponse,
   CreateAdhocParkingRequest,
@@ -17,6 +20,7 @@ import type {
   GetGroupsResponse,
 } from "../types/handlers/admin";
 import type {
+  AdHocPaymentId,
   AdhocParkingId,
   AdhocReservationId,
   BookingId,
@@ -103,8 +107,23 @@ const cancelBooking = (id: BookingId) => {
   return API.delete<CancelBookingResponse>(`/admin/booking/${id}`);
 }
 
+const getAdHocPayments = () => {
+  return API.get<GetAdHocPaymentsResponse>("/admin/adhoc-payments");
+};
+
+const createAdHocPayment = (data: CreateAdHocPaymentRequest) => {
+  return API.post<CreateAdHocPaymentResponse>("/admin/adhoc-payments", data);
+};
+
+const cancelAdHocPayment = (id: AdHocPaymentId) => {
+  return API.delete(`/admin/adhoc-payment/${id}`);
+};
+
 const AdminService = {
   cancelBooking,
+  getAdHocPayments,
+  createAdHocPayment,
+  cancelAdHocPayment,
   createBooking,
   getBooking,
   getBookings,

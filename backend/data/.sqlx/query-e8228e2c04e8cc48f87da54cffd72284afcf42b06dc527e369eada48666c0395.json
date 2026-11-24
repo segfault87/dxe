@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE adhoc_payment\n        SET paid_at=?1\n        WHERE id=?2 AND paid_at IS NULL AND canceled_at IS NULL\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "e8228e2c04e8cc48f87da54cffd72284afcf42b06dc527e369eada48666c0395"
+}

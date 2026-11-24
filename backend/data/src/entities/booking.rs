@@ -2,8 +2,8 @@ use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
 use dxe_types::{
-    AdhocParkingId, AdhocReservationId, BookingAmendmentId, BookingAttachmentId, BookingId,
-    SpaceId, TelemetryType, UnitId,
+    AdHocPaymentId, AdhocParkingId, AdhocReservationId, BookingAmendmentId, BookingAttachmentId,
+    BookingId, SpaceId, TelemetryType, UnitId, UserId,
 };
 use sqlx::FromRow;
 
@@ -49,12 +49,15 @@ pub struct BookingAmendment {
 pub enum ProductDiscriminator {
     Booking,
     BookingAmendment,
+    #[sqlx(rename = "adhoc_payment")]
+    AdHocPayment,
 }
 
 #[derive(Debug, Clone)]
 pub enum Product {
     Booking(Box<Booking>),
     Amendment(BookingAmendment),
+    AdHocPayment(AdHocPayment),
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -103,4 +106,16 @@ pub struct BookingAttachment {
     pub category: String,
     pub price: i64,
     pub disabled_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AdHocPayment {
+    pub id: AdHocPaymentId,
+    pub issuer_id: UserId,
+    pub recipient: Identity,
+    pub price: i64,
+    pub note: String,
+    pub created_at: DateTime<Utc>,
+    pub paid_at: Option<DateTime<Utc>>,
+    pub canceled_at: Option<DateTime<Utc>>,
 }

@@ -61,6 +61,10 @@ pub enum Error {
     BookingAlreadyConfirmed,
     #[error("결제 정보를 찾을 수 없습니다.")]
     ForeignPaymentNotFound,
+    #[error("결제 요청을 찾을 수 없습니다.")]
+    AdHocPaymentNotFound,
+    #[error("이미 결제되었거나 취소된 결제 요청입니다.")]
+    AdHocPaymentNotPayable,
     #[error("잘못된 파일 업로드입니다.")]
     BadFileUpload,
     #[error("파일을 찾지 못했습니다.")]
@@ -146,6 +150,8 @@ impl ResponseError for Error {
             Self::DoorNotOpened(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::BookingAlreadyConfirmed => StatusCode::BAD_REQUEST,
             Self::ForeignPaymentNotFound => StatusCode::NOT_FOUND,
+            Self::AdHocPaymentNotFound => StatusCode::NOT_FOUND,
+            Self::AdHocPaymentNotPayable => StatusCode::BAD_REQUEST,
             Self::BadFileUpload => StatusCode::BAD_REQUEST,
             Self::FileNotFound => StatusCode::NOT_FOUND,
             Self::PaymentFailed(_) => StatusCode::BAD_REQUEST,
@@ -188,6 +194,8 @@ impl ResponseError for Error {
             Self::DoorNotOpened(_) => "DoorNotOpened",
             Self::BookingAlreadyConfirmed => "BookingAlreadyConfirmed",
             Self::ForeignPaymentNotFound => "ForeignPaymentNotFound",
+            Self::AdHocPaymentNotFound => "AdHocPaymentNotFound",
+            Self::AdHocPaymentNotPayable => "AdHocPaymentNotPayable",
             Self::BadFileUpload => "BadFileUpload",
             Self::FileNotFound => "FileNotFound",
             Self::PaymentFailed(_) => "PaymentFailed",

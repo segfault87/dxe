@@ -2,8 +2,9 @@ use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use dxe_types::{
-    AdhocParkingId, AdhocReservationId, BookingAmendmentId, BookingAttachmentId, BookingId,
-    GroupId, IdentityId, IdentityProvider, ProductId, SpaceId, TelemetryType, UnitId, UserId,
+    AdHocPaymentId, AdhocParkingId, AdhocReservationId, BookingAmendmentId, BookingAttachmentId,
+    BookingId, GroupId, IdentityId, IdentityProvider, ProductId, SpaceId, TelemetryType, UnitId,
+    UserId,
 };
 use sqlx::{FromRow, QueryBuilder, SqliteConnection};
 
@@ -13,6 +14,7 @@ use crate::entities::{
     CashTransaction, Group, Identity, IdentityDiscriminator, OccupiedSlot, Product,
     ProductDiscriminator, TelemetryFile, User,
 };
+use crate::queries::payment::get_adhoc_payment;
 use crate::queries::unit::is_unit_enabled;
 use crate::utils::is_in_effect;
 
@@ -497,6 +499,7 @@ pub async fn get_occupied_slots(
 
 pub async fn get_product(
     connection: &mut SqliteConnection,
+    now: &DateTime<Utc>,
     product_id: &ProductId,
 ) -> Result<Option<Product>, Error> {
     let result = sqlx::query!(
@@ -647,6 +650,11 @@ pub async fn get_product(
                 confirmed_at: result.ba_confirmed_at,
                 canceled_at: result.ba_canceled_at,
             }),
+            ProductDiscriminator::AdHocPayment => Product::AdHocPayment(
+                get_adhoc_payment(&mut *connection, now, &AdHocPaymentId::from(*product_id))
+                    .await?
+                    .ok_or(Error::MissingField("adhoc_payment"))?,
+            ),
         })
     } else {
         None

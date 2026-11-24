@@ -15,7 +15,11 @@ import type {
   TelemetryEntry,
 } from "../models/booking";
 import type { GroupWithUsers } from "../models/group";
-import type { CashTransaction, Transaction } from "../models/payment";
+import type {
+  AdHocPaymentWithUrl,
+  CashTransaction,
+  Transaction,
+} from "../models/payment";
 import type { SelfUser } from "../models/user";
 
 export interface GetBookingResponse {
@@ -95,4 +99,18 @@ export interface CreateAdhocParkingRequest {
 
 export interface CancelBookingResponse {
   transaction: Transaction | null;
+}
+
+export interface CreateAdHocPaymentRequest {
+  amount: number;
+  recipientId: IdentityId;
+  note: string;
+}
+
+export interface CreateAdHocPaymentResponse {
+  payment: AdHocPaymentWithUrl;
+}
+
+export interface GetAdHocPaymentsResponse {
+  payments: AdHocPaymentWithUrl[];
 }

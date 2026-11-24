@@ -1,9 +1,12 @@
 use chrono::{DateTime, Utc};
-use dxe_types::{AdhocReservationId, BookingId, ForeignPaymentId, ProductId, UserId};
+use dxe_types::{
+    AdHocPaymentId, AdhocReservationId, BookingId, ForeignPaymentId, IdentityId, ProductId, UserId,
+};
 use sqlx::SqliteConnection;
 
 use crate::Error;
-use crate::entities::{CashTransaction, TossPaymentsTransaction};
+use crate::entities::{AdHocPayment, CashTransaction, TossPaymentsTransaction};
+use crate::queries::identity::get_identity;
 
 pub async fn create_cash_transaction(
     connection: &mut SqliteConnection,
@@ -302,6 +305,206 @@ pub async fn refund_toss_payments(
         WHERE id=?3
         "#,
         refund_amount,
+        now,
+        id,
+    )
+    .execute(&mut *connection)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
+}
+
+pub async fn reassign_toss_payments_transaction_user(
+    connection: &mut SqliteConnection,
+    id: &ForeignPaymentId,
+    user_id: &UserId,
+) -> Result<bool, Error> {
+    let result = sqlx::query!(
+        r#"
+        UPDATE toss_payments_transaction
+        SET user_id=?1
+        WHERE id=?2 AND confirmed_at IS NULL
+        "#,
+        user_id,
+        id,
+    )
+    .execute(&mut *connection)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
+}
+
+pub async fn create_adhoc_payment(
+    connection: &mut SqliteConnection,
+    now: &DateTime<Utc>,
+    issuer_id: &UserId,
+    recipient_id: &IdentityId,
+    price: i64,
+    note: &str,
+) -> Result<AdHocPaymentId, Error> {
+    let id = AdHocPaymentId::generate();
+    let product_id = ProductId::from(id);
+
+    sqlx::query!(
+        r#"
+        INSERT INTO product(id, discriminator)
+        VALUES(?1, 'adhoc_payment')
+        "#,
+        product_id,
+    )
+    .execute(&mut *connection)
+    .await?;
+
+    sqlx::query!(
+        r#"
+        INSERT INTO adhoc_payment(id, issuer_id, recipient_id, price, note, created_at)
+        VALUES(?1, ?2, ?3, ?4, ?5, ?6)
+        "#,
+        id,
+        issuer_id,
+        recipient_id,
+        price,
+        note,
+        now,
+    )
+    .execute(&mut *connection)
+    .await?;
+
+    Ok(id)
+}
+
+struct AdHocPaymentRow {
+    id: AdHocPaymentId,
+    issuer_id: UserId,
+    recipient_id: IdentityId,
+    price: i64,
+    note: String,
+    created_at: DateTime<Utc>,
+    paid_at: Option<DateTime<Utc>>,
+    canceled_at: Option<DateTime<Utc>>,
+}
+
+impl AdHocPaymentRow {
+    async fn resolve(
+        self,
+        connection: &mut SqliteConnection,
+        now: &DateTime<Utc>,
+    ) -> Result<AdHocPayment, Error> {
+        let recipient = get_identity(&mut *connection, now, &self.recipient_id)
+            .await?
+            .ok_or(Error::UserNotFound)?;
+
+        Ok(AdHocPayment {
+            id: self.id,
+            issuer_id: self.issuer_id,
+            recipient,
+            price: self.price,
+            note: self.note,
+            created_at: self.created_at,
+            paid_at: self.paid_at,
+            canceled_at: self.canceled_at,
+        })
+    }
+}
+
+pub async fn get_adhoc_payment(
+    connection: &mut SqliteConnection,
+    now: &DateTime<Utc>,
+    id: &AdHocPaymentId,
+) -> Result<Option<AdHocPayment>, Error> {
+    let row = sqlx::query_as!(
+        AdHocPaymentRow,
+        r#"
+        SELECT
+            id AS "id: _",
+            issuer_id AS "issuer_id: _",
+            recipient_id AS "recipient_id: _",
+            price,
+            note,
+            created_at AS "created_at: _",
+            paid_at AS "paid_at: _",
+            canceled_at AS "canceled_at: _"
+        FROM adhoc_payment
+        WHERE id=?1
+        "#,
+        id,
+    )
+    .fetch_optional(&mut *connection)
+    .await?;
+
+    match row {
+        Some(row) => Ok(Some(row.resolve(connection, now).await?)),
+        None => Ok(None),
+    }
+}
+
+pub async fn get_adhoc_payments(
+    connection: &mut SqliteConnection,
+    now: &DateTime<Utc>,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<AdHocPayment>, Error> {
+    let rows = sqlx::query_as!(
+        AdHocPaymentRow,
+        r#"
+        SELECT
+            id AS "id: _",
+            issuer_id AS "issuer_id: _",
+            recipient_id AS "recipient_id: _",
+            price,
+            note,
+            created_at AS "created_at: _",
+            paid_at AS "paid_at: _",
+            canceled_at AS "canceled_at: _"
+        FROM adhoc_payment
+        ORDER BY created_at DESC
+        LIMIT ?1 OFFSET ?2
+        "#,
+        limit,
+        offset,
+    )
+    .fetch_all(&mut *connection)
+    .await?;
+
+    let mut payments = Vec::with_capacity(rows.len());
+    for row in rows {
+        payments.push(row.resolve(&mut *connection, now).await?);
+    }
+
+    Ok(payments)
+}
+
+pub async fn mark_adhoc_payment_paid(
+    connection: &mut SqliteConnection,
+    now: &DateTime<Utc>,
+    id: &AdHocPaymentId,
+) -> Result<bool, Error> {
+    let result = sqlx::query!(
+        r#"
+        UPDATE adhoc_payment
+        SET paid_at=?1
+        WHERE id=?2 AND paid_at IS NULL AND canceled_at IS NULL
+        "#,
+        now,
+        id,
+    )
+    .execute(&mut *connection)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
+}
+
+pub async fn cancel_adhoc_payment(
+    connection: &mut SqliteConnection,
+    now: &DateTime<Utc>,
+    id: &AdHocPaymentId,
+) -> Result<bool, Error> {
+    let result = sqlx::query!(
+        r#"
+        UPDATE adhoc_payment
+        SET canceled_at=?1
+        WHERE id=?2 AND paid_at IS NULL AND canceled_at IS NULL
+        "#,
         now,
         id,
     )

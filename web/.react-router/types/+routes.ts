@@ -35,6 +35,11 @@ type Pages = {
   "/reservation/payment/toss/fail": {
     params: {};
   };
+  "/payment/:adHocPaymentId": {
+    params: {
+      "adHocPaymentId": string;
+    };
+  };
   "/reservation/:bookingId": {
     params: {
       "bookingId": string;
@@ -105,6 +110,9 @@ type Pages = {
   "/admin/adhoc-parkings": {
     params: {};
   };
+  "/admin/adhoc-payments": {
+    params: {};
+  };
   "/units/default": {
     params: {};
   };
@@ -113,11 +121,11 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/guide" | "/inquiries" | "/recording-services" | "/reservation" | "/reservation/login" | "/reservation/payment/toss/success" | "/reservation/payment/toss/fail" | "/reservation/:bookingId" | "/reservation/:bookingId/amend" | "/login" | "/temp-login" | "/register" | "/my" | "/terms-of-service" | "/booking/:bookingId/recording" | "/join/:groupId" | "/error" | "/admin" | "/admin/past-bookings" | "/admin/booking/:bookingId" | "/admin/create-booking" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/adhoc-reservations" | "/admin/adhoc-parkings" | "/units/default";
+    page: "/" | "/guide" | "/inquiries" | "/recording-services" | "/reservation" | "/reservation/login" | "/reservation/payment/toss/success" | "/reservation/payment/toss/fail" | "/payment/:adHocPaymentId" | "/reservation/:bookingId" | "/reservation/:bookingId/amend" | "/login" | "/temp-login" | "/register" | "/my" | "/terms-of-service" | "/booking/:bookingId/recording" | "/join/:groupId" | "/error" | "/admin" | "/admin/past-bookings" | "/admin/booking/:bookingId" | "/admin/create-booking" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/adhoc-reservations" | "/admin/adhoc-parkings" | "/admin/adhoc-payments" | "/units/default";
   };
   "./components/Scaffold.tsx": {
     id: "components/Scaffold";
-    page: "/" | "/guide" | "/inquiries" | "/recording-services" | "/reservation" | "/reservation/login" | "/reservation/payment/toss/success" | "/reservation/payment/toss/fail" | "/reservation/:bookingId" | "/reservation/:bookingId/amend" | "/login" | "/temp-login" | "/register" | "/my" | "/terms-of-service";
+    page: "/" | "/guide" | "/inquiries" | "/recording-services" | "/reservation" | "/reservation/login" | "/reservation/payment/toss/success" | "/reservation/payment/toss/fail" | "/payment/:adHocPaymentId" | "/reservation/:bookingId" | "/reservation/:bookingId/amend" | "/login" | "/temp-login" | "/register" | "/my" | "/terms-of-service";
   };
   "./pages/Index.tsx": {
     id: "pages/Index";
@@ -150,6 +158,10 @@ type RouteFiles = {
   "./pages/Reservation/Payment/TossPaymentFail.tsx": {
     id: "pages/Reservation/Payment/TossPaymentFail";
     page: "/reservation/payment/toss/fail";
+  };
+  "./pages/Payment/AdHocPayment.tsx": {
+    id: "pages/Payment/AdHocPayment";
+    page: "/payment/:adHocPaymentId";
   };
   "./pages/Reservation/Show.tsx": {
     id: "pages/Reservation/Show";
@@ -193,7 +205,7 @@ type RouteFiles = {
   };
   "./components/AdminScaffold.tsx": {
     id: "components/AdminScaffold";
-    page: "/admin" | "/admin/past-bookings" | "/admin/booking/:bookingId" | "/admin/create-booking" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/adhoc-reservations" | "/admin/adhoc-parkings";
+    page: "/admin" | "/admin/past-bookings" | "/admin/booking/:bookingId" | "/admin/create-booking" | "/admin/pending-bookings" | "/admin/pending-refunds" | "/admin/groups" | "/admin/users" | "/admin/adhoc-reservations" | "/admin/adhoc-parkings" | "/admin/adhoc-payments";
   };
   "./pages/Admin/ConfirmedBookings.tsx": {
     id: "pages/Admin/ConfirmedBookings";
@@ -235,6 +247,10 @@ type RouteFiles = {
     id: "pages/Admin/AdhocParkings";
     page: "/admin/adhoc-parkings";
   };
+  "./pages/Admin/AdHocPayments.tsx": {
+    id: "pages/Admin/AdHocPayments";
+    page: "/admin/adhoc-payments";
+  };
   "./components/OsdScaffold.tsx": {
     id: "components/OsdScaffold";
     page: "/units/default";
@@ -256,6 +272,7 @@ type RouteModules = {
   "pages/Reservation/Login": typeof import("./app/./pages/Reservation/Login.tsx");
   "pages/Reservation/Payment/TossPaymentSuccess": typeof import("./app/./pages/Reservation/Payment/TossPaymentSuccess.tsx");
   "pages/Reservation/Payment/TossPaymentFail": typeof import("./app/./pages/Reservation/Payment/TossPaymentFail.tsx");
+  "pages/Payment/AdHocPayment": typeof import("./app/./pages/Payment/AdHocPayment.tsx");
   "pages/Reservation/Show": typeof import("./app/./pages/Reservation/Show.tsx");
   "pages/Reservation/Amend": typeof import("./app/./pages/Reservation/Amend.tsx");
   "pages/Login": typeof import("./app/./pages/Login.tsx");
@@ -277,6 +294,7 @@ type RouteModules = {
   "pages/Admin/Users": typeof import("./app/./pages/Admin/Users.tsx");
   "pages/Admin/AdhocReservations": typeof import("./app/./pages/Admin/AdhocReservations.tsx");
   "pages/Admin/AdhocParkings": typeof import("./app/./pages/Admin/AdhocParkings.tsx");
+  "pages/Admin/AdHocPayments": typeof import("./app/./pages/Admin/AdHocPayments.tsx");
   "components/OsdScaffold": typeof import("./app/./components/OsdScaffold.tsx");
   "pages/UnitInformation/Default/Index": typeof import("./app/./pages/UnitInformation/Default/Index.tsx");
 };

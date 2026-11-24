@@ -22,8 +22,9 @@ interface LoaderData {
   orderId: string;
   paymentKey: string;
   amount: string;
-  timeFrom: Date;
-  timeTo: Date;
+  timeFrom: Date | null;
+  timeTo: Date | null;
+  note: string | null;
 }
 
 export async function clientLoader({
@@ -43,9 +44,10 @@ export async function clientLoader({
   }
 
   const state = await BookingService.getTossPaymentState(orderId);
-  const timeFrom = new Date(state.data.timeFrom);
-  const timeTo = new Date(state.data.timeTo);
+  const timeFrom = state.data.timeFrom ? new Date(state.data.timeFrom) : null;
+  const timeTo = state.data.timeTo ? new Date(state.data.timeTo) : null;
   const productType = state.data.type;
+  const note = state.data.note;
 
   return {
     productType,
@@ -55,15 +57,18 @@ export async function clientLoader({
     amount,
     timeFrom,
     timeTo,
+    note,
   };
 }
 
 function TossPaymentSuccess({ loaderData }: Route.ComponentProps) {
-  const { productType, orderId, paymentKey, amount, timeFrom, timeTo } =
+  const { productType, orderId, paymentKey, amount, timeFrom, timeTo, note } =
     loaderData;
+  const isAdHocPayment = productType === "ADHOC_PAYMENT";
 
   const navigate = useNavigate();
 
+  const [isConfirmed, setConfirmed] = useState(false);
   const [bookingId, setBookingId] = useState<BookingId | null>(null);
   const [isRequestInProgress, setRequestInProgress] = useState(false);
 
@@ -77,7 +82,7 @@ function TossPaymentSuccess({ loaderData }: Route.ComponentProps) {
     try {
       await BookingService.cancelTossPayment(orderId);
       alert("취소되었습니다.");
-      navigate("/reservation/");
+      navigate(isAdHocPayment ? "/" : "/reservation/");
     } catch (error) {
       defaultErrorHandler(error);
     } finally {
@@ -94,8 +99,11 @@ function TossPaymentSuccess({ loaderData }: Route.ComponentProps) {
         orderId,
         amount: parseInt(amount),
       });
-      TemporaryReservationIdStorage.clear();
+      if (!isAdHocPayment) {
+        TemporaryReservationIdStorage.clear();
+      }
       setBookingId(result.data.bookingId);
+      setConfirmed(true);
       ReactGA.event("payment_success");
     } catch (error) {
       if (isAxiosError(error)) {
@@ -117,16 +125,24 @@ function TossPaymentSuccess({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="contents">
-      {bookingId ? (
+      {isConfirmed ? (
         <>
-          {productType === "BOOKING_AMENDMENT" ? (
+          {isAdHocPayment ? (
+            <p>결제가 완료되었습니다. 이용해 주셔서 감사합니다.</p>
+          ) : productType === "BOOKING_AMENDMENT" ? (
             <p>예약이 연장되었습니다. 이용해 주셔서 감사합니다.</p>
           ) : (
             <p>예약이 확정되었습니다. 이용해 주셔서 감사합니다.</p>
           )}
-          <Link to={`/reservation/${bookingId}`} className="cta">
-            예약 확인
-          </Link>
+          {bookingId ? (
+            <Link to={`/reservation/${bookingId}`} className="cta">
+              예약 확인
+            </Link>
+          ) : (
+            <Link to="/" className="cta">
+              처음으로
+            </Link>
+          )}
         </>
       ) : (
         <>
@@ -135,9 +151,13 @@ function TossPaymentSuccess({ loaderData }: Route.ComponentProps) {
             <br />
             확인 후 아래 확정 버튼을 눌러주세요.
           </p>
-          <p className="date">
-            이용 시간: {timeFrom.toLocaleString()} - {timeTo.toLocaleString()}
-          </p>
+          {timeFrom && timeTo ? (
+            <p className="date">
+              이용 시간: {timeFrom.toLocaleString()} -{" "}
+              {timeTo.toLocaleString()}
+            </p>
+          ) : null}
+          {note ? <p>{note}</p> : null}
           <p className="price">
             {productType === "BOOKING_AMENDMENT"
               ? "추가 결제 금액"
@@ -150,7 +170,11 @@ function TossPaymentSuccess({ loaderData }: Route.ComponentProps) {
               onClick={confirmPayment}
               disabled={isRequestInProgress}
             >
-              {productType === "BOOKING_AMENDMENT" ? "예약 변경" : "예약 확정"}
+              {isAdHocPayment
+                ? "결제 확정"
+                : productType === "BOOKING_AMENDMENT"
+                  ? "예약 변경"
+                  : "예약 확정"}
             </button>{" "}
             <button
               className="cta"

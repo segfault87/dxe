@@ -1,7 +1,7 @@
 use actix_web::web;
 use chrono::TimeDelta;
 use dxe_data::entities::{
-    AdhocReservation, BookingAmendment, Identity, Product, TossPaymentsTransaction,
+    AdHocPayment, AdhocReservation, BookingAmendment, Identity, Product, TossPaymentsTransaction,
 };
 use dxe_data::queries::booking::{
     calculate_booking_attachments_price, cancel_booking_amendment, confirm_booking_amendment,
@@ -10,22 +10,25 @@ use dxe_data::queries::booking::{
 };
 use dxe_data::queries::identity::{get_group_members, get_identity, is_member_of};
 use dxe_data::queries::payment::{
-    confirm_toss_payments_transaction, create_toss_payments_transaction,
-    get_toss_payments_transaction_by_id, get_toss_payments_transaction_by_temporary_reservation_id,
+    confirm_toss_payments_transaction, create_toss_payments_transaction, get_adhoc_payment,
+    get_toss_payments_transaction_by_id, get_toss_payments_transaction_by_product_id,
+    get_toss_payments_transaction_by_temporary_reservation_id, mark_adhoc_payment_paid,
+    reassign_toss_payments_transaction_user,
 };
 use dxe_data::queries::unit::is_unit_enabled;
 use dxe_extern::toss_payments::{Error as TossPaymentsError, TossPaymentsClient};
-use dxe_types::{BookingId, ForeignPaymentId, ProductId};
+use dxe_types::{AdHocPaymentId, BookingId, ForeignPaymentId, ProductId, UserId};
 use sqlx::SqlitePool;
 
 use crate::config::{BookingConfig, TimeZoneConfig};
 use crate::middleware::datetime_injector::Now;
-use crate::models::Error;
-use crate::models::entities::ProductType;
+use crate::models::entities::{AdHocPayment as AdHocPaymentView, ProductType};
 use crate::models::handlers::booking::{
-    ConfirmTossPaymentRequest, ConfirmTossPaymentResponse, GetTossPaymentStateResponse,
-    InitiateTossPaymentRequest, InitiateTossPaymentResponse,
+    ConfirmTossPaymentRequest, ConfirmTossPaymentResponse, GetAdHocPaymentResponse,
+    GetTossPaymentStateResponse, InitiateAdHocTossPaymentResponse, InitiateTossPaymentRequest,
+    InitiateTossPaymentResponse,
 };
+use crate::models::{Error, IntoView};
 use crate::services::calendar::CalendarService;
 use crate::services::messaging::MessagingService;
 use crate::services::notification::{NotificationSender, Priority};
@@ -432,14 +435,14 @@ pub async fn confirm_payment(
         return Err(Error::BookingAlreadyConfirmed);
     }
 
-    let booking_id = if let Some(temporary_reservation_id) = toss_tx.temporary_reservation_id {
+    let response = if let Some(temporary_reservation_id) = toss_tx.temporary_reservation_id {
         let temporary_reservation = get_adhoc_reservation(&mut tx, &temporary_reservation_id)
             .await?
             .ok_or(Error::PaymentFailed(String::from(
                 "임시 예약을 찾을 수 없습니다.",
             )))?;
 
-        confirm_booking_payment(
+        let booking_id = confirm_booking_payment(
             &now,
             &body,
             &session,
@@ -452,28 +455,58 @@ pub async fn confirm_payment(
             notification_sender.as_ref(),
             messaging_service.as_ref(),
         )
-        .await?
-    } else if let Some(product_id) = toss_tx.product_id {
-        let Some(Product::Amendment(booking_amendment)) = get_product(&mut tx, &product_id).await?
-        else {
-            return Err(Error::PaymentFailed(String::from(
-                "예약 변경 정보를 찾을 수 없습니다.",
-            )));
-        };
+        .await?;
 
-        confirm_amend_payment(
-            &now,
-            &body,
-            toss_tx,
-            booking_amendment,
-            &mut tx,
-            toss_payments_client.as_ref(),
-            calendar_service.as_ref(),
-            timezone_config.as_ref(),
-            notification_sender.as_ref(),
-            messaging_service.as_ref(),
-        )
-        .await?
+        ConfirmTossPaymentResponse {
+            booking_id: Some(booking_id),
+            adhoc_payment_id: None,
+        }
+    } else if let Some(product_id) = toss_tx.product_id {
+        match get_product(&mut tx, &now, &product_id).await? {
+            Some(Product::Amendment(booking_amendment)) => {
+                let booking_id = confirm_amend_payment(
+                    &now,
+                    &body,
+                    toss_tx,
+                    booking_amendment,
+                    &mut tx,
+                    toss_payments_client.as_ref(),
+                    calendar_service.as_ref(),
+                    timezone_config.as_ref(),
+                    notification_sender.as_ref(),
+                    messaging_service.as_ref(),
+                )
+                .await?;
+
+                ConfirmTossPaymentResponse {
+                    booking_id: Some(booking_id),
+                    adhoc_payment_id: None,
+                }
+            }
+            Some(Product::AdHocPayment(adhoc_payment)) => {
+                let adhoc_payment_id = confirm_adhoc_payment(
+                    &now,
+                    &body,
+                    &session,
+                    toss_tx,
+                    adhoc_payment,
+                    &mut tx,
+                    toss_payments_client.as_ref(),
+                    notification_sender.as_ref(),
+                )
+                .await?;
+
+                ConfirmTossPaymentResponse {
+                    booking_id: None,
+                    adhoc_payment_id: Some(adhoc_payment_id),
+                }
+            }
+            _ => {
+                return Err(Error::PaymentFailed(String::from(
+                    "주문 정보를 찾을 수 없습니다.",
+                )));
+            }
+        }
     } else {
         return Err(Error::PaymentFailed(String::from(
             "잘못된 주문 정보입니다.",
@@ -482,10 +515,11 @@ pub async fn confirm_payment(
 
     tx.commit().await?;
 
-    Ok(web::Json(ConfirmTossPaymentResponse { booking_id }))
+    Ok(web::Json(response))
 }
 
 pub async fn get(
+    now: Now,
     session: UserSession,
     foreign_payment_id: web::Path<ForeignPaymentId>,
     timezone_config: web::Data<TimeZoneConfig>,
@@ -508,19 +542,32 @@ pub async fn get(
 
         Ok(web::Json(GetTossPaymentStateResponse {
             r#type: ProductType::Booking,
-            time_from: timezone_config.convert(adhoc_reservation.time_from),
-            time_to: timezone_config.convert(adhoc_reservation.time_to),
+            time_from: Some(timezone_config.convert(adhoc_reservation.time_from)),
+            time_to: Some(timezone_config.convert(adhoc_reservation.time_to)),
+            note: None,
         }))
     } else if let Some(product_id) = toss_tx.product_id {
-        let Some(Product::Amendment(amendment)) = get_product(&mut tx, &product_id).await? else {
-            return Err(Error::BookingAmendmentNotFound);
-        };
+        if toss_tx.user_id != session.user_id {
+            return Err(Error::ForeignPaymentNotFound);
+        }
 
-        Ok(web::Json(GetTossPaymentStateResponse {
-            r#type: ProductType::BookingAmendment,
-            time_from: timezone_config.convert(amendment.desired_time_from),
-            time_to: timezone_config.convert(amendment.desired_time_to),
-        }))
+        match get_product(&mut tx, &now, &product_id).await? {
+            Some(Product::Amendment(amendment)) => Ok(web::Json(GetTossPaymentStateResponse {
+                r#type: ProductType::BookingAmendment,
+                time_from: Some(timezone_config.convert(amendment.desired_time_from)),
+                time_to: Some(timezone_config.convert(amendment.desired_time_to)),
+                note: None,
+            })),
+            Some(Product::AdHocPayment(adhoc_payment)) => {
+                Ok(web::Json(GetTossPaymentStateResponse {
+                    r#type: ProductType::AdHocPayment,
+                    time_from: None,
+                    time_to: None,
+                    note: Some(adhoc_payment.note),
+                }))
+            }
+            _ => Err(Error::ForeignPaymentNotFound),
+        }
     } else {
         Err(Error::ForeignPaymentNotFound)
     }
@@ -552,16 +599,187 @@ pub async fn delete(
             let _ = expire_adhoc_reservation(&mut tx, &now, &temporary_reservation.id).await?;
         }
     } else if let Some(product_id) = toss_tx.product_id {
-        let Some(Product::Amendment(amendment)) = get_product(&mut tx, &product_id).await? else {
-            return Err(Error::BookingAmendmentNotFound);
-        };
+        if toss_tx.user_id != session.user_id {
+            return Err(Error::Forbidden);
+        }
 
-        if !is_in_effect(&amendment.canceled_at, &now) {
-            let _ = cancel_booking_amendment(&mut tx, &now, &amendment.id).await?;
+        match get_product(&mut tx, &now, &product_id).await? {
+            Some(Product::Amendment(amendment)) => {
+                if !is_in_effect(&amendment.canceled_at, &now) {
+                    let _ = cancel_booking_amendment(&mut tx, &now, &amendment.id).await?;
+                }
+            }
+            Some(Product::AdHocPayment(_)) => {}
+            _ => return Err(Error::BookingAmendmentNotFound),
         }
     }
 
     tx.commit().await?;
 
     Ok(web::Json(serde_json::json!({})))
+}
+
+async fn ensure_adhoc_payment_recipient(
+    connection: &mut sqlx::SqliteConnection,
+    adhoc_payment: &AdHocPayment,
+    user_id: &UserId,
+) -> Result<(), Error> {
+    let is_recipient = match &adhoc_payment.recipient {
+        Identity::User(u) => u.id == *user_id,
+        Identity::Group(g) => is_member_of(connection, &g.id, user_id).await?,
+    };
+
+    if is_recipient {
+        Ok(())
+    } else {
+        Err(Error::AdHocPaymentNotFound)
+    }
+}
+
+fn ensure_adhoc_payment_payable(adhoc_payment: &AdHocPayment, now: &Now) -> Result<(), Error> {
+    if is_in_effect(&adhoc_payment.paid_at, now) || is_in_effect(&adhoc_payment.canceled_at, now) {
+        Err(Error::AdHocPaymentNotPayable)
+    } else {
+        Ok(())
+    }
+}
+
+async fn confirm_adhoc_payment<'tx>(
+    now: &Now,
+    body: &ConfirmTossPaymentRequest,
+    session: &UserSession,
+    toss_tx: TossPaymentsTransaction,
+    adhoc_payment: AdHocPayment,
+    tx: &mut sqlx::SqliteTransaction<'tx>,
+    toss_payments_client: &TossPaymentsClient,
+    notification_sender: &NotificationSender,
+) -> Result<AdHocPaymentId, Error> {
+    ensure_adhoc_payment_recipient(tx, &adhoc_payment, &session.user_id).await?;
+    ensure_adhoc_payment_payable(&adhoc_payment, now)?;
+
+    if body.amount != toss_tx.price || body.amount != adhoc_payment.price {
+        return Err(Error::PaymentFailed(String::from(
+            "거래승인된 액수와 결재금액이 다릅니다.",
+        )));
+    }
+
+    if !mark_adhoc_payment_paid(tx, now, &adhoc_payment.id).await? {
+        return Err(Error::AdHocPaymentNotPayable);
+    }
+
+    let payment = match toss_payments_client
+        .confirm_payment(&body.order_id, body.amount, &body.payment_key)
+        .await
+    {
+        Ok(v) => {
+            log::info!(
+                "Payment {} processed successfully. total amount: {}",
+                v.order_id,
+                v.total_amount,
+            );
+
+            v
+        }
+        Err(e) => match e {
+            TossPaymentsError::Remote { code, message } => {
+                Err(Error::TossPaymentsFailed { message, code })?
+            }
+            TossPaymentsError::RemoteStatus(status) => {
+                Err(Error::PaymentFailed(status.to_string()))?
+            }
+            rest => Err(Error::Internal(Box::new(rest)))?,
+        },
+    };
+
+    let product_id = ProductId::from(adhoc_payment.id);
+    let _ =
+        confirm_toss_payments_transaction(tx, now, &toss_tx.id, &product_id, &payment.payment_key)
+            .await?;
+
+    notification_sender.enqueue(
+        Priority::High,
+        format!(
+            "Ad hoc payment by {}: {} KRW ({})",
+            adhoc_payment.recipient.name(),
+            adhoc_payment.price,
+            adhoc_payment.note,
+        ),
+    );
+
+    Ok(adhoc_payment.id)
+}
+
+pub async fn get_adhoc(
+    now: Now,
+    session: UserSession,
+    adhoc_payment_id: web::Path<AdHocPaymentId>,
+    database: web::Data<SqlitePool>,
+    timezone_config: web::Data<TimeZoneConfig>,
+) -> Result<web::Json<GetAdHocPaymentResponse>, Error> {
+    let mut connection = database.acquire().await?;
+
+    let adhoc_payment = get_adhoc_payment(&mut connection, &now, &adhoc_payment_id)
+        .await?
+        .ok_or(Error::AdHocPaymentNotFound)?;
+
+    ensure_adhoc_payment_recipient(&mut connection, &adhoc_payment, &session.user_id).await?;
+
+    Ok(web::Json(GetAdHocPaymentResponse {
+        payment: AdHocPaymentView::convert(adhoc_payment, &timezone_config, &now)?,
+    }))
+}
+
+pub async fn post_adhoc(
+    now: Now,
+    session: UserSession,
+    adhoc_payment_id: web::Path<AdHocPaymentId>,
+    database: web::Data<SqlitePool>,
+) -> Result<web::Json<InitiateAdHocTossPaymentResponse>, Error> {
+    let mut tx = database.begin().await?;
+
+    let adhoc_payment = get_adhoc_payment(&mut tx, &now, &adhoc_payment_id)
+        .await?
+        .ok_or(Error::AdHocPaymentNotFound)?;
+
+    ensure_adhoc_payment_recipient(&mut tx, &adhoc_payment, &session.user_id).await?;
+    ensure_adhoc_payment_payable(&adhoc_payment, &now)?;
+
+    let product_id = ProductId::from(adhoc_payment.id);
+
+    let order_id = match get_toss_payments_transaction_by_product_id(&mut tx, &product_id).await? {
+        Some(toss_tx) => {
+            if is_in_effect(&toss_tx.confirmed_at, &now) {
+                return Err(Error::AdHocPaymentNotPayable);
+            }
+
+            if toss_tx.user_id != session.user_id {
+                reassign_toss_payments_transaction_user(&mut tx, &toss_tx.id, &session.user_id)
+                    .await?;
+            }
+
+            toss_tx.id
+        }
+        None => {
+            let id = ForeignPaymentId::generate();
+            create_toss_payments_transaction(
+                &mut tx,
+                &now,
+                &id,
+                &session.user_id,
+                None,
+                Some(&product_id),
+                adhoc_payment.price,
+            )
+            .await?;
+
+            id
+        }
+    };
+
+    tx.commit().await?;
+
+    Ok(web::Json(InitiateAdHocTossPaymentResponse {
+        order_id,
+        price: adhoc_payment.price,
+    }))
 }

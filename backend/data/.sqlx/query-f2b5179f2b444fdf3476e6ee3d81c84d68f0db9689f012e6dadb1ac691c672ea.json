@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO adhoc_payment(id, issuer_id, recipient_id, price, note, created_at)\n        VALUES(?1, ?2, ?3, ?4, ?5, ?6)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "f2b5179f2b444fdf3476e6ee3d81c84d68f0db9689f012e6dadb1ac691c672ea"
+}

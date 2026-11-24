@@ -246,3 +246,32 @@ impl Display for BookingAttachmentId {
         write!(f, "{}", self.0)
     }
 }
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Deserialize, Serialize)]
+#[serde(transparent)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::Type), sqlx(transparent))]
+pub struct AdHocPaymentId(Uuid);
+
+impl AdHocPaymentId {
+    pub fn generate() -> Self {
+        Self(Uuid::new_v4())
+    }
+}
+
+impl Display for AdHocPaymentId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl From<AdHocPaymentId> for ProductId {
+    fn from(value: AdHocPaymentId) -> Self {
+        Self(value.0)
+    }
+}
+
+impl From<ProductId> for AdHocPaymentId {
+    fn from(value: ProductId) -> Self {
+        Self(value.0)
+    }
+}

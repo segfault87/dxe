@@ -2,9 +2,9 @@ use chrono::{DateTime, Utc};
 use dxe_data::entities;
 
 use super::{
-    AdhocParking, AdhocReservation, AudioRecording, Booking, BookingAttachment, BookingStatus,
-    CashTransaction, Group, GroupWithUsers, Identity, OccupiedSlot, SelfUser, TelemetryEntry,
-    TelemetryType, TossPaymentsTransaction, User,
+    AdHocPayment, AdHocPaymentStatus, AdhocParking, AdhocReservation, AudioRecording, Booking,
+    BookingAttachment, BookingStatus, CashTransaction, Group, GroupWithUsers, Identity,
+    OccupiedSlot, SelfUser, TelemetryEntry, TelemetryType, TossPaymentsTransaction, User,
 };
 use crate::config::{BookingConfig, TimeZoneConfig};
 use crate::models::Error;
@@ -352,6 +352,36 @@ impl IntoView for TelemetryEntry {
                 dxe_types::TelemetryType::SoundMeter => TelemetryType::SoundMeter,
                 dxe_types::TelemetryType::AqRehearsalRoom => TelemetryType::AqRehearsalRoom,
             },
+        })
+    }
+}
+
+impl IntoView for AdHocPayment {
+    type Entity = entities::AdHocPayment;
+    type Error = Error;
+
+    fn convert(
+        entity: Self::Entity,
+        timezone: &TimeZoneConfig,
+        now: &DateTime<Utc>,
+    ) -> Result<Self, Self::Error> {
+        let status = if is_in_effect(&entity.paid_at, now) {
+            AdHocPaymentStatus::Paid
+        } else if is_in_effect(&entity.canceled_at, now) {
+            AdHocPaymentStatus::Canceled
+        } else {
+            AdHocPaymentStatus::Pending
+        };
+
+        Ok(Self {
+            id: entity.id,
+            recipient: Identity::convert(entity.recipient, timezone, now)?,
+            price: entity.price,
+            note: entity.note,
+            status,
+            created_at: timezone.convert(entity.created_at),
+            paid_at: entity.paid_at.map(|v| timezone.convert(v)),
+            canceled_at: entity.canceled_at.map(|v| timezone.convert(v)),
         })
     }
 }

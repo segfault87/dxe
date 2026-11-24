@@ -2,8 +2,8 @@ mod converters;
 
 use chrono::{DateTime, FixedOffset};
 use dxe_types::{
-    AdhocParkingId, AdhocReservationId, BookingAttachmentId, BookingId, GroupId, SpaceId,
-    TelemetryType, UnitId, UserId,
+    AdHocPaymentId, AdhocParkingId, AdhocReservationId, BookingAttachmentId, BookingId, GroupId,
+    SpaceId, TelemetryType, UnitId, UserId,
 };
 use serde::Serialize;
 
@@ -77,6 +77,37 @@ pub enum BookingStatus {
 pub enum ProductType {
     Booking,
     BookingAmendment,
+    #[serde(rename = "ADHOC_PAYMENT")]
+    AdHocPayment,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum AdHocPaymentStatus {
+    Pending,
+    Paid,
+    Canceled,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdHocPayment {
+    pub id: AdHocPaymentId,
+    pub recipient: Identity,
+    pub price: i64,
+    pub note: String,
+    pub status: AdHocPaymentStatus,
+    pub created_at: DateTime<FixedOffset>,
+    pub paid_at: Option<DateTime<FixedOffset>>,
+    pub canceled_at: Option<DateTime<FixedOffset>>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdHocPaymentWithUrl {
+    #[serde(flatten)]
+    pub payment: AdHocPayment,
+    pub url: url::Url,
 }
 
 #[derive(Debug, Serialize)]

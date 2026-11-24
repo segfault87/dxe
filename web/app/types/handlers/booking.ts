@@ -1,4 +1,5 @@
 import type {
+  AdHocPaymentId,
   AdhocReservationId,
   BookingAttachmentId,
   BookingId,
@@ -14,7 +15,11 @@ import type {
   BookingAttachment,
   OccupiedSlot,
 } from "../models/booking";
-import type { CashTransaction, Transaction } from "../models/payment";
+import type {
+  AdHocPayment,
+  CashTransaction,
+  Transaction,
+} from "../models/payment";
 
 export interface CalendarResponse {
   start: DateTime;
@@ -108,11 +113,22 @@ export interface TossPaymentConfirmRequest {
 }
 
 export interface TossPaymentConfirmResponse {
-  bookingId: BookingId;
+  bookingId: BookingId | null;
+  adHocPaymentId: AdHocPaymentId | null;
 }
 
 export interface GetTossPaymentStateResponse {
   type: ProductType;
-  timeFrom: DateTime;
-  timeTo: DateTime;
+  timeFrom: DateTime | null;
+  timeTo: DateTime | null;
+  note: string | null;
+}
+
+export interface GetAdHocPaymentResponse {
+  payment: AdHocPayment;
+}
+
+export interface AdHocTossPaymentInitiateResponse {
+  orderId: ForeignPaymentId;
+  price: number;
 }
